@@ -73,7 +73,7 @@ public class CalculatorTool : ToolBase
 
             return Task.FromResult(ToolResult.Ok(sum));
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             return Task.FromResult(ToolResult.Fail($"Error: {ex.Message}"));
         }

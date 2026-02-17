@@ -70,10 +70,11 @@ public class MemoryDbContext : DbContext
 /// <summary>
 /// SQLite-based persistent memory implementation
 /// </summary>
-public class SqliteMemory : IPersistentMemory
+public class SqliteMemory : IPersistentMemory, IDisposable
 {
     private readonly MemoryDbContext _dbContext;
     private readonly MemoryBase _cache = new();
+    private bool _disposed = false;
 
     public SqliteMemory(string databasePath)
     {
@@ -179,6 +180,20 @@ public class SqliteMemory : IPersistentMemory
 
     public void Dispose()
     {
-        _dbContext?.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed)
+            return;
+
+        if (disposing)
+        {
+            _dbContext?.Dispose();
+        }
+
+        _disposed = true;
     }
 }

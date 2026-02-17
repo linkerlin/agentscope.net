@@ -6,4 +6,7 @@
     <Project Path="src/AgentScope.Core/AgentScope.Core.csproj" />
     <Project Path="src/AgentScope.TUI/AgentScope.TUI.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AgentScope.Core.Tests/AgentScope.Core.Tests.csproj" />
+  </Folder>
 </Solution>
