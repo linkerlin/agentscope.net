@@ -126,7 +126,7 @@ public class ResponseFormat
     
     public static ResponseFormat JsonObject() => new() { Type = "json_object" };
     
-    public static ResponseFormat JsonSchema(JsonSchema schema) => 
+    public static ResponseFormat WithJsonSchema(JsonSchema schema) => 
         new() { Type = "json_schema", JsonSchema = schema };
 }
 
