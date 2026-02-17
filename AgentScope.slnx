@@ -5,9 +5,6 @@
   <Folder Name="/src/">
     <Project Path="src/AgentScope.Core/AgentScope.Core.csproj" />
     <Project Path="src/AgentScope.TUI/AgentScope.TUI.csproj" />
-    <Project Path="src/AgentScope.Uno/AgentScope.Uno.csproj">
-      <Platform Project="x64" />
-    </Project>
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AgentScope.Core.Tests/AgentScope.Core.Tests.csproj" />

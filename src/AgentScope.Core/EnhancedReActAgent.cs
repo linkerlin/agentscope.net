@@ -102,7 +102,7 @@ public class EnhancedReActAgent : AgentBase
             
             if (reasoning.IsError)
             {
-                return CreateErrorResponse(reasoning.Error!);
+                return CreateErrorResponse(reasoning.ErrorMessage!);
             }
 
             thoughtHistory.Add($"Thought {iteration}: {reasoning.Thought}");
@@ -123,7 +123,7 @@ public class EnhancedReActAgent : AgentBase
             }
             else if (action.IsError)
             {
-                return CreateErrorResponse(action.Error!);
+                return CreateErrorResponse(action.ErrorMessage!);
             }
         }
 
@@ -238,7 +238,9 @@ public class EnhancedReActAgent : AgentBase
             {
                 // 执行工具
                 var tool = _tools[actionIntent.Action];
-                var toolResult = await tool.ExecuteAsync(actionIntent.Parameters ?? new Dictionary<string, object>());
+                var parameters = actionIntent.Parameters as Dictionary<string, object> 
+                    ?? new Dictionary<string, object>();
+                var toolResult = await tool.ExecuteAsync(parameters);
                 
                 result = ActionResult.ToolCall(
                     actionIntent.Action, 
@@ -379,13 +381,13 @@ internal class ReasoningResult
 {
     public bool IsError { get; set; }
     public string? Thought { get; set; }
-    public string? Error { get; set; }
+    public string? ErrorMessage { get; set; }
 
     public static ReasoningResult Success(string thought) => 
         new() { Thought = thought };
 
     public static ReasoningResult Error(string error) => 
-        new() { IsError = true, Error = error };
+        new() { IsError = true, ErrorMessage = error };
 }
 
 internal class ActionResult
@@ -397,7 +399,7 @@ internal class ActionResult
     public string? ToolName { get; set; }
     public bool ToolSuccess { get; set; }
     public string? ToolResult { get; set; }
-    public string? Error { get; set; }
+    public string? ErrorMessage { get; set; }
 
     public static ActionResult Finish(string answer) => 
         new() { IsFinish = true, FinalAnswer = answer };
@@ -406,7 +408,7 @@ internal class ActionResult
         new() { IsToolCall = true, ToolName = toolName, ToolSuccess = success, ToolResult = result };
 
     public static ActionResult Error(string error) => 
-        new() { IsError = true, Error = error };
+        new() { IsError = true, ErrorMessage = error };
 }
 
 internal class ActionIntent
