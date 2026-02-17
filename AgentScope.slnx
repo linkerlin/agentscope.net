@@ -4,6 +4,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AgentScope.Core/AgentScope.Core.csproj" />
+    <Project Path="src/AgentScope.Gui/AgentScope.Gui.csproj" />
     <Project Path="src/AgentScope.TUI/AgentScope.TUI.csproj" />
   </Folder>
   <Folder Name="/tests/">
