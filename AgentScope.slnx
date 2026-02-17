@@ -8,5 +8,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AgentScope.Core.Tests/AgentScope.Core.Tests.csproj" />
+    <Project Path="tests/AgentScope.Integration.Tests/AgentScope.Integration.Tests.csproj" />
   </Folder>
 </Solution>
