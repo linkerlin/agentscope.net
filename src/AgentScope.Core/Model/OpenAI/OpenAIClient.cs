@@ -188,6 +188,14 @@ public class OpenAIClient
     private static string BuildUrl(string? baseUrl, string endpoint)
     {
         var baseUri = string.IsNullOrEmpty(baseUrl) ? DefaultBaseUrl : baseUrl.TrimEnd('/');
+        
+        // If baseUrl already ends with /v1, and endpoint starts with /v1, 
+        // remove the duplicate /v1 to handle OpenAI-compatible APIs like DashScope
+        if (endpoint.StartsWith("/v1/") && baseUri.EndsWith("/v1"))
+        {
+            endpoint = endpoint.Substring(3); // Remove "/v1" prefix, keep the rest
+        }
+        
         return baseUri + endpoint;
     }
 

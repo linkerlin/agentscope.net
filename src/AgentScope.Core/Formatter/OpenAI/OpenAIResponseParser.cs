@@ -98,16 +98,58 @@ public static class OpenAIResponseParser
             return null;
         }
 
+        var content = choice.Message.Content;
+        
+        if (content == null)
+        {
+            return null;
+        }
+
         // 如果content是字符串
         // If content is string
-        if (choice.Message.Content is string text)
+        if (content is string text)
         {
             return text;
         }
 
+        // 如果content是JsonElement (从System.Text.Json反序列化)
+        // If content is JsonElement (deserialized from System.Text.Json)
+        if (content is System.Text.Json.JsonElement jsonElement)
+        {
+            if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                return jsonElement.GetString();
+            }
+            
+            // 如果是数组，提取所有text部分
+            // If array, extract all text parts
+            if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                var textBuilder = new StringBuilder();
+                foreach (var element in jsonElement.EnumerateArray())
+                {
+                    if (element.TryGetProperty("type", out var typeProp) &&
+                        typeProp.GetString() == "text" &&
+                        element.TryGetProperty("text", out var textProp))
+                    {
+                        var partText = textProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(partText))
+                        {
+                            if (textBuilder.Length > 0)
+                            {
+                                textBuilder.AppendLine();
+                            }
+                            textBuilder.Append(partText);
+                        }
+                    }
+                }
+                return textBuilder.ToString();
+            }
+        }
+
         // 如果content是数组，提取所有text部分
         // If content is array, extract all text parts
-        if (choice.Message.Content is List<OpenAIMessageContent> contentParts)
+        if (content is List<OpenAIMessageContent> contentParts)
         {
             var textBuilder = new StringBuilder();
             foreach (var part in contentParts)

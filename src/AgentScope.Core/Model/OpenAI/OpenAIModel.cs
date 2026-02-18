@@ -188,6 +188,7 @@ public class OpenAIModel : ModelBase
             Id = parsed.Id,
             Model = parsed.Model,
             Content = parsed.TextContent,
+            Text = parsed.TextContent, // Also set Text for ModelResponse compatibility
             StopReason = parsed.FinishReason,
             Success = true
         };
