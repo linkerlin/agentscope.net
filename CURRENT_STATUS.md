@@ -1,15 +1,15 @@
 # AgentScope.NET 当前状态总结
 
 **更新时间**: 2026-02-18  
-**版本**: v0.5 (55% 完成)
+**版本**: v0.6 (65% 完成)
 
 ## 📊 总体进度
 
-- **完成度**: ~55%
-- **已完成模块**: 14/22
-- **已完成功能**: 38/54
-- **测试覆盖**: 123+ 测试全部通过
-- **代码量**: ~7,500+ 行 C# 代码
+- **完成度**: ~65%
+- **已完成模块**: 16/22
+- **已完成功能**: 46/54
+- **测试覆盖**: 205+ 测试全部通过
+- **代码量**: ~9,000+ 行 C# 代码
 
 ## ✅ 已完成功能
 
@@ -135,25 +135,34 @@
 
 ### 高优先级（核心功能）
 
-#### 1. Plan 管理 ❌
-- ❌ PlanNotebook（核心，~1150行）
-- ❌ Plan 模型
-- ❌ Plan 存储
-- ❌ Plan Hint 系统
+#### 1. Plan 管理 ✅ **已完成**
+- ✅ PlanNotebook（完整执行引擎）
+- ✅ Plan, PlanNode 模型
+- ✅ IPlanStorage / JsonFilePlanStorage / InMemoryPlanStorage
+- ✅ PlanManager
+- ✅ PlanHints 系统
+- ✅ 并行/顺序执行支持
 
-#### 2. RAG 系统 ❌
-- ❌ Knowledge 接口
-- ❌ GenericRAGHook
-- ❌ KnowledgeRetrievalTools
-- ❌ RAG 模式枚举
+#### 2. RAG 系统 ✅ **已完成**
+- ✅ IKnowledge 接口
+- ✅ InMemoryVectorStore（余弦相似度）
+- ✅ IEmbeddingGenerator / SimpleEmbeddingGenerator
+- ✅ GenericRAGHook
+- ✅ KnowledgeSearchTool / KnowledgeGetDocumentTool / KnowledgeAddDocumentTool
+- ✅ RAGMode 枚举（Retrieval, RetrievalQA, RetrievalOnly）
 
-#### 3. Workflow 引擎 ❌ **推荐下一步**
+#### 3. Workflow 引擎 ❌ **推荐下一步 (Step A)**
 - ❌ IWorkflow 接口
 - ❌ WorkflowDefinition
 - ❌ WorkflowEngine
 - ❌ WorkflowNode 类型
 
-#### 4. Service 层 ❌
+#### 4. Multi-Agent 编排 ❌ **(Step D)**
+- ❌ AgentGroup
+- ❌ AgentRouter
+- ❌ AgentCoordinator
+
+#### 5. Service 层 ❌ **(Step E)**
 - ❌ IService 接口
 - ❌ ServiceBase
 - ❌ ServiceManager
@@ -178,6 +187,11 @@
 
 ## 📈 最近完成
 
+### 2026-02-18: Steps C & B - Plan 管理 + RAG 系统
+- **Plan 管理**: PlanNotebook, Plan模型, IPlanStorage, PlanManager
+- **RAG 系统**: IKnowledge, InMemoryVectorStore, GenericRAGHook, KnowledgeTools
+- 82 个单元测试
+
 ### 2026-02-18: Step 1.5 Pipeline 框架
 - 完整的 Pipeline 执行引擎
 - 7 种内置节点类型
@@ -197,11 +211,28 @@
 
 ## 🎯 下一步建议
 
-### 选项 A: Workflow 引擎（推荐）
-实现类似 Airflow/Dagster 的工作流编排系统，支持复杂业务逻辑。
+### 选项 A: Workflow 引擎 ⭐ 推荐下一步
+实现类似 Dagster/Airflow 的工作流编排系统：
+- IWorkflow 接口定义
+- WorkflowDefinition 工作流定义  
+- WorkflowEngine 执行引擎
+- 支持 DAG（有向无环图）编排
+- 节点依赖关系管理
+- 并行/串行混合执行
 
-### 选项 B: RAG 系统
-实现检索增强生成，支持向量数据库集成。
+### 选项 D: Multi-Agent 编排
+多 Agent 协作系统：
+- AgentGroup Agent 组
+- AgentRouter 路由
+- AgentCoordinator 协调器
+- 角色分配机制
+
+### 选项 E: Service 层
+微服务支持：
+- IService 接口
+- ServiceBase 基类
+- ServiceManager 管理器
+- 服务发现与注册
 
 ### 选项 C: Plan 管理
 实现 agentscope 的 PlanNotebook 系统，支持复杂任务规划。
