@@ -304,7 +304,7 @@ public class SessionManagerTests
         var activeSessions = manager.GetActiveSessions();
 
         // Assert
-        Assert.Equal(1, activeSessions.Count);
+        Assert.Single(activeSessions);
         Assert.Equal(session2.Id, activeSessions[0].Id);
     }
 

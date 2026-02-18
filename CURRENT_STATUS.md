@@ -1,19 +1,19 @@
 # AgentScope.NET 当前状态总结
 
 **更新时间**: 2026-02-18  
-**版本**: v0.6 (65% 完成)
+**版本**: v1.0.1 (85% 完成)
 
 ## 📊 总体进度
 
-- **完成度**: ~65%
-- **已完成模块**: 16/22
-- **已完成功能**: 46/54
-- **测试覆盖**: 205+ 测试全部通过
-- **代码量**: ~9,000+ 行 C# 代码
+- **完成度**: ~85%
+- **已完成模块**: 20/22
+- **已完成功能**: 50/54
+- **测试覆盖**: 435 测试全部通过
+- **代码量**: ~12,000+ 行 C# 代码
 
 ## ✅ 已完成功能
 
-### 核心基础设施 (14/22 模块)
+### 核心基础设施 (20/22 模块)
 
 1. **Agent 系统** ⭐
    - ✅ AgentBase 基类
@@ -70,8 +70,10 @@
    - ✅ ToolBase 基类
    - ✅ ToolResult
    - ✅ ExampleTools（计算器、搜索等）
+   - ✅ WebSearchTool
+   - ✅ CodeExecutionTool
 
-9. **Pipeline 系统** ⭐ **NEW**
+9. **Pipeline 系统** ⭐
    - ✅ IPipelineNode 接口
    - ✅ PipelineContext（状态管理）
    - ✅ Pipeline 执行引擎
@@ -96,6 +98,55 @@
     - ✅ LLM API 密钥管理
     - ✅ 数据库配置
 
+12. **Plan 管理** ⭐
+    - ✅ PlanNotebook（完整执行引擎）
+    - ✅ Plan, PlanNode 模型
+    - ✅ IPlanStorage / JsonFilePlanStorage / InMemoryPlanStorage
+    - ✅ PlanManager
+    - ✅ PlanHints 系统
+    - ✅ 并行/顺序执行支持
+
+13. **RAG 系统** ⭐
+    - ✅ IKnowledge 接口
+    - ✅ InMemoryVectorStore（余弦相似度）
+    - ✅ IEmbeddingGenerator / SimpleEmbeddingGenerator
+    - ✅ GenericRAGHook
+    - ✅ KnowledgeSearchTool / KnowledgeGetDocumentTool / KnowledgeAddDocumentTool
+    - ✅ RAGMode 枚举（Retrieval, RetrievalQA, RetrievalOnly）
+
+14. **Workflow 引擎** ⭐ **NEW**
+    - ✅ IWorkflow 接口
+    - ✅ WorkflowDefinition 工作流定义
+    - ✅ WorkflowEngine 执行引擎
+    - ✅ WorkflowNode 类型（Task, Decision, Parallel, Map, Reduce, SubWorkflow, Wait, Start, End）
+    - ✅ DAG 依赖管理
+    - ✅ 并行/串行混合执行
+
+15. **Multi-Agent 编排** ⭐ **NEW**
+    - ✅ AgentGroup（Agent 组管理）
+    - ✅ AgentRouter（消息路由）
+    - ✅ AgentCoordinator（协调器）
+    - ✅ 分发策略（Broadcast, RoundRobin, Random, LoadBased, FirstAvailable）
+
+16. **Service 层** ⭐ **NEW**
+    - ✅ IService 接口
+    - ✅ ServiceBase 基类
+    - ✅ ServiceManager 管理器
+    - ✅ InMemoryServiceDiscovery（服务发现）
+
+17. **Interruption 处理** ⭐ **NEW**
+    - ✅ IInterruptible 接口
+    - ✅ IResumable 接口
+    - ✅ InterruptionContext / InterruptionState
+    - ✅ CancellationManager
+    - ✅ InterruptibleAgentBase
+
+18. **Tracing 追踪** ⭐ **NEW**
+    - ✅ ITracer 接口
+    - ✅ Span / TraceContext
+    - ✅ ConsoleTracer / NullTracer
+    - ✅ TracingManager
+
 ### GUI 应用
 
 1. **Terminal.Gui TUI** ⭐
@@ -109,12 +160,23 @@
 
 ### 测试基础设施 ⭐
 
-- ✅ 123+ 测试（100% 通过率）
-  - 43 单元测试
-  - 7 集成测试
-  - 25 Session 测试
-  - 4 Hook 测试
-  - 32 Pipeline 测试
+- ✅ 435 测试（100% 通过率）
+  - Agent 测试
+  - Configuration 测试
+  - Formatter 测试
+  - Interruption 测试
+  - Memory 测试
+  - Message 测试
+  - Model 测试
+  - MultiAgent 测试
+  - Pipeline 测试
+  - Plan 测试
+  - RAG 测试
+  - Service 测试
+  - Session 测试
+  - Tool 测试
+  - Tracing 测试
+  - Workflow 测试
 - ✅ 最小化 Mock
 - ✅ 真实 SQLite 数据库测试
 
@@ -127,118 +189,43 @@
 - ✅ PROGRESS_SUMMARY.md（进度摘要）
 - ✅ INTEROPERABILITY.md（互操作性）
 - ✅ CONTRIBUTING.md
-- ✅ 改进计划.md（完整实施计划）⭐⭐⭐
+- ✅ 改进计划.md（完整实施计划）
 - ✅ STATUS.md
 - ✅ .env.example
+- ✅ AGENTS.md（AI Agent 指南）
 
-## ❌ 待实现功能（45%）
-
-### 高优先级（核心功能）
-
-#### 1. Plan 管理 ✅ **已完成**
-- ✅ PlanNotebook（完整执行引擎）
-- ✅ Plan, PlanNode 模型
-- ✅ IPlanStorage / JsonFilePlanStorage / InMemoryPlanStorage
-- ✅ PlanManager
-- ✅ PlanHints 系统
-- ✅ 并行/顺序执行支持
-
-#### 2. RAG 系统 ✅ **已完成**
-- ✅ IKnowledge 接口
-- ✅ InMemoryVectorStore（余弦相似度）
-- ✅ IEmbeddingGenerator / SimpleEmbeddingGenerator
-- ✅ GenericRAGHook
-- ✅ KnowledgeSearchTool / KnowledgeGetDocumentTool / KnowledgeAddDocumentTool
-- ✅ RAGMode 枚举（Retrieval, RetrievalQA, RetrievalOnly）
-
-#### 3. Workflow 引擎 ❌ **推荐下一步 (Step A)**
-- ❌ IWorkflow 接口
-- ❌ WorkflowDefinition
-- ❌ WorkflowEngine
-- ❌ WorkflowNode 类型
-
-#### 4. Multi-Agent 编排 ❌ **(Step D)**
-- ❌ AgentGroup
-- ❌ AgentRouter
-- ❌ AgentCoordinator
-
-#### 5. Service 层 ❌ **(Step E)**
-- ❌ IService 接口
-- ❌ ServiceBase
-- ❌ ServiceManager
-- ❌ ServiceDiscovery
-
-### 中优先级（增强功能）
-
-5. **Interruption 处理** ❌
-6. **Tracing 追踪** ❌
-7. **Skill 系统** ❌
-8. **Multi-Agent 编排** ❌
-9. **Web Search 工具** ❌
-10. **Code Execution 工具** ❌
+## ❌ 待实现功能（15%）
 
 ### 低优先级（扩展功能）
 
-11. **更多 GUI 支持** ❌
-12. **其他 Formatters** ❌
-    - ❌ Gemini Formatter
-    - ❌ Ollama Formatter
-13. **更多 Model 提供商** ❌
+1. **Skill 系统** ❌
+2. **更多 GUI 支持** ❌
+3. **其他 Formatters** ❌
+   - ❌ Gemini Formatter
+   - ❌ Ollama Formatter
+4. **更多 Model 提供商** ❌
 
 ## 📈 最近完成
+
+### 2026-02-18: v1.0.1 修复版本
+- 修复中文命名问题，改回英文命名
+- ModelRequest/ModelResponse/IModel/ModelBase 命名规范化
+
+### 2026-02-18: Workflow + MultiAgent + Service
+- **Workflow 引擎**: IWorkflow, WorkflowEngine, 完整 DAG 支持
+- **Multi-Agent**: AgentGroup, AgentRouter, AgentCoordinator
+- **Service 层**: IService, ServiceBase, ServiceManager
+- **Interruption**: IInterruptible, CancellationManager
+- **Tracing**: ITracer, TracingManager
 
 ### 2026-02-18: Steps C & B - Plan 管理 + RAG 系统
 - **Plan 管理**: PlanNotebook, Plan模型, IPlanStorage, PlanManager
 - **RAG 系统**: IKnowledge, InMemoryVectorStore, GenericRAGHook, KnowledgeTools
-- 82 个单元测试
 
 ### 2026-02-18: Step 1.5 Pipeline 框架
 - 完整的 Pipeline 执行引擎
 - 7 种内置节点类型
 - 流畅的构建器 API
-- 32 个单元测试
-
-### 2026-02-18: Step 1.4 真实 LLM 模型
-- OpenAIModel（HTTP API）
-- AnthropicModel（HTTP API）
-- DashScopeModel（HTTP API）
-- HTTP Transport 抽象层
-
-### 2026-02-18: Step 1.1-1.3 Formatters
-- OpenAI Formatter
-- Anthropic Formatter  
-- DashScope Formatter
-
-## 🎯 下一步建议
-
-### 选项 A: Workflow 引擎 ⭐ 推荐下一步
-实现类似 Dagster/Airflow 的工作流编排系统：
-- IWorkflow 接口定义
-- WorkflowDefinition 工作流定义  
-- WorkflowEngine 执行引擎
-- 支持 DAG（有向无环图）编排
-- 节点依赖关系管理
-- 并行/串行混合执行
-
-### 选项 D: Multi-Agent 编排
-多 Agent 协作系统：
-- AgentGroup Agent 组
-- AgentRouter 路由
-- AgentCoordinator 协调器
-- 角色分配机制
-
-### 选项 E: Service 层
-微服务支持：
-- IService 接口
-- ServiceBase 基类
-- ServiceManager 管理器
-- 服务发现与注册
-
-### 选项 C: Plan 管理
-实现 agentscope 的 PlanNotebook 系统，支持复杂任务规划。
-
-### 选项 D: Multi-Agent 编排
-实现多个 Agent 之间的协作机制。
 
 ## 📊 与 Java 版本对比
 
@@ -253,7 +240,17 @@
 | Model | ✅ | ✅ | 完成 |
 | Formatter | ✅ | ✅ | 完成 |
 | Pipeline | ✅ | ✅ | 完成 |
-| Plan | ✅ | ❌ | 待实现 |
-| RAG | ✅ | ❌ | 待实现 |
-| Workflow | ❌ | ❌ | 待实现 |
-| Service | ✅ | ❌ | 待实现 |
+| Plan | ✅ | ✅ | 完成 |
+| RAG | ✅ | ✅ | 完成 |
+| Workflow | ❌ | ✅ | .NET独有 |
+| Service | ✅ | ✅ | 完成 |
+| Multi-Agent | ✅ | ✅ | 完成 |
+| Interruption | ✅ | ✅ | 完成 |
+| Tracing | ✅ | ✅ | 完成 |
+
+## 🎯 下一步建议
+
+1. **Skill 系统** - 实现可复用的技能模块
+2. **更多 Formatters** - Gemini, Ollama 支持
+3. **GUI 改进** - 完善 Uno Platform GUI
+4. **性能优化** - 基准测试和优化

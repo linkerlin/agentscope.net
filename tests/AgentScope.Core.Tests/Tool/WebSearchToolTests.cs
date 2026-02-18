@@ -104,7 +104,7 @@ public class WebSearchToolTests
     }
 
     [Fact]
-    public void MockWebSearchTool_ReturnsMockResults()
+    public async Task MockWebSearchTool_ReturnsMockResults()
     {
         // Arrange
         var mockResults = new List<WebSearchResult>
@@ -115,7 +115,7 @@ public class WebSearchToolTests
         var tool = new MockWebSearchTool(mockResults);
 
         // Act
-        var results = tool.SearchAsync("query").Result;
+        var results = await tool.SearchAsync("query");
 
         // Assert
         Assert.Equal(2, results.Count);
@@ -123,13 +123,13 @@ public class WebSearchToolTests
     }
 
     [Fact]
-    public void MockWebSearchTool_WithoutMockResults_ReturnsDefault()
+    public async Task MockWebSearchTool_WithoutMockResults_ReturnsDefault()
     {
         // Arrange
         var tool = new MockWebSearchTool();
 
         // Act
-        var results = tool.SearchAsync("query").Result;
+        var results = await tool.SearchAsync("query");
 
         // Assert
         Assert.Single(results);

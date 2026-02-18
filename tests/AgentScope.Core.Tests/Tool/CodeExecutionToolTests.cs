@@ -190,6 +190,6 @@ public class SafeCodeExecutionToolTests
 
         // Assert - May succeed or fail depending on Python availability
         // But should not fail due to security check
-        Assert.False(result.StdErr.Contains("Security error"));
+        Assert.DoesNotContain("Security error", result.StdErr);
     }
 }

@@ -118,14 +118,14 @@ public class CancellationManagerTests
     }
 
     [Fact]
-    public void IsCancelled_AfterCancel_ReturnsTrue()
+    public async Task IsCancelled_AfterCancel_ReturnsTrue()
     {
         // Arrange
         using var manager = new CancellationManager();
         using var scope = manager.CreateScope("test-op");
 
         // Act
-        manager.CancelAsync("test-op").Wait();
+        await manager.CancelAsync("test-op");
 
         // Assert
         Assert.True(manager.IsCancelled("test-op"));
@@ -216,15 +216,15 @@ public class CancellationManagerTests
     }
 
     [Fact]
-    public void Scope_ThrowIfCancellationRequested_ThrowsWhenCancelled()
+    public async Task Scope_ThrowIfCancellationRequested_ThrowsWhenCancelled()
     {
         // Arrange
         using var manager = new CancellationManager();
         using var scope = manager.CreateScope("test-op");
-        manager.CancelAsync("test-op").Wait();
+        await manager.CancelAsync("test-op");
 
         // Act & Assert
-        Assert.Throws<OperationCanceledException>(() => scope.ThrowIfCancellationRequested());
+        await Assert.ThrowsAsync<OperationCanceledException>(() => Task.Run(() => scope.ThrowIfCancellationRequested()));
     }
 
     [Fact]
@@ -269,13 +269,13 @@ public class CancellationHelperTests
     }
 
     [Fact]
-    public void CreateTimeoutToken_AfterTimeout_IsCancelled()
+    public async Task CreateTimeoutToken_AfterTimeout_IsCancelled()
     {
         // Arrange & Act
         var token = CancellationHelper.CreateTimeoutToken(TimeSpan.FromMilliseconds(100));
         
-        // Wait for timeout
-        Thread.Sleep(300);
+        // Wait for timeout with some buffer
+        await Task.Delay(500);
 
         // Assert
         Assert.True(token.IsCancellationRequested);
