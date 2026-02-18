@@ -76,6 +76,33 @@ public interface IFormatter<TRequest, TResponse, TParams>
 }
 
 /// <summary>
+/// 工具选择类型
+/// Tool choice type
+/// </summary>
+public enum ToolChoiceType
+{
+    Auto,
+    None,
+    Required,
+    Specific
+}
+
+/// <summary>
+/// 工具选择配置
+/// Tool choice configuration
+/// </summary>
+public class ToolChoice
+{
+    public ToolChoiceType Type { get; set; }
+    public string? ToolName { get; set; }
+
+    public static ToolChoice Auto() => new() { Type = ToolChoiceType.Auto };
+    public static ToolChoice None() => new() { Type = ToolChoiceType.None };
+    public static ToolChoice Required() => new() { Type = ToolChoiceType.Required };
+    public static ToolChoice Specific(string toolName) => new() { Type = ToolChoiceType.Specific, ToolName = toolName };
+}
+
+/// <summary>
 /// 生成选项
 /// Generation options for LLM requests
 /// </summary>
@@ -90,6 +117,25 @@ public class GenerateOptions
     public List<string>? Stop { get; set; }
     public int? Seed { get; set; }
     public ResponseFormat? ResponseFormat { get; set; }
+    public ToolChoice? ToolChoice { get; set; }
+
+    /// <summary>
+    /// 额外的请求体参数（提供商特定）
+    /// Additional body parameters (provider-specific)
+    /// </summary>
+    public Dictionary<string, object>? AdditionalBodyParams { get; set; }
+
+    /// <summary>
+    /// 额外的请求头
+    /// Additional headers
+    /// </summary>
+    public Dictionary<string, string>? AdditionalHeaders { get; set; }
+
+    /// <summary>
+    /// 额外的查询参数
+    /// Additional query parameters
+    /// </summary>
+    public Dictionary<string, string>? AdditionalQueryParams { get; set; }
 }
 
 /// <summary>
