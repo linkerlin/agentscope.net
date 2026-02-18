@@ -22,23 +22,23 @@ namespace AgentScope.Core.Model;
 /// <summary>
 /// Mock model for testing and examples
 /// </summary>
-public class MockModel : ModelBase
+public class MockModel : 模型基类
 {
     public MockModel(string modelName = "mock-model") : base(modelName)
     {
     }
 
-    public override IObservable<ModelResponse> Generate(ModelRequest request)
+    public override IObservable<模型响应> Generate(模型请求 request)
     {
         return Observable.FromAsync(() => GenerateAsync(request));
     }
 
-    public override Task<ModelResponse> GenerateAsync(ModelRequest request)
+    public override Task<模型响应> GenerateAsync(模型请求 request)
     {
         var lastMessage = request.Messages.LastOrDefault();
         var text = lastMessage?.GetTextContent() ?? string.Empty;
 
-        var response = new ModelResponse
+        var response = new 模型响应
         {
             Success = true,
             Text = $"Echo: {text}",

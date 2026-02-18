@@ -72,13 +72,13 @@ public class DashScopeModel : ModelBase
     }
 
     /// <inheritdoc />
-    public override IObservable<ModelResponse> Generate(ModelRequest request)
+    public override IObservable<模型响应> Generate(模型请求 request)
     {
         return Observable.FromAsync(async () => await GenerateAsync(request));
     }
 
     /// <inheritdoc />
-    public override async Task<ModelResponse> GenerateAsync(ModelRequest request)
+    public override async Task<模型响应> GenerateAsync(模型请求 request)
     {
         var messages = request.Messages;
         var options = MergeOptions(ConvertOptions(request.Options), _defaultOptions);
@@ -228,8 +228,8 @@ public class DashScopeModel : ModelBase
                                 ["type"] = t.Parameters.Type,
                                 ["properties"] = t.Parameters.Properties?.ToDictionary(
                                     p => p.Key, 
-                                    p => (object)new { type = p.Value.Type, description = p.Value.Description }),
-                                ["required"] = t.Parameters.Required
+                                    p => (object)new { type = p.Value.Type, description = p.Value.Description }) ?? new Dictionary<string, object>(),
+                                ["required"] = t.Parameters.Required ?? new List<string>()
                             }
                             : null
                     }

@@ -445,7 +445,7 @@ public class WorkflowEngine : IWorkflowEngine
                 {
                     var message = Msg.Builder()
                         .Role("user")
-                        .TextContent(inputs.TryGetValue("prompt", out var prompt) ? prompt.ToString() : node.Description ?? "Execute task")
+                        .TextContent(inputs.TryGetValue("prompt", out var prompt) ? prompt?.ToString() ?? node.Description ?? "Execute task" : node.Description ?? "Execute task")
                         .Build();
 
                     var response = await agent.CallAsync(message);
@@ -470,7 +470,7 @@ public class WorkflowEngine : IWorkflowEngine
 
             result.Status = WorkflowNodeStatus.Completed;
             result.Outputs["condition_met"] = conditionMet;
-            result.Outputs["selected_branch"] = conditionMet ? node.TrueBranch : node.FalseBranch;
+            result.Outputs["selected_branch"] = conditionMet ? node.TrueBranch ?? "" : node.FalseBranch ?? "";
 
             return Task.FromResult(result);
         }
@@ -539,7 +539,7 @@ public class WorkflowEngine : IWorkflowEngine
             var resolved = new Dictionary<string, object>();
             foreach (var input in inputs)
             {
-                resolved[input.Key] = ResolveValue(input.Value);
+                resolved[input.Key] = ResolveValue(input.Value) ?? "";
             }
             return resolved;
         }

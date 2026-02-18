@@ -170,7 +170,7 @@ public class EnhancedReActAgent : AgentBase
             var prompt = BuildReasoningPrompt(userMessage, thoughtHistory, iteration);
             
             var messages = new List<Msg> {prompt};
-            var request = new ModelRequest { Messages = messages };
+            var request = new 模型请求 { Messages = messages };
             
             var response = await _model.GenerateAsync(request);
             

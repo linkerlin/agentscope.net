@@ -66,7 +66,7 @@ public class ReActAgent : AgentBase
     {
         var messages = BuildMessageHistory();
         
-        var request = new ModelRequest
+        var request = new 模型请求
         {
             Messages = messages
         };

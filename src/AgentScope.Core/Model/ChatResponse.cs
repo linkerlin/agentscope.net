@@ -22,94 +22,94 @@ namespace AgentScope.Core.Model;
 /// 
 /// Java参考: io.agentscope.core.model.ChatResponse
 /// </summary>
-public class ChatResponse : ModelResponse
+public class ChatResponse : 模型响应
 {
     /// <summary>
-    /// Response ID
+    /// 响应ID
     /// </summary>
     public string? Id { get; set; }
 
     /// <summary>
-    /// Response content (text)
+    /// 响应内容
     /// </summary>
-    public new string? Content { get; set; }
+    public string? Content { get; set; }
 
     /// <summary>
-    /// Tool calls in the response
+    /// 响应中的工具调用
     /// </summary>
     public List<ToolCallInfo>? ToolCalls { get; set; }
 
     /// <summary>
-    /// Token usage information
+    /// Token使用信息
     /// </summary>
     public ChatUsage? Usage { get; set; }
 
     /// <summary>
-    /// Model name used
+    /// 使用的模型名称
     /// </summary>
     public string? Model { get; set; }
 
     /// <summary>
-    /// Stop reason
+    /// 停止原因
     /// </summary>
     public string? StopReason { get; set; }
 
     /// <summary>
-    /// Whether this is the final response in a stream
+    /// 是否是流式响应中的最终响应
     /// </summary>
     public bool IsComplete { get; set; }
 }
 
 /// <summary>
-/// Tool call information
 /// 工具调用信息
+/// Tool call information
 /// </summary>
 public class ToolCallInfo
 {
     /// <summary>
-    /// Tool call ID
+    /// 工具调用ID
     /// </summary>
     public required string Id { get; set; }
 
     /// <summary>
-    /// Tool type (usually "function")
+    /// 工具类型（通常为"function"）
     /// </summary>
     public string? Type { get; set; }
 
     /// <summary>
-    /// Tool/function name
+    /// 工具/函数名称
     /// </summary>
     public required string Name { get; set; }
 
     /// <summary>
-    /// Tool arguments as JSON string
+    /// 工具参数（JSON字符串）
     /// </summary>
     public string? Arguments { get; set; }
 }
 
 /// <summary>
+/// 聊天用量
 /// Token usage information
-/// Token 使用信息
 /// </summary>
 public class ChatUsage
 {
     /// <summary>
-    /// Input tokens
+    /// 输入Token数量
     /// </summary>
     public int InputTokens { get; set; }
 
     /// <summary>
-    /// Output tokens
+    /// 输出Token数量
     /// </summary>
     public int OutputTokens { get; set; }
 
     /// <summary>
-    /// Total tokens
+    /// 总Token数量
     /// </summary>
     public int TotalTokens { get; set; }
 
     /// <summary>
-    /// Response time in seconds
+    /// 响应时间（秒）
     /// </summary>
     public double TimeSeconds { get; set; }
 }

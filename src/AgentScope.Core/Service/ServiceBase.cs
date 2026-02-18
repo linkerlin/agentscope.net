@@ -210,7 +210,7 @@ public abstract class ServiceBase : AgentBase, IService
             {
                 break;
             }
-            catch (global::System.Exception ex)
+            catch (global::System.Exception)
             {
                 // Log heartbeat error but don't stop the service
                 // Log heartbeat error but don't stop the service

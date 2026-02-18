@@ -91,6 +91,10 @@ public class GenericRAGHook : HookBase
         try
         {
             var message = @event.CurrentMessage;
+            if (message == null)
+            {
+                return;
+            }
             var query = _queryExtractor?.Invoke(message) ?? message.GetTextContent() ?? "";
             
             if (string.IsNullOrWhiteSpace(query))

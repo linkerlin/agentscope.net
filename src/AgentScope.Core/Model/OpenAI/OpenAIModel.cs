@@ -69,8 +69,7 @@ public class OpenAIModel : ModelBase
         _defaultOptions = defaultOptions;
     }
 
-    /// <inheritdoc />
-    public override IObservable<ModelResponse> Generate(ModelRequest request)
+    public override IObservable<模型响应> 生成 (模型请求 request)
     {
         return Observable.FromAsync(async () =>
         {
@@ -80,7 +79,7 @@ public class OpenAIModel : ModelBase
     }
 
     /// <inheritdoc />
-    public override async Task<ModelResponse> GenerateAsync(ModelRequest request)
+    public override async Task<模型响应> GenerateAsync(模型请求 request)
     {
         var messages = request.Messages;
         var options = MergeOptions(ConvertOptions(request.Options), _defaultOptions);
