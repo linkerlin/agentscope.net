@@ -18,14 +18,14 @@ public record OpenAIRequest
     /// Model name, e.g., "gpt-4", "gpt-3.5-turbo"
     /// </summary>
     [JsonPropertyName("model")]
-    public required string Model { get; init; }
+    public required string Model { get; set; }
 
     /// <summary>
     /// 消息列表
     /// List of messages
     /// </summary>
     [JsonPropertyName("messages")]
-    public required List<OpenAIMessage> Messages { get; init; }
+    public required List<OpenAIMessage> Messages { get; set; }
 
     /// <summary>
     /// 温度参数 (0.0-2.0)
@@ -33,7 +33,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("temperature")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double? Temperature { get; init; }
+    public double? Temperature { get; set; }
 
     /// <summary>
     /// Top-p 采样参数 (0.0-1.0)
@@ -41,7 +41,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("top_p")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double? TopP { get; init; }
+    public double? TopP { get; set; }
 
     /// <summary>
     /// 生成的最大token数
@@ -49,7 +49,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("max_tokens")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? MaxTokens { get; init; }
+    public int? MaxTokens { get; set; }
 
     /// <summary>
     /// 生成的最大完成token数（优先于max_tokens）
@@ -57,7 +57,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("max_completion_tokens")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? MaxCompletionTokens { get; init; }
+    public int? MaxCompletionTokens { get; set; }
 
     /// <summary>
     /// 频率惩罚 (-2.0 to 2.0)
@@ -65,7 +65,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("frequency_penalty")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double? FrequencyPenalty { get; init; }
+    public double? FrequencyPenalty { get; set; }
 
     /// <summary>
     /// 存在惩罚 (-2.0 to 2.0)
@@ -73,7 +73,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("presence_penalty")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public double? PresencePenalty { get; init; }
+    public double? PresencePenalty { get; set; }
 
     /// <summary>
     /// 停止序列
@@ -81,7 +81,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("stop")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public object? Stop { get; init; } // Can be string or string[]
+    public object? Stop { get; set; } // Can be string or string[]
 
     /// <summary>
     /// 是否流式返回
@@ -89,7 +89,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("stream")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? Stream { get; init; }
+    public bool? Stream { get; set; }
 
     /// <summary>
     /// 随机种子
@@ -97,7 +97,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("seed")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? Seed { get; init; }
+    public int? Seed { get; set; }
 
     /// <summary>
     /// 工具列表
@@ -105,7 +105,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("tools")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<OpenAITool>? Tools { get; init; }
+    public List<OpenAITool>? Tools { get; set; }
 
     /// <summary>
     /// 工具选择策略
@@ -113,7 +113,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("tool_choice")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public object? ToolChoice { get; init; } // Can be string or OpenAIToolChoice
+    public object? ToolChoice { get; set; } // Can be string or OpenAIToolChoice
 
     /// <summary>
     /// 响应格式配置
@@ -121,7 +121,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("response_format")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public object? ResponseFormat { get; init; }
+    public object? ResponseFormat { get; set; }
 
     /// <summary>
     /// 推理力度（o1系列模型）
@@ -129,7 +129,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("reasoning_effort")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ReasoningEffort { get; init; }
+    public string? ReasoningEffort { get; set; }
 
     /// <summary>
     /// 是否包含推理内容
@@ -137,7 +137,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("include_reasoning")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? IncludeReasoning { get; init; }
+    public bool? IncludeReasoning { get; set; }
 
     /// <summary>
     /// 用户标识
@@ -145,7 +145,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("user")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? User { get; init; }
+    public string? User { get; set; }
 
     /// <summary>
     /// 返回的选择数量
@@ -153,7 +153,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("n")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? N { get; init; }
+    public int? N { get; set; }
 
     /// <summary>
     /// Logit偏置
@@ -161,7 +161,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("logit_bias")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string, double>? LogitBias { get; init; }
+    public Dictionary<string, double>? LogitBias { get; set; }
 
     /// <summary>
     /// 是否返回logprobs
@@ -169,7 +169,7 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("logprobs")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? Logprobs { get; init; }
+    public bool? Logprobs { get; set; }
 
     /// <summary>
     /// Top logprobs数量
@@ -177,5 +177,5 @@ public record OpenAIRequest
     /// </summary>
     [JsonPropertyName("top_logprobs")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? TopLogprobs { get; init; }
+    public int? TopLogprobs { get; set; }
 }

@@ -64,6 +64,14 @@ public record OpenAIToolFunction
     [JsonPropertyName("parameters")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public object? Parameters { get; init; }
+
+    /// <summary>
+    /// 是否使用严格模式
+    /// Whether to use strict mode
+    /// </summary>
+    [JsonPropertyName("strict")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Strict { get; init; }
 }
 
 /// <summary>
