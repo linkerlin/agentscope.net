@@ -28,6 +28,9 @@ using AnthropicRequest = AgentScope.Core.Formatter.Anthropic.Dto.AnthropicReques
 using AnthropicContentBlock = AgentScope.Core.Formatter.Anthropic.Dto.AnthropicContentBlock;
 using AnthropicUsage = AgentScope.Core.Formatter.Anthropic.Dto.AnthropicUsage;
 
+// Alias for GenerateOptions to avoid ambiguity
+using AnthropicGenerateOptions = AgentScope.Core.Formatter.Anthropic.GenerateOptions;
+
 namespace AgentScope.Core.Tests.Formatter.Anthropic;
 
 /// <summary>
@@ -90,7 +93,7 @@ public class AnthropicFormatterTests
         {
             Msg.Builder().Role("user").TextContent("Hello!").Build()
         };
-        var options = new GenerateOptions
+        var options = new AnthropicGenerateOptions
         {
             Temperature = 0.7,
             MaxTokens = 1000,
@@ -131,7 +134,7 @@ public class AnthropicFormatterTests
                 }
             }
         };
-        var options = new GenerateOptions
+        var options = new AnthropicGenerateOptions
         {
             AdditionalBodyParams = new Dictionary<string, object> { ["tools"] = tools }
         };
@@ -257,55 +260,6 @@ public class AnthropicFormatterTests
         Assert.NotNull(result.Metadata);
         Assert.True(result.Metadata!.ContainsKey("thinking"));
         Assert.Equal("Let me think about this...", result.Metadata["thinking"]);
-    }
-
-    #endregion
-
-    #region Interface Implementation Tests
-
-    [Fact]
-    public void Interface_Format_ReturnsListOfRequests()
-    {
-        // Arrange
-        IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions> formatter = 
-            new AnthropicChatFormatter("claude-3-5-sonnet-20241022");
-        var messages = new List<Msg>
-        {
-            Msg.Builder().Role("user").TextContent("Hello!").Build()
-        };
-
-        // Act
-        var result = formatter.Format(messages);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Single(result);
-        Assert.Equal("claude-3-5-sonnet-20241022", result[0].Model);
-    }
-
-    [Fact]
-    public void Interface_ParseResponse_ReturnsModelResponse()
-    {
-        // Arrange
-        IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions> formatter = 
-            new AnthropicChatFormatter();
-        var response = new AnthropicResponse
-        {
-            Id = "msg_123",
-            Type = "message",
-            Role = AnthropicRole.Assistant,
-            Model = "claude-3-5-sonnet-20241022",
-            Content = new List<AnthropicContentBlock> { new Dto.TextBlock { Text = "Hi!" } },
-            Usage = new AnthropicUsage { InputTokens = 5, OutputTokens = 10 }
-        };
-        var startTime = DateTime.UtcNow.AddSeconds(-1);
-
-        // Act
-        var result = formatter.ParseResponse(response, startTime);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("Hi!", result.Text);
     }
 
     #endregion

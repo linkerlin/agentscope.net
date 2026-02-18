@@ -18,6 +18,9 @@ using AgentScope.Core.Formatter.Anthropic.Dto;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
 
+// Use the global GenerateOptions from Formatter namespace
+using GenerateOptions = AgentScope.Core.Formatter.GenerateOptions;
+
 namespace AgentScope.Core.Formatter.Anthropic;
 
 /// <summary>
@@ -32,8 +35,7 @@ namespace AgentScope.Core.Formatter.Anthropic;
 /// 
 /// Java参考: io.agentscope.core.formatter.anthropic.AnthropicChatFormatter
 /// </summary>
-public class AnthropicChatFormatter : AnthropicBaseFormatter, 
-    IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions>
+public class AnthropicChatFormatter : AnthropicBaseFormatter
 {
     private readonly string _modelName;
 
@@ -51,64 +53,6 @@ public class AnthropicChatFormatter : AnthropicBaseFormatter,
     public AnthropicChatFormatter(string modelName)
     {
         _modelName = modelName ?? throw new ArgumentNullException(nameof(modelName));
-    }
-
-    /// <summary>
-    /// Format messages to Anthropic request.
-    /// </summary>
-    List<AnthropicRequest> IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions>.Format(List<Msg> messages)
-    {
-        var request = Format(messages);
-        return new List<AnthropicRequest> { request };
-    }
-
-    /// <summary>
-    /// Parse Anthropic response to ModelResponse.
-    /// </summary>
-    ModelResponse IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions>.ParseResponse(
-        AnthropicResponse response, DateTime startTime)
-    {
-        return Parse(response, startTime);
-    }
-
-    /// <summary>
-    /// Apply generation options.
-    /// </summary>
-    void IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions>.ApplyOptions(
-        GenerateOptions paramsBuilder, GenerateOptions? options, GenerateOptions? defaultOptions)
-    {
-        // Merge options: defaultOptions first, then options override
-        if (defaultOptions != null)
-        {
-            MergeOptions(paramsBuilder, defaultOptions);
-        }
-        if (options != null)
-        {
-            MergeOptions(paramsBuilder, options);
-        }
-    }
-
-    /// <summary>
-    /// Apply tools to options.
-    /// </summary>
-    void IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions>.ApplyTools(
-        GenerateOptions paramsBuilder, List<ToolSchema>? tools)
-    {
-        if (tools != null && tools.Count > 0)
-        {
-            paramsBuilder.AdditionalBodyParams ??= new Dictionary<string, object>();
-            paramsBuilder.AdditionalBodyParams["tools"] = tools;
-        }
-    }
-
-    /// <summary>
-    /// Apply tools with provider compatibility.
-    /// </summary>
-    void IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions>.ApplyTools(
-        GenerateOptions paramsBuilder, List<ToolSchema>? tools, string? baseUrl, string? modelName)
-    {
-        // Delegate to the 2-parameter implementation
-        ((IFormatter<AnthropicRequest, AnthropicResponse, GenerateOptions>)this).ApplyTools(paramsBuilder, tools);
     }
 
     /// <summary>

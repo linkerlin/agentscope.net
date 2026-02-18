@@ -31,7 +31,7 @@ namespace AgentScope.Core.Formatter.DashScope;
 /// 
 /// Java参考: io.agentscope.core.formatter.dashscope.DashScopeChatFormatter
 /// </summary>
-public class DashScopeChatFormatter : IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>
+public class DashScopeChatFormatter
 {
     private readonly string _modelName;
 
@@ -49,63 +49,6 @@ public class DashScopeChatFormatter : IFormatter<DashScopeRequest, DashScopeResp
     public DashScopeChatFormatter(string modelName)
     {
         _modelName = modelName ?? throw new ArgumentNullException(nameof(modelName));
-    }
-
-    /// <summary>
-    /// Format messages to DashScope request.
-    /// </summary>
-    List<DashScopeRequest> IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>.Format(List<Msg> messages)
-    {
-        var dsMessages = DashScopeMessageConverter.Convert(messages);
-        var request = BuildRequest(_modelName, dsMessages, false);
-        return new List<DashScopeRequest> { request };
-    }
-
-    /// <summary>
-    /// Parse DashScope response to ChatResponse.
-    /// </summary>
-    ModelResponse IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>.ParseResponse(
-        DashScopeResponse response, DateTime startTime)
-    {
-        return DashScopeResponseParser.ParseResponse(response, startTime);
-    }
-
-    /// <summary>
-    /// Apply generation options.
-    /// </summary>
-    void IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>.ApplyOptions(
-        DashScopeParameters parameters, GenerateOptions? options, GenerateOptions? defaultOptions)
-    {
-        // Merge options: defaultOptions first, then options override
-        if (defaultOptions != null)
-        {
-            ApplyOptionsToParameters(parameters, defaultOptions);
-        }
-        if (options != null)
-        {
-            ApplyOptionsToParameters(parameters, options);
-        }
-    }
-
-    /// <summary>
-    /// Apply tools to parameters.
-    /// </summary>
-    void IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>.ApplyTools(
-        DashScopeParameters parameters, List<ToolSchema>? tools)
-    {
-        if (tools != null && tools.Count > 0)
-        {
-            parameters.Tools = ConvertTools(tools);
-        }
-    }
-
-    /// <summary>
-    /// Apply tools with provider compatibility.
-    /// </summary>
-    void IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>.ApplyTools(
-        DashScopeParameters parameters, List<ToolSchema>? tools, string? baseUrl, string? modelName)
-    {
-        ((IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>)this).ApplyTools(parameters, tools);
     }
 
     /// <summary>
@@ -151,13 +94,19 @@ public class DashScopeChatFormatter : IFormatter<DashScopeRequest, DashScopeResp
 
         if (request.Parameters != null)
         {
-            ((IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>)this).ApplyOptions(
-                request.Parameters, options, defaultOptions);
+            // Apply default options first, then override with specific options
+            if (defaultOptions != null)
+            {
+                ApplyOptionsToParameters(request.Parameters, defaultOptions);
+            }
+            if (options != null)
+            {
+                ApplyOptionsToParameters(request.Parameters, options);
+            }
 
             if (tools != null && tools.Count > 0)
             {
-                ((IFormatter<DashScopeRequest, DashScopeResponse, DashScopeParameters>)this).ApplyTools(
-                    request.Parameters, tools);
+                request.Parameters.Tools = ConvertTools(tools);
             }
 
             if (toolChoice != null)

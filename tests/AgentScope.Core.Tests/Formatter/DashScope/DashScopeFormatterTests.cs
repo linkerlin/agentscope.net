@@ -21,6 +21,9 @@ using Dto = AgentScope.Core.Formatter.DashScope.Dto;
 using AgentScope.Core.Message;
 using Xunit;
 
+// Alias for GenerateOptions to avoid ambiguity
+using DashScopeGenerateOptions = AgentScope.Core.Formatter.DashScope.GenerateOptions;
+
 namespace AgentScope.Core.Tests.Formatter.DashScope;
 
 /// <summary>
@@ -85,7 +88,7 @@ public class DashScopeFormatterTests
             Msg.Builder().Role("user").TextContent("Hello!").Build()
         };
         var dsMessages = DashScopeMessageConverter.Convert(messages);
-        var options = new GenerateOptions
+        var options = new DashScopeGenerateOptions
         {
             Temperature = 0.7,
             MaxTokens = 1000,
@@ -389,62 +392,4 @@ public class DashScopeFormatterTests
 
     #endregion
 
-    #region Interface Implementation Tests
-
-    [Fact]
-    public void Interface_Format_ReturnsListOfRequests()
-    {
-        // Arrange
-        IFormatter<Dto.DashScopeRequest, Dto.DashScopeResponse, Dto.DashScopeParameters> formatter = 
-            new DashScopeChatFormatter("qwen-plus");
-        var messages = new List<Msg>
-        {
-            Msg.Builder().Role("user").TextContent("Hello!").Build()
-        };
-
-        // Act
-        var result = formatter.Format(messages);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Single(result);
-        Assert.Equal("qwen-plus", result[0].Model);
-    }
-
-    [Fact]
-    public void Interface_ParseResponse_ReturnsModelResponse()
-    {
-        // Arrange
-        IFormatter<Dto.DashScopeRequest, Dto.DashScopeResponse, Dto.DashScopeParameters> formatter = 
-            new DashScopeChatFormatter();
-        var response = new Dto.DashScopeResponse
-        {
-            RequestId = "req_123",
-            Output = new Dto.DashScopeOutput
-            {
-                Choices = new List<Dto.DashScopeChoice>
-                {
-                    new()
-                    {
-                        Message = new Dto.DashScopeMessage
-                        {
-                            Role = "assistant",
-                            Content = "Hi!"
-                        }
-                    }
-                }
-            },
-            Usage = new Dto.DashScopeUsage { InputTokens = 5, OutputTokens = 10 }
-        };
-        var startTime = DateTime.UtcNow.AddSeconds(-1);
-
-        // Act
-        var result = formatter.ParseResponse(response, startTime);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("Hi!", result.Text);
-    }
-
-    #endregion
 }

@@ -15,11 +15,28 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using AgentScope.Core.Formatter.Anthropic.Dto;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
 
+// Use the global GenerateOptions from Formatter namespace
+using GenerateOptions = AgentScope.Core.Formatter.GenerateOptions;
+
 namespace AgentScope.Core.Formatter.Anthropic;
+
+/// <summary>
+/// Serializer options for Anthropic API.
+/// </summary>
+public static class AnthropicSerializerOptions
+{
+    public static readonly JsonSerializerOptions Default = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+}
 
 /// <summary>
 /// Abstract base formatter for Anthropic API with shared logic for handling Anthropic-specific requirements.
@@ -85,6 +102,74 @@ public abstract class AnthropicBaseFormatter
     public virtual Model.ChatResponse Parse(AnthropicResponse response, DateTime startTime)
     {
         return AnthropicResponseParser.ParseMessage(response, startTime);
+    }
+
+    /// <summary>
+    /// Parse JSON response string to ParsedResponse.
+    /// 解析 JSON 响应字符串
+    /// </summary>
+    /// <param name="json">JSON response string</param>
+    /// <returns>Parsed response</returns>
+    public virtual ParsedResponse? Parse(string json)
+    {
+        try
+        {
+            var response = JsonSerializer.Deserialize<AnthropicResponse>(json, AnthropicSerializerOptions.Default);
+            if (response == null) return null;
+
+            return ParseToParsedResponse(response);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Convert AnthropicResponse to ParsedResponse.
+    /// </summary>
+    private ParsedResponse ParseToParsedResponse(AnthropicResponse response)
+    {
+        var result = new ParsedResponse
+        {
+            Id = response.Id,
+            Model = response.Model,
+            StopReason = response.StopReason,
+            Usage = response.Usage != null ? new UsageInfo
+            {
+                InputTokens = response.Usage.InputTokens,
+                OutputTokens = response.Usage.OutputTokens
+            } : null
+        };
+
+        var toolCalls = new List<ToolCall>();
+        var textParts = new List<string>();
+
+        foreach (var block in response.Content)
+        {
+            switch (block)
+            {
+                case Dto.TextBlock textBlock:
+                    textParts.Add(textBlock.Text);
+                    break;
+                case Dto.ToolUseBlock toolUse:
+                    toolCalls.Add(new ToolCall
+                    {
+                        Id = toolUse.Id,
+                        Name = toolUse.Name,
+                        InputJson = JsonSerializer.Serialize(toolUse.Input)
+                    });
+                    break;
+            }
+        }
+
+        result.TextContent = string.Join("\n", textParts);
+        if (toolCalls.Count > 0)
+        {
+            result.ToolCalls = toolCalls;
+        }
+
+        return result;
     }
 
     /// <summary>
