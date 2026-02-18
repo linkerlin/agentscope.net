@@ -49,7 +49,7 @@ public interface IFormatter<TRequest, TResponse, TParams>
     /// 解析提供商特定的响应为 AgentScope ChatResponse
     /// Parse provider-specific response to AgentScope ChatResponse
     /// </summary>
-    模型响应 ParseResponse(TResponse response, DateTime startTime);
+    ModelResponse ParseResponse(TResponse response, DateTime startTime);
 
     /// <summary>
     /// 应用生成选项到提供商特定的请求参数

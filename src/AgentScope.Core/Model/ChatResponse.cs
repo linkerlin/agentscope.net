@@ -22,7 +22,7 @@ namespace AgentScope.Core.Model;
 /// 
 /// Java参考: io.agentscope.core.model.ChatResponse
 /// </summary>
-public class ChatResponse : 模型响应
+public class ChatResponse : ModelResponse
 {
     /// <summary>
     /// 响应ID

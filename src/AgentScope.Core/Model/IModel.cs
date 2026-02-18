@@ -20,54 +20,50 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Model;
 
 /// <summary>
-/// 模型请求
 /// Model request for LLM
 /// </summary>
-public class 模型请求
+public class ModelRequest
 {
-    public List<Msg> 消息列表 { get; set; } = new();
-    public Dictionary<string, object>? 选项 { get; set; }
+    public List<Msg> Messages { get; set; } = new();
+    public Dictionary<string, object>? Options { get; set; }
 }
 
 /// <summary>
-/// 模型响应
 /// Model response from LLM
 /// </summary>
-public class 模型响应
+public class ModelResponse
 {
-    public string? 文本内容 { get; set; }
-    public Dictionary<string, object>? 元数据 { get; set; }
-    public bool 成功 { get; set; }
-    public string? 错误信息 { get; set; }
+    public string? Text { get; set; }
+    public Dictionary<string, object>? Metadata { get; set; }
+    public bool Success { get; set; }
+    public string? Error { get; set; }
 }
 
 /// <summary>
-/// 大语言模型接口
 /// Interface for LLM models
 /// </summary>
-public interface I模型
+public interface IModel
 {
-    string 模型名称 { get; }
+    string ModelName { get; }
     
-    IObservable<模型响应> 生成 (模型请求 request);
+    IObservable<ModelResponse> Generate(ModelRequest request);
     
-    Task<模型响应> 生成 Async(模型请求 request);
+    Task<ModelResponse> GenerateAsync(ModelRequest request);
 }
 
 /// <summary>
-/// 模型基类
 /// Abstract base class for models
 /// </summary>
-public abstract class 模型基类 : I模型
+public abstract class ModelBase : IModel
 {
-    public string 模型名称 { get; protected set; }
+    public string ModelName { get; protected set; }
 
-    protected 模型基类 (string modelName)
+    protected ModelBase(string modelName)
     {
-        模型名称 = modelName;
+        ModelName = modelName;
     }
 
-    public abstract IObservable<模型响应> 生成 (模型请求 request);
+    public abstract IObservable<ModelResponse> Generate(ModelRequest request);
 
-    public abstract Task<模型响应> 生成 Async(模型请求 request);
+    public abstract Task<ModelResponse> GenerateAsync(ModelRequest request);
 }
