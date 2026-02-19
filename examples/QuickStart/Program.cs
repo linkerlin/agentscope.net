@@ -13,12 +13,15 @@
 // limitations under the License.
 
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using AgentScope.Core;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
+using AgentScope.Core.Model.OpenAI;
 using AgentScope.Core.Memory;
 using CoreVersion = AgentScope.Core.Version;
+using DotNetEnv;
 
 namespace QuickStart;
 
@@ -29,10 +32,44 @@ class Program
         Console.WriteLine($"{CoreVersion.GetFullVersion()}\n");
         Console.WriteLine("QuickStart Example - Simple Agent Chat\n");
 
-        // Create a mock model for testing
-        var model = MockModel.Builder()
-            .ModelName("mock-model")
-            .Build();
+        // Load .env file
+        var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+        if (File.Exists(envPath))
+        {
+            Env.Load(envPath);
+        }
+
+        // Configure model from environment variables
+        // Priority: DeepSeek > OpenAI Compatible > MockModel
+        IModel model;
+        var deepseekApiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
+        var deepseekModel = Environment.GetEnvironmentVariable("DEEPSEEK_MODEL");
+        var openaiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        var openaiBaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
+        var openaiModel = Environment.GetEnvironmentVariable("OPENAI_MODEL");
+
+        if (!string.IsNullOrEmpty(deepseekApiKey) && !string.IsNullOrEmpty(deepseekModel))
+        {
+            // Use DeepSeek
+            Console.WriteLine($"Using DeepSeek model: {deepseekModel}\n");
+            model = new OpenAIModel(deepseekModel, deepseekApiKey, "https://api.deepseek.com");
+        }
+        else if (!string.IsNullOrEmpty(openaiApiKey))
+        {
+            // Use OpenAI Compatible API
+            var modelName = openaiModel ?? "gpt-3.5-turbo";
+            Console.WriteLine($"Using OpenAI Compatible model: {modelName}\n");
+            model = new OpenAIModel(modelName, openaiApiKey, openaiBaseUrl);
+        }
+        else
+        {
+            // Fallback to MockModel
+            Console.WriteLine("No LLM API key found, using MockModel for testing.\n");
+            Console.WriteLine("Set DEEPSEEK_API_KEY or OPENAI_API_KEY to use real LLM.\n");
+            model = MockModel.Builder()
+                .ModelName("mock-model")
+                .Build();
+        }
 
         // Create persistent memory
         var memory = new SqliteMemory("example.db");
