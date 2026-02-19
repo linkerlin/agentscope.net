@@ -13,11 +13,14 @@
 // limitations under the License.
 
 using System;
+using System.IO;
 using Terminal.Gui;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
+using AgentScope.Core.Model.OpenAI;
 using AgentScope.Core.Memory;
 using CoreVersion = AgentScope.Core.Version;
+using DotNetEnv;
 
 namespace AgentScope.TUI;
 
@@ -25,6 +28,13 @@ class Program
 {
     static void Main(string[] args)
     {
+        // Load .env file
+        var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+        if (File.Exists(envPath))
+        {
+            Env.Load(envPath);
+        }
+
         Application.Init();
 
         var top = Application.Top;
@@ -82,9 +92,38 @@ class Program
             Y = Pos.Bottom(chatView)
         };
 
+        // Initialize model from environment variables
+        // Priority: DeepSeek > OpenAI Compatible > MockModel
+        IModel model;
+        string modelInfo;
+        var deepseekApiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
+        var deepseekModel = Environment.GetEnvironmentVariable("DEEPSEEK_MODEL");
+        var openaiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        var openaiBaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
+        var openaiModel = Environment.GetEnvironmentVariable("OPENAI_MODEL");
+
+        if (!string.IsNullOrEmpty(deepseekApiKey) && !string.IsNullOrEmpty(deepseekModel))
+        {
+            // Use DeepSeek
+            modelInfo = $"DeepSeek: {deepseekModel}";
+            model = new OpenAIModel(deepseekModel, deepseekApiKey, "https://api.deepseek.com");
+        }
+        else if (!string.IsNullOrEmpty(openaiApiKey))
+        {
+            // Use OpenAI Compatible API
+            var modelName = openaiModel ?? "gpt-3.5-turbo";
+            modelInfo = $"OpenAI: {modelName}";
+            model = new OpenAIModel(modelName, openaiApiKey, openaiBaseUrl);
+        }
+        else
+        {
+            // Fallback to MockModel
+            modelInfo = "MockModel (test mode)";
+            model = MockModel.Builder().ModelName("mock-model").Build();
+        }
+
         // Initialize agent
         var memory = new SqliteMemory("agentscope.db");
-        var model = MockModel.Builder().ModelName("mock-model").Build();
         var agent = Core.ReActAgent.Builder()
             .Name("Assistant")
             .SysPrompt("You are a helpful AI assistant.")
@@ -135,6 +174,7 @@ class Program
         top.Add(menuBar, win);
 
         chatView.Text = $"Welcome to {CoreVersion.GetFullVersion()}!\n\n" +
+            $"Model: {modelInfo}\n\n" +
             "Type your message and press Enter or click Send to chat with the assistant.";
 
         Application.Run();
