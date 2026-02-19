@@ -1,15 +1,15 @@
 # AgentScope.NET 当前状态总结
 
 **更新时间**: 2026-02-18  
-**版本**: v1.0.5 (86% 完成)
+**版本**: v1.0.7 (88% 完成)
 
 ## 📊 总体进度
 
-- **完成度**: ~86%
+- **完成度**: ~88%
 - **已完成模块**: 21/22
-- **已完成功能**: 51/54
-- **测试覆盖**: 456 测试全部通过
-- **代码量**: ~13,500+ 行 C# 代码
+- **已完成功能**: 53/54
+- **测试覆盖**: 471 测试全部通过
+- **代码量**: ~14,500+ 行 C# 代码
 
 ## ✅ 已完成功能
 
@@ -207,6 +207,21 @@
 4. **更多 Model 提供商** ❌
 
 ## 📈 最近完成
+
+### 2026-02-18: v1.0.7 Ollama 本地 LLM 支持
+- 新增 OllamaModel 类 (继承自 OpenAIModel)
+- 支持 llama2, llama3, mistral, codellama, phi3 等模型
+- Builder 模式便捷构建
+- 无需 API Key，本地推理
+- 新增 OllamaModelTests 测试 (15个)
+
+### 2026-02-18: v1.0.6 Linus代码审查改进
+- ReActAgent: 实现完整工具调用逻辑 (ReAct循环)
+- SqliteMemory: 添加批量模式 (BeginBatch/EndBatch)
+- 统一JSON库: 移除Newtonsoft.Json，使用System.Text.Json
+- PipelineBuilder: 提取AddNode()消除重复代码
+- ModelBase: ModelName只读化，添加null检查
+- 456测试全部通过
 
 ### 2026-02-18: v1.0.5 DeepSeekModel专用类
 - 新增 DeepSeekModel 类 (继承自 OpenAIModel)
