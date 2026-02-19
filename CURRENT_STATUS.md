@@ -1,15 +1,15 @@
 # AgentScope.NET 当前状态总结
 
 **更新时间**: 2026-02-18  
-**版本**: v1.0.4 (85% 完成)
+**版本**: v1.0.5 (86% 完成)
 
 ## 📊 总体进度
 
-- **完成度**: ~85%
-- **已完成模块**: 20/22
-- **已完成功能**: 50/54
-- **测试覆盖**: 448 测试全部通过
-- **代码量**: ~13,000+ 行 C# 代码
+- **完成度**: ~86%
+- **已完成模块**: 21/22
+- **已完成功能**: 51/54
+- **测试覆盖**: 456 测试全部通过
+- **代码量**: ~13,500+ 行 C# 代码
 
 ## ✅ 已完成功能
 
@@ -56,6 +56,7 @@
    - ✅ OpenAI 模型（完整 HTTP 实现）
    - ✅ Anthropic 模型（完整 HTTP 实现）
    - ✅ DashScope 模型（完整 HTTP 实现）
+   - ✅ DeepSeek 模型（完整 HTTP 实现）
    - ✅ HTTP Transport 层
 
 7. **Formatter 系统** ⭐
@@ -206,6 +207,13 @@
 4. **更多 Model 提供商** ❌
 
 ## 📈 最近完成
+
+### 2026-02-18: v1.0.5 DeepSeekModel专用类
+- 新增 DeepSeekModel 类 (继承自 OpenAIModel)
+- 支持 deepseek-chat 和 deepseek-reasoner 模型
+- Builder 模式便捷构建
+- 更新 QuickStart/TUI/LlmSystemTests 使用 DeepSeekModel
+- 新增 DeepSeekModelTests 测试
 
 ### 2026-02-18: v1.0.4 TUI应用增强
 - TUI应用支持真实LLM (DeepSeek/OpenAI兼容API)
