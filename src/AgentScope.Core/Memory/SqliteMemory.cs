@@ -15,10 +15,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using AgentScope.Core.Message;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 
 namespace AgentScope.Core.Memory;
 
@@ -42,7 +42,7 @@ public class MessageEntity
 /// </summary>
 public class MemoryDbContext : DbContext
 {
-    public DbSet<MessageEntity> Messages { get; set; }
+    public DbSet<MessageEntity> Messages { get; set; } = null!;
 
     private readonly string _connectionString;
 
@@ -68,44 +68,97 @@ public class MemoryDbContext : DbContext
 }
 
 /// <summary>
-/// SQLite-based persistent memory implementation
+/// SQLite-based persistent memory implementation.
+/// SQLite 持久化内存实现
+/// 
+/// Performance Notes:
+/// - Add() persists immediately for data safety
+/// - Use BeginBatch() / EndBatch() for bulk operations (faster)
 /// </summary>
-public class SqliteMemory : IPersistentMemory, IDisposable
+public class SqliteMemory : IPersistentMemory, IDisposable, IAsyncDisposable
 {
     private readonly MemoryDbContext _dbContext;
     private readonly MemoryBase _cache = new();
     private bool _disposed = false;
+    private bool _batchMode = false;
+    private readonly object _lock = new();
+
+    /// <summary>
+    /// Whether in batch mode (deferred persistence).
+    /// </summary>
+    public bool IsBatchMode => _batchMode;
 
     public SqliteMemory(string databasePath)
     {
         var connectionString = $"Data Source={databasePath}";
         _dbContext = new MemoryDbContext(connectionString);
         _dbContext.Database.EnsureCreated();
+        
+        // Load existing messages from database into cache
+        var entities = _dbContext.Messages.OrderBy(m => m.Timestamp).ToList();
+        foreach (var entity in entities)
+        {
+            _cache.Add(EntityToMessage(entity));
+        }
     }
 
+    /// <summary>
+    /// Begin batch mode - defer persistence until EndBatch().
+    /// 开始批量模式 - 延迟持久化直到 EndBatch()
+    /// </summary>
+    public void BeginBatch()
+    {
+        _batchMode = true;
+    }
+
+    /// <summary>
+    /// End batch mode - persist all pending changes.
+    /// 结束批量模式 - 持久化所有待处理的更改
+    /// </summary>
+    public void EndBatch()
+    {
+        _batchMode = false;
+        _dbContext.SaveChanges();
+    }
+
+    /// <summary>
+    /// End batch mode - persist all pending changes (async).
+    /// </summary>
+    public async Task EndBatchAsync()
+    {
+        _batchMode = false;
+        await _dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Add message to memory and persist to database.
+    /// 添加消息到内存并持久化到数据库
+    /// </summary>
     public void Add(Msg message)
     {
-        _cache.Add(message);
-        
-        var entity = MessageToEntity(message);
-        _dbContext.Messages.Add(entity);
-        _dbContext.SaveChanges();
+        lock (_lock)
+        {
+            _cache.Add(message);
+            
+            var entity = MessageToEntity(message);
+            _dbContext.Messages.Add(entity);
+            
+            // Persist immediately unless in batch mode
+            if (!_batchMode)
+            {
+                _dbContext.SaveChanges();
+            }
+        }
     }
 
     public List<Msg> GetAll()
     {
-        var entities = _dbContext.Messages.OrderBy(m => m.Timestamp).ToList();
-        return entities.Select(EntityToMessage).ToList();
+        return _cache.GetAll();
     }
 
     public List<Msg> GetRecent(int count)
     {
-        var entities = _dbContext.Messages
-            .OrderByDescending(m => m.Timestamp)
-            .Take(count)
-            .OrderBy(m => m.Timestamp)
-            .ToList();
-        return entities.Select(EntityToMessage).ToList();
+        return _cache.GetRecent(count);
     }
 
     public void Clear()
@@ -117,7 +170,7 @@ public class SqliteMemory : IPersistentMemory, IDisposable
 
     public int Count()
     {
-        return _dbContext.Messages.Count();
+        return _cache.Count();
     }
 
     public async Task<List<Msg>> SearchAsync(string query, int limit = 10)
@@ -155,8 +208,12 @@ public class SqliteMemory : IPersistentMemory, IDisposable
             Role = message.Role,
             Content = message.Content?.ToString(),
             Timestamp = message.Timestamp,
-            Metadata = message.Metadata != null ? JsonConvert.SerializeObject(message.Metadata) : null,
-            Url = message.Url != null ? JsonConvert.SerializeObject(message.Url) : null
+            Metadata = message.Metadata != null 
+                ? JsonSerializer.Serialize(message.Metadata) 
+                : null,
+            Url = message.Url != null 
+                ? JsonSerializer.Serialize(message.Url) 
+                : null
         };
     }
 
@@ -170,10 +227,10 @@ public class SqliteMemory : IPersistentMemory, IDisposable
             Content = entity.Content,
             Timestamp = entity.Timestamp,
             Metadata = entity.Metadata != null 
-                ? JsonConvert.DeserializeObject<Dictionary<string, object>>(entity.Metadata) 
+                ? JsonSerializer.Deserialize<Dictionary<string, object>>(entity.Metadata) 
                 : null,
             Url = entity.Url != null 
-                ? JsonConvert.DeserializeObject<List<string>>(entity.Url) 
+                ? JsonSerializer.Deserialize<List<string>>(entity.Url) 
                 : null
         };
     }
@@ -191,9 +248,29 @@ public class SqliteMemory : IPersistentMemory, IDisposable
 
         if (disposing)
         {
+            // Flush pending changes if in batch mode
+            if (_batchMode)
+            {
+                try { _dbContext.SaveChanges(); } catch { }
+            }
             _dbContext?.Dispose();
         }
 
         _disposed = true;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+
+        if (_batchMode)
+        {
+            try { await _dbContext.SaveChangesAsync(); } catch { }
+        }
+        
+        await _dbContext.DisposeAsync();
+        _disposed = true;
+        GC.SuppressFinalize(this);
     }
 }

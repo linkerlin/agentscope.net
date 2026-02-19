@@ -56,11 +56,17 @@ public interface IModel
 /// </summary>
 public abstract class ModelBase : IModel
 {
-    public string ModelName { get; protected set; }
+    private readonly string _modelName;
+    
+    public string ModelName 
+    { 
+        get => _modelName;
+        protected set => throw new InvalidOperationException("ModelName cannot be changed after construction");
+    }
 
     protected ModelBase(string modelName)
     {
-        ModelName = modelName;
+        _modelName = modelName ?? throw new ArgumentNullException(nameof(modelName));
     }
 
     public abstract IObservable<ModelResponse> Generate(ModelRequest request);

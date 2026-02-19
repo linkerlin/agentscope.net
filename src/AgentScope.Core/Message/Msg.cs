@@ -14,7 +14,8 @@
 
 using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AgentScope.Core.Message;
 
@@ -23,25 +24,25 @@ namespace AgentScope.Core.Message;
 /// </summary>
 public class Msg
 {
-    [JsonProperty("id")]
+    [JsonPropertyName("id")]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [JsonProperty("name")]
+    [JsonPropertyName("name")]
     public string? Name { get; set; }
 
-    [JsonProperty("role")]
+    [JsonPropertyName("role")]
     public string Role { get; set; } = "user";
 
-    [JsonProperty("content")]
+    [JsonPropertyName("content")]
     public object? Content { get; set; }
 
-    [JsonProperty("url")]
+    [JsonPropertyName("url")]
     public List<string>? Url { get; set; }
 
-    [JsonProperty("timestamp")]
+    [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
-    [JsonProperty("metadata")]
+    [JsonPropertyName("metadata")]
     public Dictionary<string, object>? Metadata { get; set; }
 
     public Msg()
@@ -82,7 +83,11 @@ public class Msg
 
     public override string ToString()
     {
-        return JsonConvert.SerializeObject(this, Formatting.Indented);
+        return JsonSerializer.Serialize(this, new JsonSerializerOptions 
+        { 
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        });
     }
 }
 

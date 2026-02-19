@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AgentScope.Core.Formatter.OpenAI.Dto;
 using AgentScope.Core.Message;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace AgentScope.Core.Formatter.OpenAI;
 
@@ -166,11 +165,11 @@ public static class OpenAIMessageConverter
             return text;
         }
 
-        // 如果是JObject或Dictionary，尝试提取text字段
-        // If JObject or Dictionary, try to extract text field
-        if (msg.Content is JObject jobj && jobj.TryGetValue("text", out var jtext))
+        // 如果是JsonObject或Dictionary，尝试提取text字段
+        // If JsonObject or Dictionary, try to extract text field
+        if (msg.Content is JsonObject jsonObj && jsonObj.TryGetPropertyValue("text", out var jsonText))
         {
-            return jtext?.ToString() ?? string.Empty;
+            return jsonText?.ToString() ?? string.Empty;
         }
 
         if (msg.Content is Dictionary<string, object> dict && dict.TryGetValue("text", out var textObj))
@@ -180,7 +179,7 @@ public static class OpenAIMessageConverter
 
         // 否则序列化为JSON字符串
         // Otherwise serialize to JSON string
-        return JsonConvert.SerializeObject(msg.Content);
+        return JsonSerializer.Serialize(msg.Content);
     }
 
     /// <summary>
@@ -398,9 +397,9 @@ public static class OpenAIMessageConverter
                         toolCalls.Add(toolCall);
                     }
                 }
-                else if (call is JObject jobj)
+                else if (call is JsonObject jsonObj)
                 {
-                    var toolCall = ParseToolCallFromJObject(jobj);
+                    var toolCall = ParseToolCallFromJsonObject(jsonObj);
                     if (toolCall != null)
                     {
                         toolCalls.Add(toolCall);
@@ -427,7 +426,7 @@ public static class OpenAIMessageConverter
             idObj?.ToString() : Guid.NewGuid().ToString();
 
         var arguments = dict.TryGetValue("arguments", out var argsObj) ?
-            JsonConvert.SerializeObject(argsObj) : "{}";
+            JsonSerializer.Serialize(argsObj) : "{}";
 
         return new OpenAIToolCall
         {
@@ -442,19 +441,19 @@ public static class OpenAIMessageConverter
     }
 
     /// <summary>
-    /// 从JObject解析工具调用
-    /// Parse tool call from JObject
+    /// 从JsonObject解析工具调用
+    /// Parse tool call from JsonObject
     /// </summary>
-    private static OpenAIToolCall? ParseToolCallFromJObject(JObject jobj)
+    private static OpenAIToolCall? ParseToolCallFromJsonObject(JsonObject jsonObj)
     {
-        var name = jobj["name"]?.ToString();
+        var name = jsonObj["name"]?.ToString();
         if (string.IsNullOrWhiteSpace(name))
         {
             return null;
         }
 
-        var id = jobj["id"]?.ToString() ?? Guid.NewGuid().ToString();
-        var arguments = jobj["arguments"]?.ToString() ?? "{}";
+        var id = jsonObj["id"]?.ToString() ?? Guid.NewGuid().ToString();
+        var arguments = jsonObj["arguments"]?.ToString() ?? "{}";
 
         return new OpenAIToolCall
         {

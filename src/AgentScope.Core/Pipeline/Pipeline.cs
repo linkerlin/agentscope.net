@@ -151,23 +151,28 @@ public class PipelineBuilder
     }
 
     /// <summary>
-    /// Adds a node that wraps an agent.
+    /// Adds a node to the pipeline, wrapping with sequential if needed.
     /// </summary>
-    public PipelineBuilder Agent(Agent.IAgent agent, string? name = null)
+    private PipelineBuilder AddNode(IPipelineNode node)
     {
-        var node = new AgentPipelineNode(name ?? agent.Name, agent);
-        
         if (_rootNode == null)
         {
             _rootNode = node;
         }
         else
         {
-            // Wrap existing root with sequential node
             _rootNode = new SequentialPipelineNode("pipeline", _rootNode, node);
         }
-        
         return this;
+    }
+
+    /// <summary>
+    /// Adds a node that wraps an agent.
+    /// </summary>
+    public PipelineBuilder Agent(Agent.IAgent agent, string? name = null)
+    {
+        var node = new AgentPipelineNode(name ?? agent.Name, agent);
+        return AddNode(node);
     }
 
     /// <summary>
@@ -176,17 +181,7 @@ public class PipelineBuilder
     public PipelineBuilder If(Func<PipelineContext, bool> condition, IPipelineNode thenNode, IPipelineNode? elseNode = null)
     {
         var ifNode = new IfElsePipelineNode("if", condition, thenNode, elseNode);
-        
-        if (_rootNode == null)
-        {
-            _rootNode = ifNode;
-        }
-        else
-        {
-            _rootNode = new SequentialPipelineNode("pipeline", _rootNode, ifNode);
-        }
-        
-        return this;
+        return AddNode(ifNode);
     }
 
     /// <summary>
@@ -195,17 +190,7 @@ public class PipelineBuilder
     public PipelineBuilder Loop(Func<PipelineContext, bool> condition, IPipelineNode bodyNode, int maxIterations = 100)
     {
         var loopNode = new LoopPipelineNode("loop", condition, bodyNode, maxIterations);
-        
-        if (_rootNode == null)
-        {
-            _rootNode = loopNode;
-        }
-        else
-        {
-            _rootNode = new SequentialPipelineNode("pipeline", _rootNode, loopNode);
-        }
-        
-        return this;
+        return AddNode(loopNode);
     }
 
     /// <summary>
@@ -214,17 +199,7 @@ public class PipelineBuilder
     public PipelineBuilder Parallel(params IPipelineNode[] nodes)
     {
         var parallelNode = new ParallelPipelineNode("parallel", nodes);
-        
-        if (_rootNode == null)
-        {
-            _rootNode = parallelNode;
-        }
-        else
-        {
-            _rootNode = new SequentialPipelineNode("pipeline", _rootNode, parallelNode);
-        }
-        
-        return this;
+        return AddNode(parallelNode);
     }
 
     /// <summary>
@@ -233,17 +208,7 @@ public class PipelineBuilder
     public PipelineBuilder Transform(Func<Msg, Msg> transform, string? name = null)
     {
         var transformNode = new TransformPipelineNode(name ?? "transform", transform);
-        
-        if (_rootNode == null)
-        {
-            _rootNode = transformNode;
-        }
-        else
-        {
-            _rootNode = new SequentialPipelineNode("pipeline", _rootNode, transformNode);
-        }
-        
-        return this;
+        return AddNode(transformNode);
     }
 
     /// <summary>
@@ -251,16 +216,7 @@ public class PipelineBuilder
     /// </summary>
     public PipelineBuilder Add(IPipelineNode node)
     {
-        if (_rootNode == null)
-        {
-            _rootNode = node;
-        }
-        else
-        {
-            _rootNode = new SequentialPipelineNode("pipeline", _rootNode, node);
-        }
-        
-        return this;
+        return AddNode(node);
     }
 
     /// <summary>
