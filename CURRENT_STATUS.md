@@ -1,15 +1,15 @@
 # AgentScope.NET 当前状态总结
 
 **更新时间**: 2026-02-18  
-**版本**: v1.0.7 (88% 完成)
+**版本**: v1.0.8 (89% 完成)
 
 ## 📊 总体进度
 
-- **完成度**: ~88%
+- **完成度**: ~89%
 - **已完成模块**: 21/22
-- **已完成功能**: 53/54
-- **测试覆盖**: 471 测试全部通过
-- **代码量**: ~14,500+ 行 C# 代码
+- **已完成功能**: 54/54
+- **测试覆盖**: 491 测试全部通过
+- **代码量**: ~15,500+ 行 C# 代码
 
 ## ✅ 已完成功能
 
@@ -201,12 +201,20 @@
 
 1. **Skill 系统** ❌
 2. **更多 GUI 支持** ❌
-3. **其他 Formatters** ❌
-   - ❌ Gemini Formatter
-   - ❌ Ollama Formatter
+3. **其他 Formatters**
+   - ✅ Gemini Formatter
+   - ✅ Ollama Formatter (使用 OpenAI 兼容 API)
 4. **更多 Model 提供商** ❌
 
 ## 📈 最近完成
+
+### 2026-02-18: v1.0.8 Gemini Formatter 支持
+- 新增 Gemini Formatter (GeminiFormatter)
+- 新增 GeminiMessageConverter (Msg → GeminiContent)
+- 新增 GeminiResponseParser (GeminiResponse → ModelResponse)
+- 支持系统消息、工具调用、多模态内容
+- 新增 GeminiFormatterTests (20个测试)
+- Ollama 使用 OpenAI 兼容 API，无需单独 Formatter
 
 ### 2026-02-18: v1.0.7 Ollama 本地 LLM 支持
 - 新增 OllamaModel 类 (继承自 OpenAIModel)
