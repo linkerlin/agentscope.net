@@ -27,49 +27,49 @@ namespace AgentScope.Core.Pipeline;
 /// </summary>
 public class PipelineContext
 {
-    /// <summary>
-    /// Shared state dictionary for passing data between nodes.
-/// </summary>
+/// <summary>
+    /// 节点间传递数据的共享状态字典。
+    /// </summary>
     public Dictionary<string, object> State { get; set; } = new();
 
-    /// <summary>
-    /// Execution metadata (timing, node info, etc.).
+/// <summary>
+    /// 执行元数据（计时、节点信息等）。
     /// </summary>
     public Dictionary<string, object> Metadata { get; set; } = new();
 
-    /// <summary>
-    /// Current execution depth (for nested pipelines).
+/// <summary>
+    /// 当前执行深度（用于嵌套 Pipeline）。
     /// </summary>
     public int Depth { get; set; }
 
-    /// <summary>
-    /// Maximum allowed execution depth.
+/// <summary>
+    /// 允许的最大执行深度。
     /// </summary>
     public int MaxDepth { get; set; } = 10;
 
-    /// <summary>
-    /// Cancellation token for the pipeline execution.
+/// <summary>
+    /// Pipeline 执行的取消令牌。
     /// </summary>
     public CancellationToken CancellationToken { get; set; }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether the pipeline should stop.
+/// <summary>
+    /// 获取或设置一个值，指示 Pipeline 是否应停止。
     /// </summary>
     public bool IsStopped { get; set; }
 
-    /// <summary>
-    /// Gets or sets the stop reason if the pipeline was stopped.
+/// <summary>
+    /// 获取或设置 Pipeline 停止的原因（如果已停止）。
     /// </summary>
     public string? StopReason { get; set; }
 
-    /// <summary>
-    /// Creates a child context for nested pipeline execution.
+/// <summary>
+    /// 为嵌套 Pipeline 执行创建子上下文。
     /// </summary>
     public PipelineContext CreateChildContext()
     {
         return new PipelineContext
         {
-            State = State, // Share state with parent
+            State = State, // 与父级共享状态
             Metadata = new Dictionary<string, object>(Metadata),
             Depth = Depth + 1,
             MaxDepth = MaxDepth,
@@ -77,8 +77,8 @@ public class PipelineContext
         };
     }
 
-    /// <summary>
-    /// Gets a value from the state dictionary.
+/// <summary>
+    /// 从状态字典获取值。
     /// </summary>
     public T? GetValue<T>(string key)
     {
@@ -89,8 +89,8 @@ public class PipelineContext
         return default;
     }
 
-    /// <summary>
-    /// Sets a value in the state dictionary.
+/// <summary>
+    /// 在状态字典中设置值。
     /// </summary>
     public void SetValue<T>(string key, T value)
     {
@@ -104,49 +104,49 @@ public class PipelineContext
 /// </summary>
 public class PipelineResult
 {
-    /// <summary>
-    /// Whether the node executed successfully.
+/// <summary>
+    /// 节点是否执行成功。
     /// </summary>
     public bool Success { get; set; }
 
-    /// <summary>
-    /// Output message from the node.
+/// <summary>
+    /// 节点的输出消息。
     /// </summary>
     public Msg? Output { get; set; }
 
-    /// <summary>
-    /// Error message if execution failed.
+/// <summary>
+    /// 执行失败时的错误消息。
     /// </summary>
     public string? Error { get; set; }
 
-    /// <summary>
-    /// Whether to stop the pipeline after this node.
+/// <summary>
+    /// 此节点后是否停止 Pipeline。
     /// </summary>
     public bool StopPipeline { get; set; }
 
-    /// <summary>
-    /// Additional metadata from the execution.
+/// <summary>
+    /// 执行的附加元数据。
     /// </summary>
     public Dictionary<string, object> Metadata { get; } = new();
 
-    /// <summary>
-    /// Creates a successful result.
+/// <summary>
+    /// 创建成功结果。
     /// </summary>
     public static PipelineResult SuccessResult(Msg? output = null)
     {
         return new PipelineResult { Success = true, Output = output };
     }
 
-    /// <summary>
-    /// Creates a failed result.
+/// <summary>
+    /// 创建失败结果。
     /// </summary>
     public static PipelineResult FailureResult(string error)
     {
         return new PipelineResult { Success = false, Error = error };
     }
 
-    /// <summary>
-    /// Creates a result that stops the pipeline.
+/// <summary>
+    /// 创建停止 Pipeline 的结果。
     /// </summary>
     public static PipelineResult StopResult(Msg? output = null, string? reason = null)
     {
@@ -167,13 +167,13 @@ public class PipelineResult
 /// </summary>
 public interface IPipelineNode
 {
-    /// <summary>
-    /// Node name.
+/// <summary>
+    /// 节点名称。
     /// </summary>
     string Name { get; }
 
-    /// <summary>
-    /// Executes the node with the given input and context.
+/// <summary>
+    /// 使用给定输入和上下文执行节点。
     /// </summary>
     Task<PipelineResult> ExecuteAsync(Msg input, PipelineContext context);
 }
@@ -193,25 +193,25 @@ public abstract class PipelineNodeBase : IPipelineNode
 
     public abstract Task<PipelineResult> ExecuteAsync(Msg input, PipelineContext context);
 
-    /// <summary>
-    /// Validates that the context is valid for execution.
+/// <summary>
+    /// 验证上下文是否可用于执行。
     /// </summary>
     protected virtual void ValidateContext(PipelineContext context)
     {
         if (context.Depth > context.MaxDepth)
         {
-            throw new PipelineException($"Maximum pipeline depth ({context.MaxDepth}) exceeded");
+            throw new PipelineException($"超过最大 Pipeline 深度 ({context.MaxDepth})");
         }
 
         if (context.CancellationToken.IsCancellationRequested)
         {
-            throw new OperationCanceledException("Pipeline execution was cancelled");
+            throw new OperationCanceledException("Pipeline 执行已取消");
         }
     }
 }
 
 /// <summary>
-/// Pipeline exception.
+/// Pipeline 异常。
 /// </summary>
 public class PipelineException : System.Exception
 {

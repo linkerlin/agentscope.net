@@ -164,7 +164,7 @@ public abstract class ServiceBase : AgentBase, IService
             {
                 return Msg.Builder()
                     .Role("system")
-                    .Content($"Service {Info.Name} is not running. Current status: {Status}")
+                    .Content($"服务 {Info.Name} 未运行。当前状态：{Status}")
                     .Build();
             }
 
@@ -212,8 +212,8 @@ public abstract class ServiceBase : AgentBase, IService
             }
             catch (global::System.Exception)
             {
-                // Log heartbeat error but don't stop the service
-                // Log heartbeat error but don't stop the service
+// 记录心跳错误但不停止服务
+            // Log heartbeat error but don't stop the service
             }
         }
     }

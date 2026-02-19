@@ -173,7 +173,7 @@ public class PipelineTests
         var result = await parallel.ExecuteAsync(input, context);
 
         Assert.False(result.Success);
-        Assert.Contains("Parallel execution failed", result.Error);
+        Assert.Contains("并行执行失败", result.Error);
     }
 
     #endregion
@@ -270,7 +270,7 @@ public class PipelineTests
         var result = await loop.ExecuteAsync(input, context);
 
         Assert.False(result.Success);
-        Assert.Contains("exceeded maximum iterations", result.Error);
+        Assert.Contains("循环超过最大迭代次数", result.Error);
     }
 
     [Fact]

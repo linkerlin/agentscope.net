@@ -18,16 +18,16 @@ using System.IO;
 namespace AgentScope.Core.Configuration;
 
 /// <summary>
-/// Configuration manager for AgentScope that loads settings from .env file
+/// AgentScope 配置管理器，从 .env 文件加载设置
 /// </summary>
 public static class ConfigurationManager
 {
     private static bool _isLoaded = false;
 
     /// <summary>
-    /// Load configuration from .env file
+    /// 从 .env 文件加载配置
     /// </summary>
-    /// <param name="envFilePath">Path to .env file. If null, searches in current and parent directories.</param>
+    /// <param name="envFilePath">.env 文件路径。如果为空，则在当前目录和父目录中搜索。</param>
     public static void Load(string? envFilePath = null)
     {
         if (_isLoaded)
@@ -39,11 +39,11 @@ public static class ConfigurationManager
         {
             if (envFilePath == null)
             {
-                // Search for .env file in current and parent directories
+                // 在当前目录和父目录中搜索 .env 文件
                 var currentDir = Directory.GetCurrentDirectory();
                 var searchPath = currentDir;
 
-                for (int i = 0; i < 5; i++) // Search up to 5 levels
+                for (int i = 0; i < 5; i++) // 最多向上搜索5层
                 {
                     var envPath = Path.Combine(searchPath, ".env");
                     if (File.Exists(envPath))
@@ -68,12 +68,12 @@ public static class ConfigurationManager
         }
         catch (System.Exception ex)
         {
-            Console.WriteLine($"Warning: Failed to load .env file: {ex.Message}");
+            Console.WriteLine($"警告：加载 .env 文件失败：{ex.Message}");
         }
     }
 
     /// <summary>
-    /// Get configuration value
+    /// 获取配置值
     /// </summary>
     public static string? Get(string key, string? defaultValue = null)
     {
@@ -86,47 +86,47 @@ public static class ConfigurationManager
     }
 
     /// <summary>
-    /// Get OpenAI API key
+    /// 获取 OpenAI API 密钥
     /// </summary>
     public static string? GetOpenAIApiKey() => Get("OPENAI_API_KEY");
 
     /// <summary>
-    /// Get Azure OpenAI API key
+    /// 获取 Azure OpenAI API 密钥
     /// </summary>
     public static string? GetAzureOpenAIApiKey() => Get("AZURE_OPENAI_API_KEY");
 
     /// <summary>
-    /// Get Azure OpenAI endpoint
+    /// 获取 Azure OpenAI 端点
     /// </summary>
     public static string? GetAzureOpenAIEndpoint() => Get("AZURE_OPENAI_ENDPOINT");
 
     /// <summary>
-    /// Get Anthropic API key
+    /// 获取 Anthropic API 密钥
     /// </summary>
     public static string? GetAnthropicApiKey() => Get("ANTHROPIC_API_KEY");
 
     /// <summary>
-    /// Get DashScope API key
+    /// 获取 DashScope API 密钥
     /// </summary>
     public static string? GetDashScopeApiKey() => Get("DASHSCOPE_API_KEY");
 
     /// <summary>
-    /// Get database path
+    /// 获取数据库路径
     /// </summary>
     public static string GetDatabasePath() => Get("DATABASE_PATH", "agentscope.db")!;
 
     /// <summary>
-    /// Get log level
+    /// 获取日志级别
     /// </summary>
     public static string GetLogLevel() => Get("LOG_LEVEL", "Information")!;
 
     /// <summary>
-    /// Get max iterations
+    /// 获取最大迭代次数
     /// </summary>
     public static int GetMaxIterations() => int.TryParse(Get("MAX_ITERATIONS"), out var value) ? value : 10;
 
     /// <summary>
-    /// Get default model
+    /// 获取默认模型
     /// </summary>
     public static string GetDefaultModel() => Get("DEFAULT_MODEL", "gpt-3.5-turbo")!;
 }

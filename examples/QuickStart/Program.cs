@@ -1,4 +1,4 @@
-﻿// Copyright 2024-2026 the original author or authors.
+// Copyright 2024-2026 the original author or authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,17 +31,17 @@ class Program
     static async Task Main(string[] args)
     {
         Console.WriteLine($"{CoreVersion.GetFullVersion()}\n");
-        Console.WriteLine("QuickStart Example - Simple Agent Chat\n");
+        Console.WriteLine("快速入门示例 - 简单 Agent 聊天\n");
 
-        // Load .env file
+        // 加载 .env 文件
         var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
         if (File.Exists(envPath))
         {
             Env.Load(envPath);
         }
 
-        // Configure model from environment variables
-        // Priority: DeepSeek > OpenAI Compatible > MockModel
+        // 从环境变量配置模型
+        // 优先级：DeepSeek > OpenAI Compatible > MockModel
         IModel model;
         var deepseekApiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
         var deepseekModel = Environment.GetEnvironmentVariable("DEEPSEEK_MODEL");
@@ -51,8 +51,8 @@ class Program
 
         if (!string.IsNullOrEmpty(deepseekApiKey) && !string.IsNullOrEmpty(deepseekModel))
         {
-            // Use DeepSeek
-            Console.WriteLine($"Using DeepSeek model: {deepseekModel}\n");
+            // 使用 DeepSeek
+            Console.WriteLine($"使用 DeepSeek 模型：{deepseekModel}\n");
             model = DeepSeekModel.Builder()
                 .ModelName(deepseekModel)
                 .ApiKey(deepseekApiKey)
@@ -60,25 +60,25 @@ class Program
         }
         else if (!string.IsNullOrEmpty(openaiApiKey))
         {
-            // Use OpenAI Compatible API
+            // 使用 OpenAI 兼容 API
             var modelName = openaiModel ?? "gpt-3.5-turbo";
-            Console.WriteLine($"Using OpenAI Compatible model: {modelName}\n");
+            Console.WriteLine($"使用 OpenAI 兼容模型：{modelName}\n");
             model = new OpenAIModel(modelName, openaiApiKey, openaiBaseUrl);
         }
         else
         {
-            // Fallback to MockModel
-            Console.WriteLine("No LLM API key found, using MockModel for testing.\n");
-            Console.WriteLine("Set DEEPSEEK_API_KEY or OPENAI_API_KEY to use real LLM.\n");
+            // 回退到 MockModel
+            Console.WriteLine("未找到 LLM API 密钥，使用 MockModel 进行测试。\n");
+            Console.WriteLine("设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY 以使用真实 LLM。\n");
             model = MockModel.Builder()
                 .ModelName("mock-model")
                 .Build();
         }
 
-        // Create persistent memory
+        // 创建持久化记忆
         var memory = new SqliteMemory("example.db");
 
-        // Create ReActAgent
+        // 创建 ReActAgent
         var agent = ReActAgent.Builder()
             .Name("Assistant")
             .SysPrompt("You are a helpful AI assistant.")
@@ -86,12 +86,12 @@ class Program
             .Memory(memory)
             .Build();
 
-        Console.WriteLine("Agent created successfully!");
-        Console.WriteLine($"Agent Name: {agent.Name}");
-        Console.WriteLine($"Memory Count: {memory.Count()}\n");
+        Console.WriteLine("Agent 创建成功！");
+        Console.WriteLine($"Agent 名称：{agent.Name}");
+        Console.WriteLine($"记忆数量：{memory.Count()}\n");
 
-        // Simple conversation loop
-        Console.WriteLine("Type your message (or 'quit' to exit):\n");
+        // 简单对话循环
+        Console.WriteLine("输入您的消息（或输入 'quit' 退出）：\n");
 
         while (true)
         {
@@ -103,20 +103,20 @@ class Program
                 break;
             }
 
-            // Create user message
+            // 创建用户消息
             var userMsg = Msg.Builder()
                 .Role("user")
                 .TextContent(input)
                 .Build();
 
-            // Call agent
+            // 调用 Agent
             var response = await agent.CallAsync(userMsg);
             var responseText = response.GetTextContent();
 
             Console.WriteLine($"Assistant: {responseText}\n");
         }
 
-        Console.WriteLine("\nGoodbye!");
-        Console.WriteLine($"Total messages in memory: {memory.Count()}");
+        Console.WriteLine("\n再见！");
+        Console.WriteLine($"记忆中的消息总数：{memory.Count()}");
     }
 }

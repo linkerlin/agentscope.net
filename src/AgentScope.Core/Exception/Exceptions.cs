@@ -17,7 +17,7 @@ using System;
 namespace AgentScope.Core.Exception;
 
 /// <summary>
-/// Base exception for AgentScope
+/// AgentScope 基础异常
 /// </summary>
 public class AgentScopeException : System.Exception
 {
@@ -29,7 +29,7 @@ public class AgentScopeException : System.Exception
 }
 
 /// <summary>
-/// Exception for model errors
+/// 模型错误异常
 /// </summary>
 public class ModelException : AgentScopeException
 {
@@ -41,7 +41,7 @@ public class ModelException : AgentScopeException
 }
 
 /// <summary>
-/// Exception for tool execution errors
+/// 工具执行错误异常
 /// </summary>
 public class ToolException : AgentScopeException
 {
@@ -53,7 +53,7 @@ public class ToolException : AgentScopeException
 }
 
 /// <summary>
-/// Exception for agent errors
+/// Agent 错误异常
 /// </summary>
 public class AgentException : AgentScopeException
 {
@@ -65,7 +65,7 @@ public class AgentException : AgentScopeException
 }
 
 /// <summary>
-/// Exception for memory errors
+/// 记忆错误异常
 /// </summary>
 public class MemoryException : AgentScopeException
 {

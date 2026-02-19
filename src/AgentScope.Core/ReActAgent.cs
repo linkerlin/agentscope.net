@@ -155,7 +155,7 @@ public class ReActAgent : AgentBase
 
         if (iteration >= _maxIterations && string.IsNullOrEmpty(finalResponse))
         {
-            finalResponse = "Reached maximum iterations without conclusion.";
+            finalResponse = "达到最大迭代次数但未得出结论。";
         }
 
         return Msg.Builder()
@@ -183,7 +183,7 @@ public class ReActAgent : AgentBase
 
             if (!response.Success)
             {
-                return ReasoningResult.Error(response.Error ?? "Model error");
+                return ReasoningResult.Error(response.Error ?? "模型错误");
             }
 
             var thought = ParseThought(response.Text ?? "");
@@ -191,7 +191,7 @@ public class ReActAgent : AgentBase
         }
         catch (System.Exception ex)
         {
-            return ReasoningResult.Error($"Reasoning error: {ex.Message}");
+            return ReasoningResult.Error($"推理错误：{ex.Message}");
         }
     }
 
@@ -221,13 +221,13 @@ public class ReActAgent : AgentBase
             }
             else
             {
-                // Unknown action, treat as finish
+                // 未知行动，当作完成处理
                 return ActionResult.Finish(reasoning.Thought ?? "Done");
             }
         }
         catch (System.Exception ex)
         {
-            return ActionResult.Error($"Acting error: {ex.Message}");
+            return ActionResult.Error($"行动错误：{ex.Message}");
         }
     }
 
@@ -322,7 +322,7 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
         return Msg.Builder()
             .Name(Name)
             .Role("assistant")
-            .TextContent($"Error: {error}")
+            .TextContent($"错误：{error}")
             .Build();
     }
 
@@ -333,7 +333,7 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
 }
 
 /// <summary>
-/// Builder for ReActAgent
+/// ReActAgent 构建器
 /// </summary>
 public class ReActAgentBuilder
 {
@@ -390,7 +390,7 @@ public class ReActAgentBuilder
     {
         if (_model == null)
         {
-            throw new InvalidOperationException("Model is required");
+            throw new InvalidOperationException("必须指定模型");
         }
 
         return new ReActAgent(_name, _model, _sysPrompt, _memory, _tools, _maxIterations);

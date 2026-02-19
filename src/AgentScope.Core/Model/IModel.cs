@@ -20,7 +20,7 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Model;
 
 /// <summary>
-/// Model request for LLM
+/// LLM 模型请求
 /// </summary>
 public class ModelRequest
 {
@@ -29,7 +29,7 @@ public class ModelRequest
 }
 
 /// <summary>
-/// Model response from LLM
+/// LLM 模型响应
 /// </summary>
 public class ModelResponse
 {
@@ -40,7 +40,7 @@ public class ModelResponse
 }
 
 /// <summary>
-/// Interface for LLM models
+/// LLM 模型接口
 /// </summary>
 public interface IModel
 {
@@ -52,7 +52,7 @@ public interface IModel
 }
 
 /// <summary>
-/// Abstract base class for models
+/// 模型抽象基类
 /// </summary>
 public abstract class ModelBase : IModel
 {

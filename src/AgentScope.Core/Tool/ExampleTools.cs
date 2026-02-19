@@ -19,7 +19,7 @@ using System.Threading.Tasks;
 namespace AgentScope.Core.Tool;
 
 /// <summary>
-/// Example tool that calculates the sum of two numbers
+/// 计算两个数字之和的示例工具
 /// </summary>
 public class CalculatorTool : ToolBase
 {
@@ -44,12 +44,12 @@ public class CalculatorTool : ToolBase
                         ["a"] = new Dictionary<string, object>
                         {
                             ["type"] = "number",
-                            ["description"] = "First number"
+                            ["description"] = "第一个数字"
                         },
                         ["b"] = new Dictionary<string, object>
                         {
                             ["type"] = "number",
-                            ["description"] = "Second number"
+                            ["description"] = "第二个数字"
                         }
                     },
                     ["required"] = new[] { "a", "b" }
@@ -64,7 +64,7 @@ public class CalculatorTool : ToolBase
         {
             if (!parameters.ContainsKey("a") || !parameters.ContainsKey("b"))
             {
-                return Task.FromResult(ToolResult.Fail("Missing required parameters: a and b"));
+                return Task.FromResult(ToolResult.Fail("缺少必需参数：a 和 b"));
             }
 
             var a = Convert.ToDouble(parameters["a"]);
@@ -75,13 +75,13 @@ public class CalculatorTool : ToolBase
         }
         catch (System.Exception ex)
         {
-            return Task.FromResult(ToolResult.Fail($"Error: {ex.Message}"));
+            return Task.FromResult(ToolResult.Fail($"错误：{ex.Message}"));
         }
     }
 }
 
 /// <summary>
-/// Example tool that gets the current time
+/// 获取当前时间的示例工具
 /// </summary>
 public class GetTimeTool : ToolBase
 {

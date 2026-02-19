@@ -261,13 +261,13 @@ public class ServiceManager : IDisposable
                     var isHealthy = await service.HealthCheckAsync();
                     if (!isHealthy)
                     {
-                        Console.Error.WriteLine($"Health check failed for service {service.Info.Name}");
+                        Console.Error.WriteLine($"服务 {service.Info.Name} 健康检查失败");
                     }
                 }
             }
             catch (global::System.Exception ex)
             {
-                Console.Error.WriteLine($"Error during health check for service {service.Info.Name}: {ex.Message}");
+                Console.Error.WriteLine($"服务 {service.Info.Name} 健康检查出错：{ex.Message}");
             }
         }
     }

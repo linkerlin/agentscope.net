@@ -193,7 +193,7 @@ public class InMemoryServiceDiscovery : IServiceDiscovery, IDisposable
                 }
                 catch (global::System.Exception ex)
                 {
-                    Console.Error.WriteLine($"Error notifying watcher: {ex.Message}");
+                    Console.Error.WriteLine($"通知观察者时出错：{ex.Message}");
                 }
             }
         }

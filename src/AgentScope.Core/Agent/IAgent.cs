@@ -20,7 +20,7 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Agent;
 
 /// <summary>
-/// Interface for all agents
+/// 所有 Agent 的接口
 /// </summary>
 public interface IAgent
 {
@@ -32,7 +32,7 @@ public interface IAgent
 }
 
 /// <summary>
-/// Abstract base class for agents
+/// Agent 抽象基类
 /// </summary>
 public abstract class AgentBase : IAgent
 {

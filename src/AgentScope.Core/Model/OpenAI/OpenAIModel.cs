@@ -49,8 +49,8 @@ public class OpenAIModel : ModelBase
     private readonly string _modelName;
     private readonly GenerateOptions? _defaultOptions;
 
-    /// <summary>
-    /// Creates a new OpenAI chat model instance.
+/// <summary>
+    /// 创建新的 OpenAI 聊天模型实例。
     /// </summary>
     public OpenAIModel(
         string modelName,
@@ -88,17 +88,17 @@ public class OpenAIModel : ModelBase
         // Format messages
         var openaiRequest = _formatter.Format(messages, options);
 
-        // Make API call
+        // 调用 API
         var response = await _client.CallAsync(_apiKey, _baseUrl, openaiRequest);
 
-        // Parse response
+        // 解析响应
         var parsedResponse = _formatter.Parse(response);
         var chatResponse = ConvertToChatResponse(parsedResponse);
         return chatResponse;
     }
 
-    /// <summary>
-    /// Generate streaming response.
+/// <summary>
+    /// 生成流式响应。
     /// </summary>
     public async IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
         List<Msg> messages,
@@ -124,8 +124,8 @@ public class OpenAIModel : ModelBase
         }
     }
 
-    /// <summary>
-    /// Merge provided options with default options.
+/// <summary>
+    /// 合并提供的选项与默认选项。
     /// </summary>
     private GenerateOptions? MergeOptions(GenerateOptions? options, GenerateOptions? defaults)
     {
@@ -148,8 +148,8 @@ public class OpenAIModel : ModelBase
         return merged;
     }
 
-    /// <summary>
-    /// Convert Dictionary<string, object> to GenerateOptions.
+/// <summary>
+    /// 将 Dictionary&lt;string, object&gt; 转换为 GenerateOptions。
     /// </summary>
     private GenerateOptions? ConvertOptions(Dictionary<string, object>? options)
     {
@@ -178,8 +178,8 @@ public class OpenAIModel : ModelBase
         return result;
     }
 
-    /// <summary>
-    /// Convert ParsedResponse to ChatResponse.
+/// <summary>
+    /// 将 ParsedResponse 转换为 ChatResponse。
     /// </summary>
     private ChatResponse ConvertToChatResponse(ParsedResponse parsed)
     {
@@ -188,7 +188,7 @@ public class OpenAIModel : ModelBase
             Id = parsed.Id,
             Model = parsed.Model,
             Content = parsed.TextContent,
-            Text = parsed.TextContent, // Also set Text for ModelResponse compatibility
+            Text = parsed.TextContent, // 同时设置 Text 以兼容 ModelResponse
             StopReason = parsed.FinishReason,
             Success = true
         };
@@ -221,13 +221,13 @@ public class OpenAIModel : ModelBase
         return chatResponse;
     }
 
-    /// <summary>
-    /// Create a new builder for OpenAIModel.
+/// <summary>
+    /// 创建 OpenAIModel 的新构建器。
     /// </summary>
     public static Builder CreateBuilder() => new();
 
-    /// <summary>
-    /// Builder for OpenAIModel.
+/// <summary>
+    /// OpenAIModel 构建器。
     /// </summary>
     public class Builder
     {
@@ -278,7 +278,7 @@ public class OpenAIModel : ModelBase
         {
             if (string.IsNullOrEmpty(_modelName))
             {
-                throw new ArgumentException("Model name must be set");
+                throw new ArgumentException("必须设置模型名称");
             }
 
             return new OpenAIModel(

@@ -48,8 +48,8 @@ public class AnthropicModel : ModelBase
     private readonly string _modelName;
     private readonly GenerateOptions? _defaultOptions;
 
-    /// <summary>
-    /// Creates a new Anthropic model instance.
+/// <summary>
+    /// 创建新的 Anthropic 模型实例。
     /// </summary>
     public AnthropicModel(
         string modelName,
@@ -98,14 +98,14 @@ public class AnthropicModel : ModelBase
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new ModelException($"Anthropic API error: {response.StatusCode} - {responseBody}");
+            throw new ModelException($"Anthropic API 错误：{response.StatusCode} - {responseBody}");
         }
 
         // Parse response
         var parsedResponse = _formatter.Parse(responseBody);
         if (parsedResponse == null)
         {
-            throw new ModelException("Failed to parse Anthropic response");
+            throw new ModelException("解析 Anthropic 响应失败");
         }
 
         return new ModelResponse
@@ -118,8 +118,8 @@ public class AnthropicModel : ModelBase
         };
     }
 
-    /// <summary>
-    /// Generate streaming response.
+/// <summary>
+    /// 生成流式响应。
     /// </summary>
     public async IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
         List<Msg> messages,
@@ -159,7 +159,7 @@ public class AnthropicModel : ModelBase
             var line = await reader.ReadLineAsync(cancellationToken);
             if (string.IsNullOrWhiteSpace(line)) continue;
 
-            // Parse SSE format: "data: {...}"
+            // 解析 SSE 格式："data: {...}"
             if (line.StartsWith("data: "))
             {
                 var data = line.Substring(6);
@@ -282,13 +282,13 @@ public class AnthropicModel : ModelBase
         var envKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
         if (!string.IsNullOrEmpty(envKey)) return envKey;
         
-        throw new ModelException(
-            "Anthropic API key not found. Please set ANTHROPIC_API_KEY environment variable or provide apiKey parameter.");
+throw new ModelException(
+            "未找到 Anthropic API 密钥。请设置 ANTHROPIC_API_KEY 环境变量或提供 apiKey 参数。");
     }
 }
 
 /// <summary>
-/// Serializer options for Anthropic API.
+/// Anthropic API 的序列化选项。
 /// </summary>
 public static class AnthropicSerializerOptions
 {

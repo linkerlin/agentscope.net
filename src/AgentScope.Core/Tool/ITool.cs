@@ -19,7 +19,7 @@ using System.Threading.Tasks;
 namespace AgentScope.Core.Tool;
 
 /// <summary>
-/// Tool result
+/// 工具执行结果
 /// </summary>
 public class ToolResult
 {
@@ -39,7 +39,7 @@ public class ToolResult
 }
 
 /// <summary>
-/// Interface for tools that agents can use
+/// Agent 可使用的工具接口
 /// </summary>
 public interface ITool
 {
@@ -53,7 +53,7 @@ public interface ITool
 }
 
 /// <summary>
-/// Abstract base class for tools
+/// 工具抽象基类
 /// </summary>
 public abstract class ToolBase : ITool
 {

@@ -45,7 +45,7 @@ public class SequentialPipelineNode : PipelineNodeBase
         Msg currentInput = input;
         PipelineResult? lastResult = null;
 
-        // Increment node count in metadata
+        // 在元数据中增加节点计数
         context.Metadata["nodeCount"] = context.Metadata.TryGetValue("nodeCount", out var count) 
             ? (int)count + _nodes.Count 
             : _nodes.Count;
@@ -69,7 +69,7 @@ public class SequentialPipelineNode : PipelineNodeBase
                 return lastResult;
             }
 
-            // Use output as input for next node
+            // 使用输出作为下一个节点的输入
             if (lastResult.Output != null)
             {
                 currentInput = lastResult.Output;
@@ -106,20 +106,20 @@ public class ParallelPipelineNode : PipelineNodeBase
             ? (int)count + _nodes.Count 
             : _nodes.Count;
 
-        // Execute all nodes in parallel
+        // 并行执行所有节点
         var tasks = _nodes.Select(node => node.ExecuteAsync(input, context)).ToArray();
         
         var results = await Task.WhenAll(tasks);
 
-        // Check for failures
+        // 检查失败
         var failures = results.Where(r => !r.Success).ToList();
         if (failures.Any())
         {
-            return PipelineResult.FailureResult(
-                $"Parallel execution failed: {string.Join(", ", failures.Select(f => f.Error))}");
+return PipelineResult.FailureResult(
+                $"并行执行失败：{string.Join(", ", failures.Select(f => f.Error))}");
         }
 
-        // Combine outputs into a single message
+        // 将输出合并为单个消息
         var outputs = results.Where(r => r.Output != null).Select(r => r.Output!).ToList();
         var combinedContent = string.Join("\n\n", outputs.Select(o => o.GetTextContent()));
         
@@ -169,7 +169,7 @@ public class IfElsePipelineNode : PipelineNodeBase
         }
         catch (System.Exception ex)
         {
-            return PipelineResult.FailureResult($"Condition evaluation failed: {ex.Message}");
+            return PipelineResult.FailureResult($"条件评估失败：{ex.Message}");
         }
 
         if (conditionResult)
@@ -182,7 +182,7 @@ public class IfElsePipelineNode : PipelineNodeBase
         }
         else
         {
-            // No else branch, just pass through
+            // 无 else 分支，直接传递
             return PipelineResult.SuccessResult(input);
         }
     }
@@ -228,7 +228,7 @@ public class LoopPipelineNode : PipelineNodeBase
                 break;
             }
 
-            // Check condition
+            // 检查条件
             bool shouldContinue;
             try
             {
@@ -236,7 +236,7 @@ public class LoopPipelineNode : PipelineNodeBase
             }
             catch (System.Exception ex)
             {
-                return PipelineResult.FailureResult($"Loop condition evaluation failed: {ex.Message}");
+                return PipelineResult.FailureResult($"循环条件评估失败：{ex.Message}");
             }
 
             if (!shouldContinue)
@@ -244,7 +244,7 @@ public class LoopPipelineNode : PipelineNodeBase
                 break;
             }
 
-            // Execute body
+            // 执行循环体
             var result = await _bodyNode.ExecuteAsync(currentInput, context);
 
             if (!result.Success)
@@ -264,7 +264,7 @@ public class LoopPipelineNode : PipelineNodeBase
 
             iteration++;
 
-            // Increment node count
+// 增加节点计数
             context.Metadata["nodeCount"] = context.Metadata.TryGetValue("nodeCount", out var count) 
                 ? (int)count + 1 
                 : 1;
@@ -272,7 +272,7 @@ public class LoopPipelineNode : PipelineNodeBase
 
         if (iteration >= _maxIterations)
         {
-            return PipelineResult.FailureResult($"Loop exceeded maximum iterations ({_maxIterations})");
+            return PipelineResult.FailureResult($"循环超过最大迭代次数 ({_maxIterations})");
         }
 
         return PipelineResult.SuccessResult(currentInput);
@@ -308,7 +308,7 @@ public class AgentPipelineNode : PipelineNodeBase
         }
         catch (System.Exception ex)
         {
-            return PipelineResult.FailureResult($"Agent execution failed: {ex.Message}");
+            return PipelineResult.FailureResult($"Agent 执行失败：{ex.Message}");
         }
     }
 }
@@ -372,11 +372,11 @@ public class ActionPipelineNode : PipelineNodeBase
         try
         {
             await _action(input, context);
-            return PipelineResult.SuccessResult(input); // Pass through unchanged
+            return PipelineResult.SuccessResult(input); // 原样传递
         }
         catch (System.Exception ex)
         {
-            return PipelineResult.FailureResult($"Action failed: {ex.Message}");
+            return PipelineResult.FailureResult($"动作失败：{ex.Message}");
         }
     }
 }

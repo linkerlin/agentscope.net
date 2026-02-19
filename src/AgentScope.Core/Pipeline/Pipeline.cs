@@ -33,8 +33,8 @@ public class Pipeline
     private readonly IPipelineNode _rootNode;
     private readonly PipelineOptions _options;
 
-    /// <summary>
-    /// Creates a new pipeline with the specified root node.
+/// <summary>
+    /// 使用指定根节点创建新 Pipeline。
     /// </summary>
     public Pipeline(IPipelineNode rootNode, PipelineOptions? options = null)
     {
@@ -42,8 +42,8 @@ public class Pipeline
         _options = options ?? new PipelineOptions();
     }
 
-    /// <summary>
-    /// Executes the pipeline with the given input message.
+/// <summary>
+    /// 使用给定输入消息执行 Pipeline。
     /// </summary>
     public async Task<PipelineResult> ExecuteAsync(Msg input, CancellationToken cancellationToken = default)
     {
@@ -61,7 +61,7 @@ public class Pipeline
             
             stopwatch.Stop();
             
-            // Add execution metadata
+            // 添加执行元数据
             result.Metadata["executionTimeMs"] = stopwatch.ElapsedMilliseconds;
             result.Metadata["totalNodes"] = context.Metadata.TryGetValue("nodeCount", out var count) ? count : 0;
             
@@ -69,16 +69,16 @@ public class Pipeline
         }
         catch (OperationCanceledException)
         {
-            return PipelineResult.FailureResult("Pipeline execution was cancelled");
+            return PipelineResult.FailureResult("Pipeline 执行已取消");
         }
         catch (System.Exception ex)
         {
-            return PipelineResult.FailureResult($"Pipeline execution failed: {ex.Message}");
+            return PipelineResult.FailureResult($"Pipeline 执行失败：{ex.Message}");
         }
     }
 
-    /// <summary>
-    /// Executes the pipeline with a simple text input.
+/// <summary>
+    /// 使用简单文本输入执行 Pipeline。
     /// </summary>
     public async Task<PipelineResult> ExecuteAsync(string text, CancellationToken cancellationToken = default)
     {
@@ -92,22 +92,22 @@ public class Pipeline
 }
 
 /// <summary>
-/// Pipeline execution options.
+/// Pipeline 执行选项。
 /// </summary>
 public class PipelineOptions
 {
-    /// <summary>
-    /// Maximum execution depth for nested pipelines.
+/// <summary>
+    /// 嵌套 Pipeline 的最大执行深度。
     /// </summary>
     public int MaxDepth { get; set; } = 10;
 
-    /// <summary>
-    /// Whether to continue execution on node failure.
+/// <summary>
+    /// 节点失败时是否继续执行。
     /// </summary>
     public bool ContinueOnError { get; set; } = false;
 
-    /// <summary>
-    /// Timeout for the entire pipeline execution.
+/// <summary>
+    /// 整个 Pipeline 执行的超时时间。
     /// </summary>
     public TimeSpan? Timeout { get; set; }
 }
@@ -123,8 +123,8 @@ public class PipelineBuilder
     private IPipelineNode? _rootNode;
     private PipelineOptions _options = new();
 
-    /// <summary>
-    /// Sets the root node of the pipeline.
+/// <summary>
+    /// 设置 Pipeline 的根节点。
     /// </summary>
     public PipelineBuilder Root(IPipelineNode node)
     {
@@ -132,8 +132,8 @@ public class PipelineBuilder
         return this;
     }
 
-    /// <summary>
-    /// Creates a sequential pipeline from multiple nodes.
+/// <summary>
+    /// 从多个节点创建顺序 Pipeline。
     /// </summary>
     public PipelineBuilder Sequential(params IPipelineNode[] nodes)
     {
@@ -141,8 +141,8 @@ public class PipelineBuilder
         return this;
     }
 
-    /// <summary>
-    /// Creates a sequential pipeline with a name.
+/// <summary>
+    /// 创建带名称的顺序 Pipeline。
     /// </summary>
     public PipelineBuilder Sequential(string name, params IPipelineNode[] nodes)
     {
@@ -150,8 +150,8 @@ public class PipelineBuilder
         return this;
     }
 
-    /// <summary>
-    /// Adds a node to the pipeline, wrapping with sequential if needed.
+/// <summary>
+    /// 添加节点到 Pipeline，如需要则包装为顺序节点。
     /// </summary>
     private PipelineBuilder AddNode(IPipelineNode node)
     {
@@ -166,8 +166,8 @@ public class PipelineBuilder
         return this;
     }
 
-    /// <summary>
-    /// Adds a node that wraps an agent.
+/// <summary>
+    /// 添加包装 Agent 的节点。
     /// </summary>
     public PipelineBuilder Agent(Agent.IAgent agent, string? name = null)
     {
@@ -175,8 +175,8 @@ public class PipelineBuilder
         return AddNode(node);
     }
 
-    /// <summary>
-    /// Adds a conditional branch to the pipeline.
+/// <summary>
+    /// 添加条件分支到 Pipeline。
     /// </summary>
     public PipelineBuilder If(Func<PipelineContext, bool> condition, IPipelineNode thenNode, IPipelineNode? elseNode = null)
     {
@@ -184,8 +184,8 @@ public class PipelineBuilder
         return AddNode(ifNode);
     }
 
-    /// <summary>
-    /// Adds a loop to the pipeline.
+/// <summary>
+    /// 添加循环到 Pipeline。
     /// </summary>
     public PipelineBuilder Loop(Func<PipelineContext, bool> condition, IPipelineNode bodyNode, int maxIterations = 100)
     {
@@ -193,8 +193,8 @@ public class PipelineBuilder
         return AddNode(loopNode);
     }
 
-    /// <summary>
-    /// Adds a parallel execution node.
+/// <summary>
+    /// 添加并行执行节点。
     /// </summary>
     public PipelineBuilder Parallel(params IPipelineNode[] nodes)
     {
@@ -202,8 +202,8 @@ public class PipelineBuilder
         return AddNode(parallelNode);
     }
 
-    /// <summary>
-    /// Adds a transform node that modifies the message.
+/// <summary>
+    /// 添加转换节点以修改消息。
     /// </summary>
     public PipelineBuilder Transform(Func<Msg, Msg> transform, string? name = null)
     {
@@ -211,16 +211,16 @@ public class PipelineBuilder
         return AddNode(transformNode);
     }
 
-    /// <summary>
-    /// Adds a custom node to the pipeline.
+/// <summary>
+    /// 添加自定义节点到 Pipeline。
     /// </summary>
     public PipelineBuilder Add(IPipelineNode node)
     {
         return AddNode(node);
     }
 
-    /// <summary>
-    /// Sets the maximum execution depth.
+/// <summary>
+    /// 设置最大执行深度。
     /// </summary>
     public PipelineBuilder WithMaxDepth(int maxDepth)
     {
@@ -228,8 +228,8 @@ public class PipelineBuilder
         return this;
     }
 
-    /// <summary>
-    /// Sets whether to continue on error.
+/// <summary>
+    /// 设置是否在出错时继续。
     /// </summary>
     public PipelineBuilder ContinueOnError(bool continueOnError = true)
     {
@@ -237,8 +237,8 @@ public class PipelineBuilder
         return this;
     }
 
-    /// <summary>
-    /// Sets the execution timeout.
+/// <summary>
+    /// 设置执行超时时间。
     /// </summary>
     public PipelineBuilder WithTimeout(TimeSpan timeout)
     {
@@ -246,21 +246,21 @@ public class PipelineBuilder
         return this;
     }
 
-    /// <summary>
-    /// Builds the pipeline.
+/// <summary>
+    /// 构建 Pipeline。
     /// </summary>
     public Pipeline Build()
     {
         if (_rootNode == null)
         {
-            throw new InvalidOperationException("Pipeline must have at least one node");
+            throw new InvalidOperationException("Pipeline 必须至少有一个节点");
         }
 
         return new Pipeline(_rootNode, _options);
     }
 
-    /// <summary>
-    /// Creates a new builder.
+/// <summary>
+    /// 创建新构建器。
     /// </summary>
     public static PipelineBuilder Create() => new();
 }

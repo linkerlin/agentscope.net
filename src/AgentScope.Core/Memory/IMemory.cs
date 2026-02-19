@@ -20,7 +20,7 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Memory;
 
 /// <summary>
-/// Interface for agent memory
+/// Agent 记忆接口
 /// </summary>
 public interface IMemory
 {
@@ -36,7 +36,7 @@ public interface IMemory
 }
 
 /// <summary>
-/// In-memory implementation of IMemory
+/// IMemory 的内存实现
 /// </summary>
 public class MemoryBase : IMemory
 {
@@ -85,7 +85,7 @@ public class MemoryBase : IMemory
 }
 
 /// <summary>
-/// Interface for persistent memory with search capabilities
+/// 支持搜索功能的持久化记忆接口
 /// </summary>
 public interface IPersistentMemory : IMemory
 {

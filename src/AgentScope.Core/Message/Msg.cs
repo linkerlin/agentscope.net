@@ -20,7 +20,7 @@ using System.Text.Json.Serialization;
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// Message class for communication between agents
+/// Agent 间通信的消息类
 /// </summary>
 public class Msg
 {
@@ -92,7 +92,7 @@ public class Msg
 }
 
 /// <summary>
-/// Builder for Msg class
+/// Msg 类的构建器
 /// </summary>
 public class MsgBuilder
 {

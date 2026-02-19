@@ -20,7 +20,7 @@ using System.Threading.Tasks;
 namespace AgentScope.Core.Model;
 
 /// <summary>
-/// Mock model for testing and examples
+/// 用于测试和示例的模拟模型
 /// </summary>
 public class MockModel : ModelBase
 {
@@ -59,7 +59,7 @@ public class MockModel : ModelBase
 }
 
 /// <summary>
-/// Builder for MockModel
+/// MockModel 构建器
 /// </summary>
 public class MockModelBuilder
 {

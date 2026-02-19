@@ -1,4 +1,4 @@
-﻿// Copyright 2024-2026 the original author or authors.
+// Copyright 2024-2026 the original author or authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ class Program
 {
     static void Main(string[] args)
     {
-        // Load .env file
+        // 加载 .env 文件
         var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
         if (File.Exists(envPath))
         {
@@ -59,8 +59,8 @@ class Program
                 new MenuItem("_About", "", () =>
                 {
                     MessageBox.Query("About", $"{CoreVersion.GetFullVersion()}\n\n" +
-                        "A .NET port of AgentScope framework\n" +
-                        "for building LLM-powered applications.", "Ok");
+                        "A .NET 移植版 AgentScope 框架\n" +
+                        "用于构建 LLM 应用程序。", "确定");
                 })
             })
         });
@@ -93,8 +93,8 @@ class Program
             Y = Pos.Bottom(chatView)
         };
 
-        // Initialize model from environment variables
-        // Priority: DeepSeek > OpenAI Compatible > MockModel
+        // 从环境变量初始化模型
+        // 优先级：DeepSeek > OpenAI Compatible > MockModel
         IModel model;
         string modelInfo;
         var deepseekApiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
@@ -105,7 +105,7 @@ class Program
 
         if (!string.IsNullOrEmpty(deepseekApiKey) && !string.IsNullOrEmpty(deepseekModel))
         {
-            // Use DeepSeek
+            // 使用 DeepSeek
             modelInfo = $"DeepSeek: {deepseekModel}";
             model = DeepSeekModel.Builder()
                 .ModelName(deepseekModel)
@@ -114,19 +114,19 @@ class Program
         }
         else if (!string.IsNullOrEmpty(openaiApiKey))
         {
-            // Use OpenAI Compatible API
+            // 使用 OpenAI 兼容 API
             var modelName = openaiModel ?? "gpt-3.5-turbo";
             modelInfo = $"OpenAI: {modelName}";
             model = new OpenAIModel(modelName, openaiApiKey, openaiBaseUrl);
         }
         else
         {
-            // Fallback to MockModel
+            // 回退到 MockModel
             modelInfo = "MockModel (test mode)";
             model = MockModel.Builder().ModelName("mock-model").Build();
         }
 
-        // Initialize agent
+        // 初始化 Agent
         var memory = new SqliteMemory("agentscope.db");
         var agent = Core.ReActAgent.Builder()
             .Name("Assistant")
@@ -177,9 +177,9 @@ class Program
         win.Add(chatView, inputLabel, inputField, sendButton);
         top.Add(menuBar, win);
 
-        chatView.Text = $"Welcome to {CoreVersion.GetFullVersion()}!\n\n" +
-            $"Model: {modelInfo}\n\n" +
-            "Type your message and press Enter or click Send to chat with the assistant.";
+        chatView.Text = $"欢迎使用 {CoreVersion.GetFullVersion()}！\n\n" +
+            $"模型：{modelInfo}\n\n" +
+            "输入您的消息，按 Enter 或点击发送按钮与助手聊天。";
 
         Application.Run();
         Application.Shutdown();
