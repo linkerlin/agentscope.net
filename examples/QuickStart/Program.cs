@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 using AgentScope.Core;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
+using AgentScope.Core.Model.DeepSeek;
 using AgentScope.Core.Model.OpenAI;
 using AgentScope.Core.Memory;
 using CoreVersion = AgentScope.Core.Version;
@@ -52,7 +53,10 @@ class Program
         {
             // Use DeepSeek
             Console.WriteLine($"Using DeepSeek model: {deepseekModel}\n");
-            model = new OpenAIModel(deepseekModel, deepseekApiKey, "https://api.deepseek.com");
+            model = DeepSeekModel.Builder()
+                .ModelName(deepseekModel)
+                .ApiKey(deepseekApiKey)
+                .Build();
         }
         else if (!string.IsNullOrEmpty(openaiApiKey))
         {

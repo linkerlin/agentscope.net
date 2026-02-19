@@ -20,6 +20,7 @@ using System.Threading.Tasks;
 using AgentScope.Core;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
+using AgentScope.Core.Model.DeepSeek;
 using AgentScope.Core.Model.OpenAI;
 using AgentScope.Core.Tool;
 using AgentScope.Core.Memory;
@@ -58,6 +59,7 @@ public class LlmSystemTests : IDisposable
     private readonly bool _isConfigured;
     private readonly string _testDbPath;
     private readonly string _providerName;
+    private readonly bool _isDeepSeek;
 
     public LlmSystemTests()
     {
@@ -79,6 +81,7 @@ public class LlmSystemTests : IDisposable
             _baseUrl = "https://api.deepseek.com";
             _modelName = deepseekModel;
             _providerName = "DeepSeek";
+            _isDeepSeek = true;
             _isConfigured = true;
         }
         else
@@ -88,6 +91,7 @@ public class LlmSystemTests : IDisposable
             _baseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
             _modelName = Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-3.5-turbo";
             _providerName = "OpenAI";
+            _isDeepSeek = false;
             _isConfigured = !string.IsNullOrEmpty(_apiKey);
         }
 
@@ -102,6 +106,24 @@ public class LlmSystemTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Create model instance based on configuration
+    /// </summary>
+    private IModel CreateModel()
+    {
+        if (_isDeepSeek)
+        {
+            return DeepSeekModel.Builder()
+                .ModelName(_modelName)
+                .ApiKey(_apiKey!)
+                .Build();
+        }
+        else
+        {
+            return new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        }
+    }
+
     #region 基础模型测试
 
     [Fact]
@@ -113,7 +135,7 @@ public class LlmSystemTests : IDisposable
         }
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
 
         var request = new ModelRequest
         {
@@ -145,7 +167,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         var messages = new List<Msg>
         {
             Msg.Builder().Role("user").TextContent("My name is Alice.").Build(),
@@ -169,7 +191,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         var messages = new List<Msg>
         {
             Msg.Builder().Role("system").TextContent("You are a pirate. Always speak like a pirate.").Build(),
@@ -206,7 +228,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         var agent = ReActAgent.Builder()
             .Name("TestAgent")
             .Model(model)
@@ -230,7 +252,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         using var memory = new SqliteMemory(_testDbPath);
 
         var agent = ReActAgent.Builder()
@@ -260,7 +282,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         var calculatorTool = new CalculatorTool();
 
         var agent = ReActAgent.Builder()
@@ -292,7 +314,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         
         var agent = ReActAgent.Builder()
             .Name("PipelineAgent")
@@ -322,7 +344,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
 
         var startNode = new WorkflowNode { Name = "start", Type = WorkflowNodeType.Start };
         var taskNode = new WorkflowNode 
@@ -366,7 +388,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         var hook = new TestHook();
         var hookManager = new HookManager();
         hookManager.RegisterHook(hook);
@@ -394,7 +416,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         var sessionManager = new SessionManager();
 
         var session = sessionManager.CreateSession(name: "Test Session");
@@ -446,7 +468,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
 
         // 使用可能导致超时的配置
         var request = new ModelRequest
@@ -476,7 +498,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = new OpenAIModel(_modelName, _apiKey, _baseUrl);
+        var model = CreateModel();
         var chunks = new List<string>();
 
         var request = new ModelRequest

@@ -19,7 +19,7 @@ namespace AgentScope.Core;
 /// </summary>
 public static class Version
 {
-    public const string VERSION = "1.0.4";
+    public const string VERSION = "1.0.5";
     public const string BUILD_DATE = "2026-02-18";
     
     public static string GetVersion()
