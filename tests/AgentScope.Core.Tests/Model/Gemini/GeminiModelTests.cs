@@ -230,14 +230,23 @@ public class GeminiModelTests
         Assert.Contains("API error", response.Error);
     }
 
-    [Fact(Skip = "Requires valid GOOGLE_API_KEY environment variable")]
+    [Fact]
     public async Task GeminiModel_GenerateAsync_WithRealApi_ReturnsResponse()
     {
         // This test requires a valid Google API key
-        // Run with: dotnet test --filter "FullyQualifiedName~GeminiModel_GenerateAsync_WithRealApi"
+        // Check if API key is configured
+        var apiKey = Environment.GetEnvironmentVariable("GOOGLE_API_KEY")
+                  ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+        
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            // Skip if API key is not configured
+            return;
+        }
         
         // Arrange
         var model = GeminiModel.Builder()
+            .ApiKey(apiKey)
             .UseGeminiPro()
             .Build();
 

@@ -95,11 +95,12 @@ public class DeepSeekModelTests
         Assert.NotNull(model);
     }
 
-    [Fact(Skip = "Requires DEEPSEEK_API_KEY environment variable")]
+    [Fact]
     public async Task DeepSeekModel_GenerateAsync_WithRealApi_ReturnsResponse()
     {
         if (!_isConfigured)
         {
+            // Skip if environment variables are not configured
             return;
         }
 
