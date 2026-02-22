@@ -1,15 +1,15 @@
 # AgentScope.NET 当前状态总结
 
-**更新时间**: 2026-02-18  
-**版本**: v1.0.9 (90% 完成)
+**更新时间**: 2026-02-23  
+**版本**: v1.1.0 (92% 完成)
 
 ## 📊 总体进度
 
-- **完成度**: ~90%
-- **已完成模块**: 21/22
-- **已完成功能**: 55/55
-- **测试覆盖**: 506 测试全部通过
-- **代码量**: ~16,000+ 行 C# 代码
+- **完成度**: ~92%
+- **已完成模块**: 22/22
+- **已完成功能**: 57/57
+- **测试覆盖**: 537 测试全部通过
+- **代码量**: ~16,500+ 行 C# 代码
 
 ## ✅ 已完成功能
 
@@ -210,6 +210,15 @@
    - ✅ Google Gemini
 
 ## 📈 最近完成
+
+### 2026-02-23: v1.1.0 ModelFactory & ToolFactory
+- 新增 ModelFactory 统一模型工厂
+- 支持 7 种模型提供商：OpenAI、Azure、Anthropic、DeepSeek、 Gemini、DashScope、Ollama
+- 新增 ToolFactory 统一工具工厂
+- 支持 4 种内置工具：Calculator、GetTime、WebSearch、CodeExecution
+- 新增 51 个单元测试（ModelFactoryTests, ToolFactoryTests）
+- 537 测试全部通过
+- 22/22 模块全部完成
 
 ### 2026-02-18: v1.0.9 Gemini Model Provider
 - 新增 GeminiModel 类（实现 IModel 接口）

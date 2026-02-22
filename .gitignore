@@ -62,3 +62,6 @@ nunit-*.xml
 *.db
 *.db-shm
 *.db-wal
+
+# Custom
+NuGet.Config

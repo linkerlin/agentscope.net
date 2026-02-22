@@ -6,11 +6,13 @@ A .NET implementation of the AgentScope framework for building LLM-powered appli
 
 ## 项目状态 Project Status
 
-**完成度 Completion**: ~90% | 21/22 模块完成 | 516 测试 (100% 通过) | 16,000+ 行代码
+**完成度 Completion**: ~92% | 21/22 模块完成 | 537 测试 (100% 通过) | 16,500+ 行代码
 
-**当前版本 Version**: v1.0.9
+**当前版本 Version**: v1.1.0
 
 **最新进展 Latest Progress**:
+- ✅ ModelFactory 统一模型工厂（7 种提供商）
+- ✅ ToolFactory 统一工具工厂（4 种内置工具）
 - ✅ 完整的 ReAct Agent 系统（EnhancedReActAgent）
 - ✅ Hook 扩展系统（Pre/Post Reasoning/Acting hooks）
 - ✅ Session 和 State 管理（线程安全）
