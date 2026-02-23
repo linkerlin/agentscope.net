@@ -7,10 +7,17 @@
     <Version>1.1.0</Version>
     <PackageId>AgentScope.Core</PackageId>
     <Authors>AgentScope Team</Authors>
+    <Company>AgentScope</Company>
+    <Copyright>Copyright 2024-2026 AgentScope Team</Copyright>
     <Description>A .NET implementation of the AgentScope framework for building LLM-powered applications</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/agentscope-ai/agentscope.net</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Tags>ai,llm,agent,agentscope,openai,anthropic,gemini</Tags>
+    <ReleaseNotes>v1.1.0: Added ModelFactory and ToolFactory for unified model and tool creation</ReleaseNotes>
+    <PublishSingleFile>false</PublishSingleFile>
+    <IncludeAllContentForPack>false</IncludeAllContentForPack>
   </PropertyGroup>
 
   <ItemGroup>

@@ -65,3 +65,4 @@ nunit-*.xml
 
 # Custom
 NuGet.Config
+dist/
