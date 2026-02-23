@@ -60,7 +60,7 @@ public record AnthropicToolChoice
     public required AnthropicToolChoiceType Type { get; init; }
 
     [JsonPropertyName("name")]
-    public string? Name { get; init; }  // Required when Type is Tool
+    public string? Name { get; init; }
 }
 
 /// <summary>
@@ -70,5 +70,5 @@ public record AnthropicToolChoice
 public record CacheControl
 {
     [JsonPropertyName("type")]
-    public required string Type { get; init; }  // "ephemeral"
+    public required string Type { get; init; }
 }
