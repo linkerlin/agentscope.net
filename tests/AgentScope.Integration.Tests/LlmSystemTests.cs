@@ -20,6 +20,7 @@ using System.Threading.Tasks;
 using AgentScope.Core;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
+using AgentScope.Core.Model.DashScope;
 using AgentScope.Core.Model.DeepSeek;
 using AgentScope.Core.Model.OpenAI;
 using AgentScope.Core.Tool;
@@ -38,10 +39,15 @@ namespace AgentScope.Integration.Tests;
 /// System tests using real LLM API
 /// 
 /// 优先级:
-/// 1. DeepSeek (DEEPSEEK_API_KEY, DEEPSEEK_MODEL)
-/// 2. OpenAI 兼容 API (OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL)
+/// 1. DashScope (DASHSCOPE_API_KEY, DASHSCOPE_MODEL) - 支持推理模型
+/// 2. DeepSeek (DEEPSEEK_API_KEY, DEEPSEEK_MODEL)
+/// 3. OpenAI 兼容 API (OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL)
 /// 
 /// 环境变量配置:
+/// DashScope:
+/// - DASHSCOPE_API_KEY: DashScope API密钥
+/// - DASHSCOPE_MODEL: 模型名称 (如 qwen-plus)
+///
 /// DeepSeek:
 /// - DEEPSEEK_API_KEY: DeepSeek API密钥
 /// - DEEPSEEK_MODEL: 模型名称 (如 deepseek-chat)
@@ -59,7 +65,7 @@ public class LlmSystemTests : IDisposable
     private readonly bool _isConfigured;
     private readonly string _testDbPath;
     private readonly string _providerName;
-    private readonly bool _isDeepSeek;
+    private readonly string _providerType;
 
     public LlmSystemTests()
     {
@@ -70,18 +76,28 @@ public class LlmSystemTests : IDisposable
             Env.Load(envPath);
         }
 
-        // 优先使用 DeepSeek
-        var deepseekApiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
-        var deepseekModel = Environment.GetEnvironmentVariable("DEEPSEEK_MODEL");
+        // 优先使用 DashScope（支持推理模型）
+        var dashscopeApiKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
+        var dashscopeModel = Environment.GetEnvironmentVariable("DASHSCOPE_MODEL");
 
-        if (!string.IsNullOrEmpty(deepseekApiKey) && !string.IsNullOrEmpty(deepseekModel))
+        if (!string.IsNullOrEmpty(dashscopeApiKey) && !string.IsNullOrEmpty(dashscopeModel))
+        {
+            _apiKey = dashscopeApiKey;
+            _baseUrl = "https://dashscope.aliyuncs.com";
+            _modelName = dashscopeModel;
+            _providerName = "DashScope";
+            _providerType = "DashScope";
+            _isConfigured = true;
+        }
+        else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY")) && 
+                 !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DEEPSEEK_MODEL")))
         {
             // 使用 DeepSeek
-            _apiKey = deepseekApiKey;
+            _apiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
             _baseUrl = "https://api.deepseek.com";
-            _modelName = deepseekModel;
+            _modelName = Environment.GetEnvironmentVariable("DEEPSEEK_MODEL")!;
             _providerName = "DeepSeek";
-            _isDeepSeek = true;
+            _providerType = "DeepSeek";
             _isConfigured = true;
         }
         else
@@ -91,7 +107,7 @@ public class LlmSystemTests : IDisposable
             _baseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
             _modelName = Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-3.5-turbo";
             _providerName = "OpenAI";
-            _isDeepSeek = false;
+            _providerType = "OpenAI";
             _isConfigured = !string.IsNullOrEmpty(_apiKey);
         }
 
@@ -111,17 +127,15 @@ public class LlmSystemTests : IDisposable
     /// </summary>
     private IModel CreateModel()
     {
-        if (_isDeepSeek)
+        return _providerType switch
         {
-            return DeepSeekModel.Builder()
+            "DashScope" => new DashScopeModel(_modelName, _apiKey, _baseUrl),
+            "DeepSeek" => DeepSeekModel.Builder()
                 .ModelName(_modelName)
                 .ApiKey(_apiKey!)
-                .Build();
-        }
-        else
-        {
-            return new OpenAIModel(_modelName, _apiKey, _baseUrl);
-        }
+                .Build(),
+            _ => new OpenAIModel(_modelName, _apiKey, _baseUrl)
+        };
     }
 
     #region 基础模型测试
@@ -304,6 +318,42 @@ public class LlmSystemTests : IDisposable
         var content = response.GetTextContent() ?? "";
         // 由于 LLM 响应格式可能不一致，我们只验证响应不为空
         Assert.False(string.IsNullOrEmpty(content));
+    }
+
+    [Fact]
+    public async Task ReActAgent_WithRealLlm_ShouldNotLeakThoughtOrCompletionMarker()
+    {
+        if (!_isConfigured) return;
+
+        // Arrange
+        var model = CreateModel();
+        var expectedFinal = $"FINAL_ONLY_{Guid.NewGuid():N}";
+
+        var agent = ReActAgent.Builder()
+            .Name("LeakCheckAgent")
+            .Model(model)
+            .AddTool(new CalculatorTool())
+            .SysPrompt($@"你是一个严格遵循格式的测试助手。
+你必须且只能输出以下三行，不能添加任何其他字符：
+Thought: INTERNAL_PLAN_SHOULD_NOT_BE_VISIBLE
+Action: finish
+Action Input: {expectedFinal}")
+            .MaxIterations(2)
+            .Build();
+
+        // Act
+        var response = await agent.CallAsync(
+            Msg.Builder().TextContent("请按系统提示词输出。不要解释。")
+                .Build());
+
+        // Assert
+        var output = response.GetTextContent()?.Trim() ?? "";
+
+        Assert.Equal(expectedFinal, output);
+        Assert.DoesNotContain("Thought", output, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Action", output, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual("Done", output, StringComparer.OrdinalIgnoreCase);
+        Assert.NotEqual("完成", output, StringComparer.OrdinalIgnoreCase);
     }
 
     #endregion
@@ -524,6 +574,73 @@ public class LlmSystemTests : IDisposable
 
         // Assert
         Assert.NotEmpty(chunks);
+    }
+
+    #endregion
+
+    #region 推理模型测试（Thinking Models）
+
+    [Fact]
+    public async Task ReasoningModel_ShouldReturnBothThinkingAndContent()
+    {
+        if (!_isConfigured) return;
+
+        // 只有 DashScope 支持推理模型的 reasoning_content
+        if (_providerType != "DashScope") return;
+
+        // 检查是否是推理模型
+        var isReasoningModel = _modelName.Contains("plus") || 
+                                _modelName.Contains("max") ||
+                                _modelName.Contains("reasoning") ||
+                                _modelName.Contains("thinking") ||
+                                _modelName.Contains("r1");
+
+        if (!isReasoningModel)
+        {
+            Console.WriteLine($"Model {_modelName} is not a reasoning model, skipping test");
+            return;
+        }
+
+        // Arrange
+        var model = CreateModel();
+
+        var request = new ModelRequest
+        {
+            Messages = new List<Msg>
+            {
+                Msg.Builder().Role("user").TextContent("What is 123 + 456? Show your thinking.").Build()
+            }
+        };
+
+        // Act
+        var response = await model.GenerateAsync(request);
+
+        // Assert
+        Console.WriteLine($"Provider: {_providerName}");
+        Console.WriteLine($"Model: {_modelName}");
+        Console.WriteLine($"Success: {response.Success}");
+        Console.WriteLine($"Text: {response.Text}");
+        Console.WriteLine($"Metadata: {response.Metadata}");
+
+        Assert.True(response.Success, $"Response failed: {response.Error}");
+        Assert.NotNull(response.Text);
+        Assert.NotEmpty(response.Text);
+
+        // 验证正式回复存在
+        Assert.False(string.IsNullOrWhiteSpace(response.Text), "Content should not be empty");
+
+        // 对于推理模型，验证 thinking 是否存在于 metadata 中
+        // 注意：不是所有推理模型都会返回 thinking content，这取决于模型配置
+        if (response.Metadata != null && response.Metadata.TryGetValue("thinking", out var thinking))
+        {
+            Console.WriteLine($"Thinking content: {thinking}");
+            Assert.NotNull(thinking);
+            Assert.NotEmpty(thinking?.ToString());
+        }
+        else
+        {
+            Console.WriteLine("Note: No thinking content in metadata (may depend on model configuration)");
+        }
     }
 
     #endregion

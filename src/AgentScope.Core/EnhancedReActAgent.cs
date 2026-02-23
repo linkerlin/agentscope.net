@@ -179,7 +179,8 @@ public class EnhancedReActAgent : AgentBase
                 return ReasoningResult.Error(response.Error ?? "Model error");
             }
 
-            var thought = ParseThought(response.Text ?? "");
+            var rawResponse = response.Text ?? "";
+            var thought = ParseThought(rawResponse);
 
             // 触发 Post-Reasoning Hook
             var postEvent = new PostReasoningEvent
@@ -195,7 +196,7 @@ public class EnhancedReActAgent : AgentBase
                 Console.WriteLine($"Thought: {thought}");
             }
 
-            return ReasoningResult.Success(thought);
+            return ReasoningResult.Success(thought, response, rawResponse);
         }
         catch (System.Exception ex)
         {
@@ -212,7 +213,8 @@ public class EnhancedReActAgent : AgentBase
         try
         {
             // 解析行动意图
-            var actionIntent = ParseActionIntent(reasoning.Thought!);
+            var responseText = reasoning.RawResponseText ?? reasoning.Thought ?? "";
+            var actionIntent = ParseActionIntent(responseText);
 
             // 触发 Pre-Acting Hook
             var preEvent = new PreActingEvent
@@ -232,14 +234,13 @@ public class EnhancedReActAgent : AgentBase
 
             if (actionIntent.Action == "finish")
             {
-                // 如果 Parameters 为空，尝试从 reasoning.Thought 中提取实际内容
+                // 如果 Parameters 为空，尝试从响应文本中提取最终答复
                 var finalAnswer = actionIntent.Parameters?.ToString();
-                if (string.IsNullOrWhiteSpace(finalAnswer) || finalAnswer == "Done")
+                if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
                 {
-                    // 如果没有有效回复，尝试解析 Thought 中的实际内容
-                    finalAnswer = ExtractFinalAnswerFromThought(reasoning.Thought);
+                    finalAnswer = ExtractFinalAnswerForFinish(responseText, actionIntent.HasActionLine);
                 }
-                result = ActionResult.Finish(finalAnswer ?? "完成");
+                result = ActionResult.Finish(finalAnswer ?? string.Empty);
             }
             else if (_tools.ContainsKey(actionIntent.Action))
             {
@@ -344,7 +345,7 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
     {
         if (string.IsNullOrWhiteSpace(thought))
         {
-            return "完成";
+            return string.Empty;
         }
 
         // 移除 "Thought X:" 前缀
@@ -390,7 +391,7 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
             // 此时将整个 thought 作为最终答案
             if (actionLine == null)
             {
-                return new ActionIntent { Action = "finish", Parameters = thought };
+                return new ActionIntent { Action = "finish", Parameters = null, HasActionLine = false };
             }
 
             var action = actionLine.Substring("Action:".Length).Trim().ToLower();
@@ -409,12 +410,54 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
                 }
             }
 
-            return new ActionIntent { Action = action, Parameters = parameters };
+            return new ActionIntent { Action = action, Parameters = parameters, HasActionLine = true };
         }
         catch
         {
-            return new ActionIntent { Action = "finish", Parameters = thought };
+            return new ActionIntent { Action = "finish", Parameters = null, HasActionLine = false };
         }
+    }
+
+    private static bool IsCompletionMarker(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim();
+        return normalized.Equals("Done", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("完成", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string? ExtractFinalAnswerForFinish(string responseText, bool hasActionLine)
+    {
+        if (string.IsNullOrWhiteSpace(responseText))
+        {
+            return null;
+        }
+
+        if (!hasActionLine)
+        {
+            return null;
+        }
+
+        var lines = responseText.Split('\n');
+        var actionInputLine = lines.FirstOrDefault(l =>
+            l.StartsWith("Action Input:", StringComparison.OrdinalIgnoreCase));
+
+        if (actionInputLine == null)
+        {
+            return null;
+        }
+
+        var value = actionInputLine.Substring("Action Input:".Length).Trim();
+        if (string.IsNullOrWhiteSpace(value) || IsCompletionMarker(value))
+        {
+            return null;
+        }
+
+        return value;
     }
 
     private Msg CreateErrorResponse(string error)
@@ -438,9 +481,11 @@ internal class ReasoningResult
     public bool IsError { get; set; }
     public string? Thought { get; set; }
     public string? ErrorMessage { get; set; }
+    public ModelResponse? ModelResponse { get; set; }
+    public string? RawResponseText { get; set; }
 
-    public static ReasoningResult Success(string thought) => 
-        new() { Thought = thought };
+    public static ReasoningResult Success(string thought, ModelResponse? modelResponse = null, string? rawResponseText = null) => 
+        new() { Thought = thought, ModelResponse = modelResponse, RawResponseText = rawResponseText };
 
     public static ReasoningResult Error(string error) => 
         new() { IsError = true, ErrorMessage = error };
@@ -471,6 +516,7 @@ internal class ActionIntent
 {
     public string Action { get; set; } = "";
     public object? Parameters { get; set; }
+    public bool HasActionLine { get; set; }
 }
 
 /// <summary>

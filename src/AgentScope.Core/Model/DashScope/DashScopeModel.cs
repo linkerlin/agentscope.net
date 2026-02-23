@@ -115,11 +115,27 @@ public class DashScopeModel : ModelBase
         return new ModelResponse
         {
             Text = parsedResponse.TextContent,
-            Metadata = parsedResponse.ToolCalls?.Count > 0 
-                ? new Dictionary<string, object> { ["toolCalls"] = parsedResponse.ToolCalls }
-                : null,
+            Metadata = BuildMetadata(parsedResponse),
             Success = true
         };
+    }
+
+    private static Dictionary<string, object>? BuildMetadata(ParsedResponse parsedResponse)
+    {
+        if (parsedResponse.ToolCalls?.Count > 0 || !string.IsNullOrEmpty(parsedResponse.ThinkingContent))
+        {
+            var metadata = new Dictionary<string, object>();
+            if (parsedResponse.ToolCalls?.Count > 0)
+            {
+                metadata["toolCalls"] = parsedResponse.ToolCalls;
+            }
+            if (!string.IsNullOrEmpty(parsedResponse.ThinkingContent))
+            {
+                metadata["thinking"] = parsedResponse.ThinkingContent;
+            }
+            return metadata;
+        }
+        return null;
     }
 
     /// <summary>
@@ -270,7 +286,8 @@ public class DashScopeModel : ModelBase
                     InputTokens = response.Usage.InputTokens ?? 0,
                     OutputTokens = response.Usage.OutputTokens ?? 0,
                     TotalTokens = response.Usage.TotalTokens ?? 0
-                } : null
+                } : null,
+                ThinkingContent = message.ReasoningContent
             };
 
             // Extract text content

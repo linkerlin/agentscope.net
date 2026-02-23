@@ -218,6 +218,12 @@ public class OpenAIModel : ModelBase
             }
         }
 
+        if (!string.IsNullOrEmpty(parsed.ReasoningContent))
+        {
+            chatResponse.Metadata ??= new Dictionary<string, object>();
+            chatResponse.Metadata["thinking"] = parsed.ReasoningContent;
+        }
+
         return chatResponse;
     }
 

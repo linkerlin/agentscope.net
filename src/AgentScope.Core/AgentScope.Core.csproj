@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.1.3</Version>
+    <Version>1.1.7</Version>
     <PackageId>AgentScope.Core</PackageId>
     <Authors>AgentScope Team</Authors>
     <Company>AgentScope</Company>
@@ -15,7 +15,7 @@
     <RepositoryUrl>https://github.com/agentscope-ai/agentscope.net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <Tags>ai,llm,agent,agentscope,openai,anthropic,gemini</Tags>
-    <ReleaseNotes>v1.1.3: Updated version for NuGet release</ReleaseNotes>
+    <ReleaseNotes>v1.1.7: Fixed EnhancedReActAgent to properly handle reasoning model responses - now prioritizes ModelResponse.Text over extracted thought content</ReleaseNotes>
     <PublishSingleFile>false</PublishSingleFile>
     <IncludeAllContentForPack>false</IncludeAllContentForPack>
   </PropertyGroup>

@@ -64,6 +64,14 @@ public record OpenAIMessage
     [JsonPropertyName("tool_call_id")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ToolCallId { get; init; }
+
+    /// <summary>
+    /// 思考内容（用于推理模型如 qwen-plus, deepseek-r1 等）
+    /// Reasoning/thinking content (for reasoning models like qwen-plus, deepseek-r1, etc.)
+    /// </summary>
+    [JsonPropertyName("reasoning_content")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReasoningContent { get; init; }
 }
 
 /// <summary>

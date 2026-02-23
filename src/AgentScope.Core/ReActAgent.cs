@@ -186,8 +186,9 @@ public class ReActAgent : AgentBase
                 return ReasoningResult.Error(response.Error ?? "模型错误");
             }
 
-            var thought = ParseThought(response.Text ?? "");
-            return ReasoningResult.Success(thought);
+            var rawResponse = response.Text ?? "";
+            var thought = ParseThought(rawResponse);
+            return ReasoningResult.Success(thought, response, rawResponse);
         }
         catch (System.Exception ex)
         {
@@ -202,11 +203,18 @@ public class ReActAgent : AgentBase
     {
         try
         {
-            var intent = ParseActionIntent(reasoning.Thought!);
+            var responseText = reasoning.RawResponseText ?? reasoning.Thought ?? "";
+            var intent = ParseActionIntent(responseText);
 
             if (intent.Action == "finish")
             {
-                return ActionResult.Finish(intent.Parameters?.ToString() ?? "Done");
+                var finalAnswer = intent.Parameters?.ToString();
+                if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
+                {
+                    finalAnswer = ExtractFinalAnswerForFinish(responseText, intent.HasActionLine);
+                }
+
+                return ActionResult.Finish(finalAnswer ?? string.Empty);
             }
             else if (_tools.TryGetValue(intent.Action, out var tool))
             {
@@ -222,7 +230,7 @@ public class ReActAgent : AgentBase
             else
             {
                 // 未知行动，当作完成处理
-                return ActionResult.Finish(reasoning.Thought ?? "Done");
+                return ActionResult.Finish(string.Empty);
             }
         }
         catch (System.Exception ex)
@@ -309,12 +317,49 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
                 }
             }
 
-            return new ActionIntent { Action = action, Parameters = parameters };
+            return new ActionIntent { Action = action, Parameters = parameters, HasActionLine = actionLine != null };
         }
         catch
         {
-            return new ActionIntent { Action = "finish", Parameters = thought };
+            return new ActionIntent { Action = "finish", Parameters = null, HasActionLine = false };
         }
+    }
+
+    private static bool IsCompletionMarker(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim();
+        return normalized.Equals("Done", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("完成", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string? ExtractFinalAnswerForFinish(string responseText, bool hasActionLine)
+    {
+        if (string.IsNullOrWhiteSpace(responseText))
+        {
+            return null;
+        }
+
+        if (!hasActionLine)
+        {
+            return null;
+        }
+
+        var lines = responseText.Split('\n');
+        var actionInputLine = lines.FirstOrDefault(l =>
+            l.StartsWith("Action Input:", StringComparison.OrdinalIgnoreCase));
+
+        if (actionInputLine == null)
+        {
+            return null;
+        }
+
+        var value = actionInputLine.Substring("Action Input:".Length).Trim();
+        return string.IsNullOrWhiteSpace(value) || IsCompletionMarker(value) ? null : value;
     }
 
     private Msg CreateErrorResponse(string error)

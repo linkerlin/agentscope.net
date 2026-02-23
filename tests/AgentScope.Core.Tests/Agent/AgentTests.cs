@@ -17,6 +17,8 @@ using AgentScope.Core;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
 using AgentScope.Core.Memory;
+using AgentScope.Core.Tool;
+using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 
@@ -123,5 +125,96 @@ public class ReActAgentTests
         // Assert
         Assert.NotNull(response);
         Assert.NotNull(response.GetTextContent());
+    }
+
+    [Fact]
+    public async Task ReActAgent_WithToolAndReActFormat_ShouldUseActionInputAsFinalAnswer()
+    {
+        // Arrange
+        var model = new ScriptedModel(
+            "Thought: 需要直接回复用户\nAction: finish\nAction Input: 你好！");
+        var agent = ReActAgent.Builder()
+            .Name("ReActFormatAgent")
+            .Model(model)
+            .AddTool(new NoOpTool())
+            .MaxIterations(2)
+            .Build();
+
+        var userMsg = Msg.Builder().TextContent("你好").Build();
+
+        // Act
+        var response = await agent.CallAsync(userMsg);
+
+        // Assert
+        Assert.Equal("你好！", response.GetTextContent());
+    }
+
+    [Fact]
+    public async Task ReActAgent_WithToolAndMissingActionInput_ShouldNotReturnCompletionMarker()
+    {
+        // Arrange
+        var model = new ScriptedModel(
+            "Thought: 用户发来问候，无需调用工具，直接完成回复即可。\nAction: finish\nAction Input: Done");
+        var agent = ReActAgent.Builder()
+            .Name("NoMarkerAgent")
+            .Model(model)
+            .AddTool(new NoOpTool())
+            .MaxIterations(2)
+            .Build();
+
+        var userMsg = Msg.Builder().TextContent("你好").Build();
+
+        // Act
+        var response = await agent.CallAsync(userMsg);
+        var text = response.GetTextContent();
+
+        // Assert
+        Assert.True(string.IsNullOrEmpty(text));
+    }
+
+    private sealed class NoOpTool : ToolBase
+    {
+        public NoOpTool() : base("noop", "No operation tool")
+        {
+        }
+
+        public override Dictionary<string, object> GetSchema() => new();
+
+        public override Task<ToolResult> ExecuteAsync(Dictionary<string, object> parameters)
+        {
+            return Task.FromResult(ToolResult.Ok("ok"));
+        }
+    }
+
+    private sealed class ScriptedModel : IModel
+    {
+        private readonly Queue<string> _responses;
+
+        public ScriptedModel(params string[] responses)
+        {
+            _responses = new Queue<string>(responses);
+        }
+
+        public string ModelName => "scripted";
+
+        public IObservable<ModelResponse> Generate(ModelRequest request)
+        {
+            return Observable.Return(CreateResponse());
+        }
+
+        public Task<ModelResponse> GenerateAsync(ModelRequest request)
+        {
+            return Task.FromResult(CreateResponse());
+        }
+
+        private ModelResponse CreateResponse()
+        {
+            var text = _responses.Count > 0 ? _responses.Dequeue() : string.Empty;
+            return new ModelResponse
+            {
+                Success = true,
+                Text = text
+            };
+        }
     }
 }

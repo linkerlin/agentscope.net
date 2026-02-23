@@ -65,6 +65,7 @@ public static class DashScopeResponseParser
 
                     // Get text content
                     textContent = message.ContentAsString;
+
                     if (string.IsNullOrEmpty(textContent) && message.ContentAsList?.Count > 0)
                     {
                         // Extract text from multimodal content

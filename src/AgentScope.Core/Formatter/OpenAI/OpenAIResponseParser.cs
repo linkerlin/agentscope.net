@@ -210,6 +210,13 @@ public static class OpenAIResponseParser
             return null;
         }
 
+        // 首先检查消息中的 reasoning_content 字段（DashScope 等使用）
+        // First check reasoning_content field in message (used by DashScope, etc.)
+        if (!string.IsNullOrWhiteSpace(choice.Message.ReasoningContent))
+        {
+            return choice.Message.ReasoningContent;
+        }
+
         // 如果content是数组，查找reasoning类型的内容
         // If content is array, find reasoning type content
         if (choice.Message.Content is List<OpenAIMessageContent> contentParts)

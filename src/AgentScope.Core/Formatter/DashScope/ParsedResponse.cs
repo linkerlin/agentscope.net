@@ -57,6 +57,12 @@ public class ParsedResponse
     /// Token usage
     /// </summary>
     public UsageInfo? Usage { get; set; }
+
+    /// <summary>
+    /// 思考内容 (用于推理模型如 qwen-plus)
+    /// Thinking content (for reasoning models like qwen-plus)
+    /// </summary>
+    public string? ThinkingContent { get; set; }
 }
 
 /// <summary>
