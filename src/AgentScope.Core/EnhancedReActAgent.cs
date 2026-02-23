@@ -232,7 +232,14 @@ public class EnhancedReActAgent : AgentBase
 
             if (actionIntent.Action == "finish")
             {
-                result = ActionResult.Finish(actionIntent.Parameters?.ToString() ?? "Done");
+                // 如果 Parameters 为空，尝试从 reasoning.Thought 中提取实际内容
+                var finalAnswer = actionIntent.Parameters?.ToString();
+                if (string.IsNullOrWhiteSpace(finalAnswer) || finalAnswer == "Done")
+                {
+                    // 如果没有有效回复，尝试解析 Thought 中的实际内容
+                    finalAnswer = ExtractFinalAnswerFromThought(reasoning.Thought);
+                }
+                result = ActionResult.Finish(finalAnswer ?? "完成");
             }
             else if (_tools.ContainsKey(actionIntent.Action))
             {
@@ -329,6 +336,48 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
         return thoughtLine?.Substring("Thought:".Length).Trim() ?? response;
     }
 
+    /// <summary>
+    /// 从 Thought 中提取最终答案
+    /// 当 Action Input 为空时，尝试从 Thought 内容中提取实际回复
+    /// </summary>
+    private string ExtractFinalAnswerFromThought(string? thought)
+    {
+        if (string.IsNullOrWhiteSpace(thought))
+        {
+            return "完成";
+        }
+
+        // 移除 "Thought X:" 前缀
+        var lines = thought.Split('\n');
+        var contentLines = new List<string>();
+        
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.Trim();
+            // 跳过 Action 和 Action Input 行
+            if (trimmedLine.StartsWith("Action:", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith("Action Input:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            // 移除 Thought 前缀
+            if (trimmedLine.StartsWith("Thought", StringComparison.OrdinalIgnoreCase))
+            {
+                var colonIndex = trimmedLine.IndexOf(':');
+                if (colonIndex > 0)
+                {
+                    trimmedLine = trimmedLine.Substring(colonIndex + 1).Trim();
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(trimmedLine))
+            {
+                contentLines.Add(trimmedLine);
+            }
+        }
+
+        return string.Join(" ", contentLines);
+    }
+
     private ActionIntent ParseActionIntent(string thought)
     {
         try
@@ -337,7 +386,14 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
             var actionLine = lines.FirstOrDefault(l => l.StartsWith("Action:", StringComparison.OrdinalIgnoreCase));
             var inputLine = lines.FirstOrDefault(l => l.StartsWith("Action Input:", StringComparison.OrdinalIgnoreCase));
 
-            var action = actionLine?.Substring("Action:".Length).Trim().ToLower() ?? "finish";
+            // 如果没有找到 Action 行，说明模型没有按照 ReAct 格式回复
+            // 此时将整个 thought 作为最终答案
+            if (actionLine == null)
+            {
+                return new ActionIntent { Action = "finish", Parameters = thought };
+            }
+
+            var action = actionLine.Substring("Action:".Length).Trim().ToLower();
             var input = inputLine?.Substring("Action Input:".Length).Trim() ?? "";
 
             object? parameters = null;

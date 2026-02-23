@@ -21,7 +21,7 @@ namespace AgentScope.Core.Formatter.Anthropic.Dto;
 /// Anthropic 内容块基类
 /// Anthropic content block base class
 /// </summary>
-[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "block_type")]
 [JsonDerivedType(typeof(TextBlock), typeDiscriminator: "text")]
 [JsonDerivedType(typeof(ImageBlock), typeDiscriminator: "image")]
 [JsonDerivedType(typeof(ToolUseBlock), typeDiscriminator: "tool_use")]
