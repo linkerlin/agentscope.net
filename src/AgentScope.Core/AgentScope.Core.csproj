@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.1.8</Version>
+    <Version>1.2.0</Version>
     <PackageId>AgentScope.Core</PackageId>
     <Authors>AgentScope Team</Authors>
     <Company>AgentScope</Company>
@@ -15,7 +15,7 @@
     <RepositoryUrl>https://github.com/agentscope-ai/agentscope.net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <Tags>ai,llm,agent,agentscope,openai,anthropic,gemini</Tags>
-    <ReleaseNotes>v1.1.8: Fixed EnhancedReActAgent to properly handle reasoning model responses - now prioritizes ModelResponse.Text over extracted thought content</ReleaseNotes>
+    <ReleaseNotes>v1.2.0: 按改进方案与计划实施 - Event/流式/State/Hook扩展/ExecutionConfig; WebSearchTool可配置Provider与优雅降级; 文件与命令工具(路径沙箱/校验器); ToolGroup/Skill/结构化输出; SubAgent/Accumulator; WebSocket/MCP/TTS/多模态骨架; 能力扫描脚本与报告</ReleaseNotes>
     <PublishSingleFile>false</PublishSingleFile>
     <IncludeAllContentForPack>false</IncludeAllContentForPack>
   </PropertyGroup>
