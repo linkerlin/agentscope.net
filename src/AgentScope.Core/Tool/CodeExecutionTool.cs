@@ -220,7 +220,7 @@ public class CodeExecutionTool : ToolBase
     private async Task<CodeExecutionResult> ExecuteProcessAsync(LanguageConfig config, string code)
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"agentscope_{Guid.NewGuid()}{config.FileExtension}");
-        await File.WriteAllTextAsync(tempFile, code);
+        await System.IO.File.WriteAllTextAsync(tempFile, code);
 
         try
         {
@@ -288,7 +288,7 @@ public class CodeExecutionTool : ToolBase
         {
             try
             {
-                File.Delete(tempFile);
+                System.IO.File.Delete(tempFile);
             }
             catch { }
         }

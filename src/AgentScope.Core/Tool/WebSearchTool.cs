@@ -46,12 +46,16 @@ public class WebSearchResult
 /// Web search tool for searching the internet
 /// 网络搜索工具，用于搜索互联网
 /// 
+/// 支持可配置 Provider：无 key 或调用失败时优雅降级为模拟结果；
+/// 可通过 UseSimulatedSearchOnly 强制仅使用模拟结果（测试或禁用 API 时）。
 /// 参考: agentscope-java 的工具概念
 /// </summary>
 public class WebSearchTool : ToolBase
 {
     private readonly HttpClient _httpClient;
     private readonly string? _searchEngineUrl;
+    private readonly IWebSearchProvider? _provider;
+    private static readonly IWebSearchProvider DefaultSimulatedProvider = new SimulatedWebSearchProvider();
 
     /// <summary>
     /// Maximum number of results to return
@@ -72,14 +76,30 @@ public class WebSearchTool : ToolBase
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Creates a new web search tool
+    /// 当为 true 时，始终使用模拟结果，不调用任何外部 API 或 Provider。
+    /// 用于测试或明确禁用真实搜索时。
+    /// </summary>
+    public bool UseSimulatedSearchOnly { get; set; }
+
+    /// <summary>
+    /// Creates a new web search tool（无 Provider 时使用自定义 URL 或模拟结果）
     /// 创建新网络搜索工具
     /// </summary>
-    public WebSearchTool(HttpClient? httpClient = null, string? searchEngineUrl = null) 
+    public WebSearchTool(HttpClient? httpClient = null, string? searchEngineUrl = null)
+        : this(httpClient, searchEngineUrl, null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new web search tool with optional search provider.
+    /// 使用可选搜索提供者创建。Provider 异常（如未配置 API Key）时会优雅降级为模拟结果。
+    /// </summary>
+    public WebSearchTool(HttpClient? httpClient, string? searchEngineUrl, IWebSearchProvider? provider)
         : base("web_search", "Search the web for information. Input should be a search query string.")
     {
         _httpClient = httpClient ?? new HttpClient();
         _searchEngineUrl = searchEngineUrl;
+        _provider = provider;
     }
 
     /// <summary>
@@ -111,25 +131,61 @@ public class WebSearchTool : ToolBase
     }
 
     /// <summary>
-    /// Search the web
+    /// 上次搜索是否因降级使用了模拟结果（Provider/API 未配置或失败时为 true）
+    /// </summary>
+    public bool LastSearchWasFallback { get; private set; }
+
+    /// <summary>
+    /// Search the web. 无 key 或 Provider 失败时优雅降级为模拟结果。
     /// 搜索网络
     /// </summary>
     public virtual async Task<IReadOnlyList<WebSearchResult>> SearchAsync(string query)
     {
+        LastSearchWasFallback = false;
         var results = new List<WebSearchResult>();
+
+        if (UseSimulatedSearchOnly)
+        {
+            results.AddRange(await DefaultSimulatedProvider.SearchAsync(query, MaxResults));
+            LastSearchWasFallback = true;
+            return results;
+        }
+
+        if (_provider != null)
+        {
+            try
+            {
+                var providerResults = await _provider.SearchAsync(query, MaxResults, CancellationToken.None);
+                return providerResults.Take(MaxResults).ToList();
+            }
+            catch (System.Exception)
+            {
+                // 优雅降级：无 key、网络错误等时使用模拟结果，便于错误定位
+                LastSearchWasFallback = true;
+                results.AddRange(await DefaultSimulatedProvider.SearchAsync(query, MaxResults));
+                return results;
+            }
+        }
 
         if (!string.IsNullOrEmpty(_searchEngineUrl))
         {
-            // Use custom search engine
-            results.AddRange(await SearchWithEngineAsync(query));
-        }
-        else
-        {
-            // Simulate search results (in production, use real search API)
-            results.AddRange(SimulateSearchResults(query));
+            try
+            {
+                results.AddRange(await SearchWithEngineAsync(query));
+                return results.Take(MaxResults).ToList();
+            }
+            catch (System.Exception)
+            {
+                LastSearchWasFallback = true;
+                results.AddRange(await DefaultSimulatedProvider.SearchAsync(query, MaxResults));
+                return results;
+            }
         }
 
-        return results.Take(MaxResults).ToList();
+        // 默认：模拟结果
+        LastSearchWasFallback = true;
+        results.AddRange(await DefaultSimulatedProvider.SearchAsync(query, MaxResults));
+        return results;
     }
 
     /// <summary>
@@ -154,43 +210,6 @@ public class WebSearchTool : ToolBase
     }
 
     /// <summary>
-    /// Simulate search results (for testing/demo)
-    /// 模拟搜索结果（用于测试/演示）
-    /// </summary>
-    protected virtual IReadOnlyList<WebSearchResult> SimulateSearchResults(string query)
-    {
-        // In a real implementation, this would call an actual search API
-        // This is a placeholder that returns simulated results
-        return new List<WebSearchResult>
-        {
-            new()
-            {
-                Title = $"Search results for: {query}",
-                Url = $"https://example.com/search?q={HttpUtility.UrlEncode(query)}",
-                Snippet = "This is a simulated search result. In production, integrate with a real search API like Google Custom Search, Bing API, or DuckDuckGo.",
-                Source = "example.com",
-                Score = 0.95
-            },
-            new()
-            {
-                Title = "How to integrate web search in your application",
-                Url = "https://example.com/guide",
-                Snippet = "To integrate real web search, you can use APIs like: Google Custom Search JSON API, Microsoft Bing Web Search API, SerpAPI, or DuckDuckGo Instant Answer API.",
-                Source = "example.com",
-                Score = 0.85
-            },
-            new()
-            {
-                Title = "Best practices for web search tools",
-                Url = "https://example.com/best-practices",
-                Snippet = "1. Cache results to reduce API calls. 2. Respect rate limits. 3. Handle errors gracefully. 4. Provide relevant snippets.",
-                Source = "example.com",
-                Score = 0.75
-            }
-        }.AsReadOnly();
-    }
-
-    /// <summary>
     /// Format search results as string
     /// 将搜索结果格式化为字符串
     /// </summary>
@@ -202,6 +221,10 @@ public class WebSearchTool : ToolBase
         }
 
         var lines = new List<string>();
+        if (LastSearchWasFallback)
+        {
+            lines.Add("[Simulated results - no search API key or provider error. Configure IWebSearchProvider or set UseSimulatedSearchOnly=false with a provider.]\n");
+        }
         lines.Add($"Found {results.Count} results:\n");
 
         for (int i = 0; i < results.Count; i++)

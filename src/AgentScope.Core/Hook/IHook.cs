@@ -69,20 +69,54 @@ public class PostActingEvent : HookEvent
 }
 
 /// <summary>
+/// 推理块事件（流式推理过程中的单块内容）
+/// </summary>
+public class ReasoningChunkEvent : HookEvent
+{
+    public string Chunk { get; set; } = "";
+}
+
+/// <summary>
+/// 行动块事件（流式行动过程中的单块内容）
+/// </summary>
+public class ActingChunkEvent : HookEvent
+{
+    public string Chunk { get; set; } = "";
+}
+
+/// <summary>
+/// 错误事件
+/// </summary>
+public class ErrorHookEvent : HookEvent
+{
+    public string ErrorMessage { get; set; } = "";
+    public System.Exception? Exception { get; set; }
+}
+
+/// <summary>
 /// Hook 接口
 /// Hook interface for extensibility
 /// </summary>
 public interface IHook
 {
     string Name { get; }
-    
+
     Task OnPreReasoningAsync(PreReasoningEvent @event);
-    
+
     Task OnPostReasoningAsync(PostReasoningEvent @event);
-    
+
     Task OnPreActingAsync(PreActingEvent @event);
-    
+
     Task OnPostActingAsync(PostActingEvent @event);
+
+    /// <summary>推理块（流式）</summary>
+    Task OnReasoningChunkAsync(ReasoningChunkEvent @event);
+
+    /// <summary>行动块（流式）</summary>
+    Task OnActingChunkAsync(ActingChunkEvent @event);
+
+    /// <summary>错误</summary>
+    Task OnErrorAsync(ErrorHookEvent @event);
 }
 
 /// <summary>
@@ -109,6 +143,21 @@ public abstract class HookBase : IHook
     }
 
     public virtual Task OnPostActingAsync(PostActingEvent @event)
+    {
+        return Task.CompletedTask;
+    }
+
+    public virtual Task OnReasoningChunkAsync(ReasoningChunkEvent @event)
+    {
+        return Task.CompletedTask;
+    }
+
+    public virtual Task OnActingChunkAsync(ActingChunkEvent @event)
+    {
+        return Task.CompletedTask;
+    }
+
+    public virtual Task OnErrorAsync(ErrorHookEvent @event)
     {
         return Task.CompletedTask;
     }
@@ -169,6 +218,33 @@ public class HookManager
         foreach (var hook in _hooks)
         {
             await hook.OnPostActingAsync(@event);
+            if (@event.ShouldStop) break;
+        }
+    }
+
+    public async Task ExecuteReasoningChunkHooksAsync(ReasoningChunkEvent @event)
+    {
+        foreach (var hook in _hooks)
+        {
+            await hook.OnReasoningChunkAsync(@event);
+            if (@event.ShouldStop) break;
+        }
+    }
+
+    public async Task ExecuteActingChunkHooksAsync(ActingChunkEvent @event)
+    {
+        foreach (var hook in _hooks)
+        {
+            await hook.OnActingChunkAsync(@event);
+            if (@event.ShouldStop) break;
+        }
+    }
+
+    public async Task ExecuteErrorHooksAsync(ErrorHookEvent @event)
+    {
+        foreach (var hook in _hooks)
+        {
+            await hook.OnErrorAsync(@event);
             if (@event.ShouldStop) break;
         }
     }

@@ -135,4 +135,44 @@ public class WebSearchToolTests
         Assert.Single(results);
         Assert.Contains("Mock", results[0].Title);
     }
+
+    [Fact]
+    public async Task UseSimulatedSearchOnly_ReturnsSimulatedAndSetsFallbackFlag()
+    {
+        // Arrange: 强制仅模拟，不调用任何 Provider
+        var tool = new WebSearchTool { UseSimulatedSearchOnly = true };
+
+        // Act
+        var results = await tool.SearchAsync("test");
+        var exec = await tool.ExecuteAsync(new Dictionary<string, object> { ["query"] = "test" });
+
+        // Assert
+        Assert.True(tool.LastSearchWasFallback);
+        Assert.NotEmpty(results);
+        Assert.True(exec.Success);
+        Assert.Contains("Simulated results", exec.Result?.ToString());
+    }
+
+    [Fact]
+    public async Task ProviderThrows_FallsBackToSimulatedAndResultIsSuccess()
+    {
+        // Arrange: Provider 模拟未配置 key 时抛异常
+        var failingProvider = new FailingWebSearchProvider();
+        var tool = new WebSearchTool(null, null, failingProvider);
+
+        // Act
+        var result = await tool.ExecuteAsync(new Dictionary<string, object> { ["query"] = "test" });
+
+        // Assert: 优雅降级，返回成功且为模拟结果，错误可定位
+        Assert.True(result.Success);
+        Assert.True(tool.LastSearchWasFallback);
+        Assert.NotNull(result.Result);
+        Assert.Contains("Simulated results", result.Result.ToString());
+    }
+
+    private sealed class FailingWebSearchProvider : IWebSearchProvider
+    {
+        public Task<IReadOnlyList<WebSearchResult>> SearchAsync(string query, int maxResults, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("API key not configured.");
+    }
 }

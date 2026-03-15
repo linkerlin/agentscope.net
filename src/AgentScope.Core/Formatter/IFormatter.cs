@@ -103,11 +103,32 @@ public class ToolChoice
 }
 
 /// <summary>
+/// 执行配置：重试、超时、退避等，统一模型调用语义。
+/// </summary>
+public class ExecutionConfig
+{
+    /// <summary>最大重试次数</summary>
+    public int MaxRetries { get; set; } = 3;
+
+    /// <summary>重试间隔</summary>
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>单次调用超时</summary>
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>是否指数退避</summary>
+    public bool ExponentialBackoff { get; set; } = true;
+}
+
+/// <summary>
 /// 生成选项
 /// Generation options for LLM requests
 /// </summary>
 public class GenerateOptions
 {
+    /// <summary>执行配置（重试/超时/退避）</summary>
+    public ExecutionConfig? ExecutionConfig { get; set; }
+
     public double? Temperature { get; set; }
     public int? MaxTokens { get; set; }
     public double? TopP { get; set; }
