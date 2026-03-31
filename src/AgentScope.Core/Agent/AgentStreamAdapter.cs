@@ -28,6 +28,13 @@ public sealed class AgentStreamAdapter : IStreamableAgent
     public async IAsyncEnumerable<Event> StreamAsync(IEnumerable<Msg> messages, StreamOptions options)
     {
         options.CancellationToken.ThrowIfCancellationRequested();
+        if (_inner is IStreamableAgent streamable)
+        {
+            await foreach (var ev in streamable.StreamAsync(messages, options).ConfigureAwait(false))
+                yield return ev;
+            yield break;
+        }
+
         var list = messages as IList<Msg> ?? messages.ToList();
         if (list.Count == 0)
         {

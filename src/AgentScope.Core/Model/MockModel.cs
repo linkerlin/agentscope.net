@@ -13,8 +13,11 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AgentScope.Core.Model;
@@ -22,7 +25,7 @@ namespace AgentScope.Core.Model;
 /// <summary>
 /// 用于测试和示例的模拟模型
 /// </summary>
-public class MockModel : ModelBase
+public class MockModel : ModelBase, IStreamingChatModel
 {
     public MockModel(string modelName = "mock-model") : base(modelName)
     {
@@ -50,6 +53,25 @@ public class MockModel : ModelBase
         };
 
         return Task.FromResult(response);
+    }
+
+    public async IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
+        List<AgentScope.Core.Message.Msg> messages,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var response = await GenerateAsync(new ModelRequest { Messages = messages }).ConfigureAwait(false);
+        yield return new ChatResponse
+        {
+            Success = response.Success,
+            Error = response.Error,
+            Text = response.Text,
+            Content = response.Text,
+            Metadata = response.Metadata,
+            Model = ModelName,
+            IsComplete = true
+        };
     }
 
     public static MockModelBuilder Builder()

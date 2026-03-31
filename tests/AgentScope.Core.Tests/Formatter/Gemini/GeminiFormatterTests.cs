@@ -311,8 +311,9 @@ public class GeminiMessageConverterTests
 
         // Assert
         Assert.Single(content.Parts);
-        Assert.NotNull(content.Parts[0].FunctionCall);
-        Assert.Equal("get_weather", content.Parts[0].FunctionCall.Name);
+        var functionCall = content.Parts[0].FunctionCall;
+        Assert.NotNull(functionCall);
+        Assert.Equal("get_weather", functionCall!.Name);
     }
 
     [Fact]
@@ -336,8 +337,9 @@ public class GeminiMessageConverterTests
 
         // Assert
         Assert.Single(content.Parts);
-        Assert.NotNull(content.Parts[0].FunctionResponse);
-        Assert.Equal("get_weather", content.Parts[0].FunctionResponse.Name);
+        var functionResponse = content.Parts[0].FunctionResponse;
+        Assert.NotNull(functionResponse);
+        Assert.Equal("get_weather", functionResponse!.Name);
     }
 
     [Fact]

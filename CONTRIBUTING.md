@@ -121,6 +121,9 @@ git push origin feature/your-feature-name
 
 - 为关键流程添加集成测试 / Add integration tests for critical flows
 - 测试与外部服务的集成 / Test integration with external services
+- 快速集成测试统一使用 `Category=FastIntegration`，确保本地与 CI 可快速回归 / Use `Category=FastIntegration` for quick integration coverage
+- 真实 API、网络、凭据依赖统一使用 `Category=ExternalDependency`，避免与快路径混跑 / Use `Category=ExternalDependency` for real API and network dependent tests
+- `Category=ExternalDependency` 测试默认必须显式设置环境变量 `AGENTSCOPE_RUN_EXTERNAL_TESTS=1` 才会真正执行外部调用；推荐通过 `pwsh ./scripts/test-external.ps1` 运行 smoke 子集，需要完整回归时使用 `pwsh ./scripts/test-external.ps1 -Full` / External dependency tests require `AGENTSCOPE_RUN_EXTERNAL_TESTS=1`; use `pwsh ./scripts/test-external.ps1` for the smoke subset and `pwsh ./scripts/test-external.ps1 -Full` for the full suite
 
 ## 文档 Documentation
 

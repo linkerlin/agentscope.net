@@ -14,6 +14,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using AgentScope.Core.Message;
 
@@ -49,6 +50,15 @@ public interface IModel
     IObservable<ModelResponse> Generate(ModelRequest request);
     
     Task<ModelResponse> GenerateAsync(ModelRequest request);
+}
+
+/// <summary>
+/// 统一的流式聊天模型接口。
+/// 适配已有 Provider 的 GenerateStreamAsync 能力，供 Agent 层统一消费。
+/// </summary>
+public interface IStreamingChatModel
+{
+    IAsyncEnumerable<ChatResponse> GenerateStreamAsync(List<Msg> messages, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

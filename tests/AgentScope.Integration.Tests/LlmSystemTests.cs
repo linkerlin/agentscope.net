@@ -57,8 +57,11 @@ namespace AgentScope.Integration.Tests;
 /// - OPENAI_BASE_URL: API基础URL (可选,用于兼容OpenAI的其他服务)
 /// - OPENAI_MODEL: 模型名称 (可选)
 /// </summary>
+[Trait(TestCategories.Name, TestCategories.ExternalDependency)]
 public class LlmSystemTests : IDisposable
 {
+    private const string ExternalTestsOptInEnvironmentVariable = "AGENTSCOPE_RUN_EXTERNAL_TESTS";
+
     private readonly string? _apiKey;
     private readonly string? _baseUrl;
     private readonly string _modelName;
@@ -69,6 +72,16 @@ public class LlmSystemTests : IDisposable
 
     public LlmSystemTests()
     {
+        if (!IsExternalTestExecutionEnabled())
+        {
+            _modelName = string.Empty;
+            _providerName = "Disabled";
+            _providerType = "Disabled";
+            _testDbPath = Path.Combine(Path.GetTempPath(), $"llm_test_{Guid.NewGuid()}.db");
+            _isConfigured = false;
+            return;
+        }
+
         // 加载 .env 文件
         var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
         if (File.Exists(envPath))
@@ -114,6 +127,19 @@ public class LlmSystemTests : IDisposable
         _testDbPath = Path.Combine(Path.GetTempPath(), $"llm_test_{Guid.NewGuid()}.db");
     }
 
+    private static bool IsExternalTestExecutionEnabled()
+    {
+        var rawValue = Environment.GetEnvironmentVariable(ExternalTestsOptInEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return false;
+        }
+
+        return rawValue.Equals("1", StringComparison.OrdinalIgnoreCase)
+            || rawValue.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || rawValue.Equals("yes", StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         if (File.Exists(_testDbPath))
@@ -125,22 +151,41 @@ public class LlmSystemTests : IDisposable
     /// <summary>
     /// Create model instance based on configuration
     /// </summary>
-    private IModel CreateModel()
+    private IModel CreateModel(bool preferFastModel = true)
     {
+        var resolvedModelName = ResolveModelName(preferFastModel);
+
         return _providerType switch
         {
-            "DashScope" => new DashScopeModel(_modelName, _apiKey, _baseUrl),
+            "DashScope" => new DashScopeModel(resolvedModelName, _apiKey, _baseUrl),
             "DeepSeek" => DeepSeekModel.Builder()
-                .ModelName(_modelName)
+                .ModelName(resolvedModelName)
                 .ApiKey(_apiKey!)
                 .Build(),
-            _ => new OpenAIModel(_modelName, _apiKey, _baseUrl)
+            _ => new OpenAIModel(resolvedModelName, _apiKey, _baseUrl)
         };
+    }
+
+    private string ResolveModelName(bool preferFastModel)
+    {
+        if (!preferFastModel)
+        {
+            return _modelName;
+        }
+
+        if (_providerType == "DeepSeek" &&
+            string.Equals(_modelName, DeepSeekModel.Models.Reasoner, StringComparison.OrdinalIgnoreCase))
+        {
+            return DeepSeekModel.Models.Chat;
+        }
+
+        return _modelName;
     }
 
     #region 基础模型测试
 
     [Fact]
+    [Trait(TestCategories.Name, TestCategories.ExternalDependencySmoke)]
     public async Task OpenAIModel_SimpleChat_ShouldReturnResponse()
     {
         if (!_isConfigured)
@@ -164,7 +209,7 @@ public class LlmSystemTests : IDisposable
 
         // Assert - Print debug info
         Console.WriteLine($"Provider: {_providerName}");
-        Console.WriteLine($"Model: {_modelName}");
+        Console.WriteLine($"Model: {model.ModelName}");
         Console.WriteLine($"Success: {response.Success}");
         Console.WriteLine($"Text: {response.Text}");
         Console.WriteLine($"Error: {response.Error}");
@@ -181,7 +226,7 @@ public class LlmSystemTests : IDisposable
         if (!_isConfigured) return;
 
         // Arrange
-        var model = CreateModel();
+        var model = CreateModel(preferFastModel: false);
         var messages = new List<Msg>
         {
             Msg.Builder().Role("user").TextContent("My name is Alice.").Build(),
@@ -237,6 +282,7 @@ public class LlmSystemTests : IDisposable
     #region Agent 集成测试
 
     [Fact]
+    [Trait(TestCategories.Name, TestCategories.ExternalDependencySmoke)]
     public async Task ReActAgent_WithRealLLM_ShouldAnswerQuestion()
     {
         if (!_isConfigured) return;
@@ -494,6 +540,7 @@ Action Input: {expectedFinal}")
     #region 错误处理测试
 
     [Fact]
+    [Trait(TestCategories.Name, TestCategories.ExternalDependencySmoke)]
     public async Task OpenAIModel_InvalidApiKey_ShouldFailGracefully()
     {
         // Arrange - 使用无效的 API Key
@@ -545,6 +592,7 @@ Action Input: {expectedFinal}")
     #region 流式响应测试
 
     [Fact]
+    [Trait(TestCategories.Name, TestCategories.ExternalDependencySmoke)]
     public async Task OpenAIModel_StreamResponse_ShouldYieldChunks()
     {
         if (!_isConfigured) return;
@@ -563,14 +611,21 @@ Action Input: {expectedFinal}")
 
         // Act
         var observable = model.Generate(request);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var subscription = observable.Subscribe(
-            chunk => chunks.Add(chunk.Text ?? ""),
-            error => { /* Handle error */ },
-            () => { /* Completed */ }
+            chunk =>
+            {
+                if (!string.IsNullOrWhiteSpace(chunk.Text))
+                {
+                    chunks.Add(chunk.Text);
+                }
+            },
+            error => completion.TrySetException(error),
+            () => completion.TrySetResult()
         );
 
-        // Wait for completion
-        await Task.Delay(30000); // 30 second timeout
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        subscription.Dispose();
 
         // Assert
         Assert.NotEmpty(chunks);
@@ -617,7 +672,7 @@ Action Input: {expectedFinal}")
 
         // Assert
         Console.WriteLine($"Provider: {_providerName}");
-        Console.WriteLine($"Model: {_modelName}");
+        Console.WriteLine($"Model: {model.ModelName}");
         Console.WriteLine($"Success: {response.Success}");
         Console.WriteLine($"Text: {response.Text}");
         Console.WriteLine($"Metadata: {response.Metadata}");
@@ -635,7 +690,8 @@ Action Input: {expectedFinal}")
         {
             Console.WriteLine($"Thinking content: {thinking}");
             Assert.NotNull(thinking);
-            Assert.NotEmpty(thinking?.ToString());
+            var thinkingText = thinking?.ToString();
+            Assert.False(string.IsNullOrWhiteSpace(thinkingText), "Thinking content should not be empty when metadata contains thinking");
         }
         else
         {

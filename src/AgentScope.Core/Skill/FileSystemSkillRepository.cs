@@ -10,11 +10,13 @@ public class FileSystemSkillRepository : ISkillRepository
 {
     private readonly string _basePath;
     private readonly Func<RegisteredSkill, ISkill>? _loader;
+    private readonly MarkdownSkillParser _parser;
 
-    public FileSystemSkillRepository(string basePath, Func<RegisteredSkill, ISkill>? loader = null)
+    public FileSystemSkillRepository(string basePath, Func<RegisteredSkill, ISkill>? loader = null, MarkdownSkillParser? parser = null)
     {
         _basePath = basePath ?? throw new ArgumentNullException(nameof(basePath));
         _loader = loader;
+        _parser = parser ?? new MarkdownSkillParser();
     }
 
     public IEnumerable<RegisteredSkill> Scan()
@@ -24,16 +26,34 @@ public class FileSystemSkillRepository : ISkillRepository
         var list = new List<RegisteredSkill>();
         foreach (var path in System.IO.Directory.EnumerateFiles(_basePath, "*.md", System.IO.SearchOption.TopDirectoryOnly))
         {
-            var id = System.IO.Path.GetFileNameWithoutExtension(path);
-            list.Add(new RegisteredSkill { Id = id, Name = id, SourcePath = path });
+            list.Add(_parser.ParseFile(path));
         }
         return list;
     }
 
     public ISkill Load(RegisteredSkill registered)
     {
+        if (registered == null)
+            throw new ArgumentNullException(nameof(registered));
+
         if (_loader != null)
             return _loader(registered);
-        throw new NotSupportedException("FileSystemSkillRepository 未配置 Loader，请提供 Func<RegisteredSkill, ISkill>。");
+
+        RegisteredSkill resolvedSkill;
+
+        if (!string.IsNullOrWhiteSpace(registered.SourcePath) && File.Exists(registered.SourcePath))
+        {
+            resolvedSkill = _parser.ParseFile(registered.SourcePath);
+        }
+        else if (!string.IsNullOrWhiteSpace(registered.RawContent))
+        {
+            resolvedSkill = _parser.Parse(registered.RawContent, registered.SourcePath);
+        }
+        else
+        {
+            resolvedSkill = registered;
+        }
+
+        return new MarkdownSkill(resolvedSkill, isActive: resolvedSkill.IsActiveByDefault);
     }
 }

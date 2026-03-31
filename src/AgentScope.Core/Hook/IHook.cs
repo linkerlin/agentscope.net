@@ -69,6 +69,22 @@ public class PostActingEvent : HookEvent
 }
 
 /// <summary>
+/// 摘要前事件
+/// </summary>
+public class PreSummaryEvent : HookEvent
+{
+    public string SummaryText { get; set; } = "";
+}
+
+/// <summary>
+/// 摘要后事件
+/// </summary>
+public class PostSummaryEvent : HookEvent
+{
+    public string SummaryText { get; set; } = "";
+}
+
+/// <summary>
 /// 推理块事件（流式推理过程中的单块内容）
 /// </summary>
 public class ReasoningChunkEvent : HookEvent
@@ -80,6 +96,14 @@ public class ReasoningChunkEvent : HookEvent
 /// 行动块事件（流式行动过程中的单块内容）
 /// </summary>
 public class ActingChunkEvent : HookEvent
+{
+    public string Chunk { get; set; } = "";
+}
+
+/// <summary>
+/// 摘要块事件（流式最终答复中的单块内容）
+/// </summary>
+public class SummaryChunkEvent : HookEvent
 {
     public string Chunk { get; set; } = "";
 }
@@ -109,11 +133,18 @@ public interface IHook
 
     Task OnPostActingAsync(PostActingEvent @event);
 
+    Task OnPreSummaryAsync(PreSummaryEvent @event);
+
+    Task OnPostSummaryAsync(PostSummaryEvent @event);
+
     /// <summary>推理块（流式）</summary>
     Task OnReasoningChunkAsync(ReasoningChunkEvent @event);
 
     /// <summary>行动块（流式）</summary>
     Task OnActingChunkAsync(ActingChunkEvent @event);
+
+    /// <summary>摘要块（流式最终答复）</summary>
+    Task OnSummaryChunkAsync(SummaryChunkEvent @event);
 
     /// <summary>错误</summary>
     Task OnErrorAsync(ErrorHookEvent @event);
@@ -147,12 +178,27 @@ public abstract class HookBase : IHook
         return Task.CompletedTask;
     }
 
+    public virtual Task OnPreSummaryAsync(PreSummaryEvent @event)
+    {
+        return Task.CompletedTask;
+    }
+
+    public virtual Task OnPostSummaryAsync(PostSummaryEvent @event)
+    {
+        return Task.CompletedTask;
+    }
+
     public virtual Task OnReasoningChunkAsync(ReasoningChunkEvent @event)
     {
         return Task.CompletedTask;
     }
 
     public virtual Task OnActingChunkAsync(ActingChunkEvent @event)
+    {
+        return Task.CompletedTask;
+    }
+
+    public virtual Task OnSummaryChunkAsync(SummaryChunkEvent @event)
     {
         return Task.CompletedTask;
     }
@@ -222,6 +268,24 @@ public class HookManager
         }
     }
 
+    public async Task ExecutePreSummaryHooksAsync(PreSummaryEvent @event)
+    {
+        foreach (var hook in _hooks)
+        {
+            await hook.OnPreSummaryAsync(@event);
+            if (@event.ShouldStop) break;
+        }
+    }
+
+    public async Task ExecutePostSummaryHooksAsync(PostSummaryEvent @event)
+    {
+        foreach (var hook in _hooks)
+        {
+            await hook.OnPostSummaryAsync(@event);
+            if (@event.ShouldStop) break;
+        }
+    }
+
     public async Task ExecuteReasoningChunkHooksAsync(ReasoningChunkEvent @event)
     {
         foreach (var hook in _hooks)
@@ -236,6 +300,15 @@ public class HookManager
         foreach (var hook in _hooks)
         {
             await hook.OnActingChunkAsync(@event);
+            if (@event.ShouldStop) break;
+        }
+    }
+
+    public async Task ExecuteSummaryChunkHooksAsync(SummaryChunkEvent @event)
+    {
+        foreach (var hook in _hooks)
+        {
+            await hook.OnSummaryChunkAsync(@event);
             if (@event.ShouldStop) break;
         }
     }

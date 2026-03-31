@@ -40,7 +40,7 @@ namespace AgentScope.Core.Model.OpenAI;
 /// 
 /// Java参考: io.agentscope.core.model.OpenAIChatModel
 /// </summary>
-public class OpenAIModel : ModelBase
+public class OpenAIModel : ModelBase, IStreamingChatModel
 {
     private readonly OpenAIClient _client;
     private readonly OpenAIChatFormatter _formatter;
@@ -122,6 +122,13 @@ public class OpenAIModel : ModelBase
                 yield return chatResponse;
             }
         }
+    }
+
+    public IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
+        List<Msg> messages,
+        CancellationToken cancellationToken = default)
+    {
+        return GenerateStreamAsync(messages, options: null, cancellationToken: cancellationToken);
     }
 
 /// <summary>

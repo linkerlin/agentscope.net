@@ -46,11 +46,13 @@ public class ReActAgent : AgentBase
     private readonly IModel _model;
     private readonly IMemory _memory;
     private readonly Dictionary<string, ITool> _tools;
+    private readonly ToolGroupManager? _toolGroupManager;
     private readonly string _systemPrompt;
     private readonly int _maxIterations;
 
     internal ReActAgent(string name, IModel model, string systemPrompt, 
-                        IMemory? memory = null, List<ITool>? tools = null, 
+                        IMemory? memory = null, List<ITool>? tools = null,
+                        ToolGroupManager? toolGroupManager = null,
                         int maxIterations = 10)
         : base(name)
     {
@@ -58,6 +60,7 @@ public class ReActAgent : AgentBase
         _systemPrompt = systemPrompt ?? "You are a helpful AI assistant.";
         _memory = memory ?? new MemoryBase();
         _tools = tools?.ToDictionary(t => t.Name) ?? new Dictionary<string, ITool>();
+        _toolGroupManager = toolGroupManager;
         _maxIterations = maxIterations > 0 ? maxIterations : 10;
     }
 
@@ -69,7 +72,7 @@ public class ReActAgent : AgentBase
 
             // 如果有工具，执行完整的 ReAct 循环
             Msg response;
-            if (_tools.Count > 0)
+            if (GetAvailableTools().Count > 0)
             {
                 response = await ProcessWithReActLoopAsync(message);
             }
@@ -216,7 +219,7 @@ public class ReActAgent : AgentBase
 
                 return ActionResult.Finish(finalAnswer ?? string.Empty);
             }
-            else if (_tools.TryGetValue(intent.Action, out var tool))
+            else if (GetAvailableTools().TryGetValue(intent.Action, out var tool))
             {
                 var parameters = intent.Parameters as Dictionary<string, object> 
                     ?? new Dictionary<string, object>();
@@ -241,8 +244,7 @@ public class ReActAgent : AgentBase
 
     private Msg BuildReActPrompt(Msg userMessage, List<string> thoughtHistory, int iteration)
     {
-        var toolDescriptions = string.Join("\n", 
-            _tools.Values.Select(t => $"- {t.Name}: {t.Description}"));
+        var toolDescriptions = BuildAvailableToolDescriptions();
 
         var promptText = $@"{_systemPrompt}
 
@@ -281,6 +283,19 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
 
         messages.AddRange(_memory.GetAll());
         return messages;
+    }
+
+    private IReadOnlyDictionary<string, ITool> GetAvailableTools()
+    {
+        return _toolGroupManager?.FilterActiveTools(_tools) ?? _tools;
+    }
+
+    private string BuildAvailableToolDescriptions()
+    {
+        var availableTools = GetAvailableTools();
+        return availableTools.Count == 0
+            ? "(当前没有激活的可用工具)"
+            : string.Join("\n", availableTools.Values.Select(t => $"- {t.Name}: {t.Description}"));
     }
 
     private string ParseThought(string response)
@@ -387,6 +402,7 @@ public class ReActAgentBuilder
     private string _sysPrompt = "You are a helpful AI assistant.";
     private IMemory? _memory;
     private readonly List<ITool> _tools = new();
+    private ToolGroupManager? _toolGroupManager;
     private int _maxIterations = 10;
 
     public ReActAgentBuilder Name(string name)
@@ -419,6 +435,19 @@ public class ReActAgentBuilder
         return this;
     }
 
+    public ReActAgentBuilder ToolGroupManager(ToolGroupManager manager)
+    {
+        _toolGroupManager = manager;
+        return this;
+    }
+
+    public ReActAgentBuilder AddToolGroup(ToolGroup group)
+    {
+        _toolGroupManager ??= new ToolGroupManager();
+        _toolGroupManager.RegisterGroup(group);
+        return this;
+    }
+
     public ReActAgentBuilder Tools(IEnumerable<ITool> tools)
     {
         _tools.AddRange(tools);
@@ -438,6 +467,6 @@ public class ReActAgentBuilder
             throw new InvalidOperationException("必须指定模型");
         }
 
-        return new ReActAgent(_name, _model, _sysPrompt, _memory, _tools, _maxIterations);
+        return new ReActAgent(_name, _model, _sysPrompt, _memory, _tools, _toolGroupManager, _maxIterations);
     }
 }

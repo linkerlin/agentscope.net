@@ -27,6 +27,7 @@ namespace AgentScope.Integration.Tests;
 /// <summary>
 /// Integration tests for agent-memory workflows
 /// </summary>
+[Trait(TestCategories.Name, TestCategories.FastIntegration)]
 public class AgentMemoryIntegrationTests : IDisposable
 {
     private readonly string _testDbPath;
@@ -138,6 +139,7 @@ public class AgentMemoryIntegrationTests : IDisposable
 /// <summary>
 /// Integration tests for agent-model-tool workflows
 /// </summary>
+[Trait(TestCategories.Name, TestCategories.FastIntegration)]
 public class AgentModelToolIntegrationTests
 {
     [Fact]
@@ -201,6 +203,7 @@ public class AgentModelToolIntegrationTests
 /// <summary>
 /// End-to-end workflow tests
 /// </summary>
+[Trait(TestCategories.Name, TestCategories.FastIntegration)]
 public class EndToEndWorkflowTests : IDisposable
 {
     private readonly string _testDbPath;

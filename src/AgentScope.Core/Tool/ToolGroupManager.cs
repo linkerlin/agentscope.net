@@ -12,6 +12,16 @@ public class ToolGroupManager
 {
     private readonly Dictionary<string, ToolGroup> _groups = new(StringComparer.OrdinalIgnoreCase);
 
+    public bool HasGroups => _groups.Count > 0;
+
+    public IEnumerable<string> GetActiveGroupNames()
+    {
+        return _groups.Values
+            .Where(group => group.IsActive)
+            .Select(group => group.Name)
+            .ToArray();
+    }
+
     public void RegisterGroup(ToolGroup group)
     {
         if (group == null) throw new ArgumentNullException(nameof(group));
@@ -30,6 +40,15 @@ public class ToolGroupManager
             g.IsActive = false;
     }
 
+    public void SetActiveGroups(IEnumerable<string>? groupNames)
+    {
+        var activeNames = groupNames?.ToHashSet(StringComparer.OrdinalIgnoreCase)
+            ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in _groups.Values)
+            group.IsActive = activeNames.Contains(group.Name);
+    }
+
     public IEnumerable<string> GetActiveToolNames()
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -42,18 +61,38 @@ public class ToolGroupManager
     }
 
     /// <summary>
+    /// 根据当前激活组，从工具表中过滤出实际可用工具。
+    /// 若未注册任何分组，则返回全部工具，避免对未接入场景造成破坏性影响。
+    /// </summary>
+    public IReadOnlyDictionary<string, ITool> FilterActiveTools(IReadOnlyDictionary<string, ITool>? toolsByName)
+    {
+        if (toolsByName == null)
+            return new Dictionary<string, ITool>(StringComparer.OrdinalIgnoreCase);
+
+        if (!HasGroups)
+            return toolsByName;
+
+        var names = GetActiveToolNames().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var filtered = new Dictionary<string, ITool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in names)
+        {
+            if (toolsByName.TryGetValue(name, out var tool))
+                filtered[name] = tool;
+        }
+        return filtered;
+    }
+
+    /// <summary>
     /// 根据当前激活组，从工具表中筛选并生成 ToolSchema 列表（与 Formatter 兼容）。
     /// </summary>
     public List<ToolSchema> GetActiveToolSchemas(IReadOnlyDictionary<string, ITool>? toolsByName)
     {
-        var names = GetActiveToolNames().ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (toolsByName == null || names.Count == 0)
+        var filteredTools = FilterActiveTools(toolsByName);
+        if (filteredTools.Count == 0)
             return new List<ToolSchema>();
         var list = new List<ToolSchema>();
-        foreach (var name in names)
+        foreach (var (name, tool) in filteredTools)
         {
-            if (!toolsByName.TryGetValue(name, out var tool))
-                continue;
             var schema = tool.GetSchema();
             var ts = new ToolSchema
             {

@@ -1,26 +1,28 @@
-﻿# AgentScope.NET Capability Status Report
+# AgentScope.NET Capability Status Report
 
-Generated: 2026-03-15 15:11:55
+Generated: 2026-03-31 13:59:41
 
-| Capability | Path | Status |
-|------------|------|--------|
-| Event | Event\Event.cs | Implemented |
-| EventType | Event\EventType.cs | Implemented |
-| IStreamableAgent | Agent\IStreamableAgent.cs | Implemented |
-| StreamOptions | Agent\StreamOptions.cs | Implemented |
-| Accumulator | Accumulator\ReasoningContext.cs | Implemented |
-| IHttpTransport | Model\Transport\IHttpTransport.cs | Implemented |
-| Hook | Hook\IHook.cs | Implemented |
-| SkillRegistry | Skill\SkillRegistry.cs | Implemented |
-| MCP Client | MCP\McpClientWrapper.cs | Implemented |
-| TTS | Model\TTS\ITTSModel.cs | Implemented |
-| Multimodal | Tool\Multimodal\OpenAIMultiModalTool.cs | Implemented |
-| SubAgentTool | Tool\SubAgent\SubAgentTool.cs | Implemented |
-| ToolGroup | Tool\ToolGroup.cs | Implemented |
-| State | State\IState.cs | Implemented |
-| WebSocket | Model\Transport\WebSocket\IWebSocketTransport.cs | Implemented |
-| GenerateOptions | Formatter\DashScope\GenerateOptions.cs | Implemented |
-| WebSearchTool | Tool\WebSearchTool.cs | Implemented |
+Status model: Missing -> Scaffolded -> Verified -> Integrated -> ProviderReady
 
-**Summary**: Implemented 17 | Partial 0 | Missing 0
+| Capability | Path | Source | Tests | Integration | Provider | Status |
+|------------|------|--------|-------|-------------|----------|--------|
+| Event | Event\Event.cs | Yes | Yes | Yes | N/A | Integrated |
+| EventType | Event\EventType.cs | Yes | Yes | Yes | N/A | Integrated |
+| IStreamableAgent | Agent\IStreamableAgent.cs | Yes | Yes | Yes | N/A | Integrated |
+| StreamOptions | Agent\StreamOptions.cs | Yes | Yes | Yes | N/A | Integrated |
+| Accumulator | Accumulator\ReasoningContext.cs | Yes | Yes | Yes | N/A | Integrated |
+| IHttpTransport | Model\Transport\IHttpTransport.cs | Yes | No | Yes | N/A | Scaffolded |
+| Hook | Hook\IHook.cs | Yes | Yes | Yes | N/A | Integrated |
+| SkillRegistry | Skill\SkillRegistry.cs | Yes | Yes | Yes | N/A | Integrated |
+| MCP Client | MCP\McpClientWrapper.cs | Yes | Yes | Yes | No | Integrated |
+| TTS | Model\TTS\ITTSModel.cs | Yes | Yes | Yes | No | Integrated |
+| Multimodal | Tool\Multimodal\OpenAIMultiModalTool.cs | Yes | Yes | Yes | No | Integrated |
+| SubAgentTool | Tool\SubAgent\SubAgentTool.cs | Yes | Yes | Yes | N/A | Integrated |
+| ToolGroup | Tool\ToolGroup.cs | Yes | Yes | Yes | N/A | Integrated |
+| State | State\IState.cs | Yes | Yes | Yes | N/A | Integrated |
+| WebSocket | Model\Transport\WebSocket\IWebSocketTransport.cs | Yes | Yes | Yes | N/A | Integrated |
+| GenerateOptions | Formatter\DashScope\GenerateOptions.cs | Yes | Yes | Yes | N/A | Integrated |
+| WebSearchTool | Tool\WebSearchTool.cs | Yes | Yes | Yes | N/A | Integrated |
+
+**Summary**: Missing 0 | Scaffolded 1 | Verified 0 | Integrated 16 | ProviderReady 0
 

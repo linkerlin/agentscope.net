@@ -36,7 +36,7 @@ namespace AgentScope.Core.Model.Anthropic;
 /// 
 /// Java参考: io.agentscope.core.model.AnthropicChatModel
 /// </summary>
-public class AnthropicModel : ModelBase
+public class AnthropicModel : ModelBase, IStreamingChatModel
 {
     public const string DefaultBaseUrl = "https://api.anthropic.com";
     public const string MessagesEndpoint = "/v1/messages";
@@ -172,6 +172,13 @@ public class AnthropicModel : ModelBase
                 }
             }
         }
+    }
+
+    public IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
+        List<Msg> messages,
+        CancellationToken cancellationToken = default)
+    {
+        return GenerateStreamAsync(messages, options: null, cancellationToken: cancellationToken);
     }
 
     /// <summary>

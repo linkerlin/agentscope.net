@@ -10,6 +10,9 @@ public class RegisteredSkill
 {
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public List<string> ToolNames { get; set; } = new();
+    public bool IsActiveByDefault { get; set; } = true;
     public string? SourcePath { get; set; }
     public string? RawContent { get; set; }
 }

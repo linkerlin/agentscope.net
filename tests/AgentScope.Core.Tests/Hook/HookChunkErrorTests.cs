@@ -32,6 +32,27 @@ public class HookChunkErrorTests
     }
 
     [Fact]
+    public async Task ExecuteSummaryHooksAsync_InvokesHook()
+    {
+        var manager = new HookManager();
+        var capturingHook = new SummaryCaptureHook();
+        manager.RegisterHook(capturingHook);
+
+        var preEvent = new PreSummaryEvent { AgentName = "A", SummaryText = "draft" };
+        await manager.ExecutePreSummaryHooksAsync(preEvent);
+
+        var chunkEvent = new SummaryChunkEvent { AgentName = "A", Chunk = preEvent.SummaryText };
+        await manager.ExecuteSummaryChunkHooksAsync(chunkEvent);
+
+        var postEvent = new PostSummaryEvent { AgentName = "A", SummaryText = preEvent.SummaryText };
+        await manager.ExecutePostSummaryHooksAsync(postEvent);
+
+        Assert.Equal("draft-post", capturingHook.LastPreSummary);
+        Assert.Equal("draft-post", capturingHook.LastChunk);
+        Assert.Equal("draft-post", capturingHook.LastPostSummary);
+    }
+
+    [Fact]
     public async Task ExecuteErrorHooksAsync_InvokesHook()
     {
         var manager = new HookManager();
@@ -91,6 +112,32 @@ public class HookChunkErrorTests
         public override Task OnErrorAsync(ErrorHookEvent @event)
         {
             LastErrorMessage = @event.ErrorMessage;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class SummaryCaptureHook : HookBase
+    {
+        public string LastPreSummary { get; private set; } = "";
+        public string LastChunk { get; private set; } = "";
+        public string LastPostSummary { get; private set; } = "";
+
+        public override Task OnPreSummaryAsync(PreSummaryEvent @event)
+        {
+            @event.SummaryText += "-post";
+            LastPreSummary = @event.SummaryText;
+            return Task.CompletedTask;
+        }
+
+        public override Task OnSummaryChunkAsync(SummaryChunkEvent @event)
+        {
+            LastChunk = @event.Chunk;
+            return Task.CompletedTask;
+        }
+
+        public override Task OnPostSummaryAsync(PostSummaryEvent @event)
+        {
+            LastPostSummary = @event.SummaryText;
             return Task.CompletedTask;
         }
     }

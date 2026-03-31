@@ -105,7 +105,8 @@ agentscope.net/
 │   │   └── Configuration/         # 配置管理
 │   └── AgentScope.TUI/            # 终端界面应用
 ├── examples/
-│   └── QuickStart/                # 快速入门示例
+│   ├── QuickStart/                # 快速入门示例
+│   └── WebSocketEcho/             # WebSocket 本地回环示例
 ├── tests/
 │   ├── AgentScope.Core.Tests/     # 单元测试 (500+ tests)
 │   └── AgentScope.Integration.Tests/ # 集成测试
@@ -150,17 +151,45 @@ cp .env.example .env
 ### 运行测试 Run Tests
 
 ```bash
-# 运行所有测试 Run all tests (516 tests, 100% passing)
+# 运行所有测试 Run all tests
 dotnet test
+
+# 显式运行真实外部依赖测试（默认不开启）
+$env:AGENTSCOPE_RUN_EXTERNAL_TESTS=1
+dotnet test tests/AgentScope.Integration.Tests/ --filter "Category=ExternalDependency"
 
 # 运行单元测试 Run unit tests only
 dotnet test tests/AgentScope.Core.Tests/
 
-# 运行集成测试 Run integration tests only
-dotnet test tests/AgentScope.Integration.Tests/
+# 运行快速验证路径（单元测试 + 非外部依赖集成测试）
+pwsh ./scripts/test-fast.ps1
+
+# 运行快速集成测试 Run fast integration tests only
+dotnet test tests/AgentScope.Integration.Tests/ --filter "Category=FastIntegration"
+
+# 运行外部依赖 smoke 验证路径（默认，只跑代表性真实 LLM 用例）
+pwsh ./scripts/test-external.ps1
+
+# 运行完整外部依赖验证路径（较慢）
+pwsh ./scripts/test-external.ps1 -Full
+
+# 运行外部依赖集成测试 Run external dependency integration tests only
+dotnet test tests/AgentScope.Integration.Tests/ --filter "Category=ExternalDependency"
 
 # 详细输出 Verbose output
 dotnet test --logger "console;verbosity=detailed"
+```
+
+说明：`Category=ExternalDependency` 测试默认需要显式设置环境变量 `AGENTSCOPE_RUN_EXTERNAL_TESTS=1` 才会真正访问外部 LLM，避免本地全量回归因已配置凭据而误跑慢测试。`pwsh ./scripts/test-external.ps1` 默认只跑 smoke 子集；完整外部依赖回归请使用 `pwsh ./scripts/test-external.ps1 -Full`。
+
+### 运行示例 Run Examples
+
+```bash
+# 快速入门示例
+dotnet run --project examples/QuickStart/QuickStart.csproj
+
+# WebSocket 本地回环示例（无需外部 API）
+dotnet run --project examples/WebSocketEcho/WebSocketEcho.csproj
 ```
 
 ### 运行 TUI 应用 Run TUI Application

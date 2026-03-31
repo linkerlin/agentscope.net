@@ -38,7 +38,7 @@ namespace AgentScope.Core.Model.DashScope;
 /// 
 /// Java参考: io.agentscope.core.model.DashScopeChatModel
 /// </summary>
-public class DashScopeModel : ModelBase
+public class DashScopeModel : ModelBase, IStreamingChatModel
 {
     public const string DefaultBaseUrl = "https://dashscope.aliyuncs.com";
     public const string ChatEndpoint = "/compatible-mode/v1/chat/completions";
@@ -191,6 +191,13 @@ public class DashScopeModel : ModelBase
                 }
             }
         }
+    }
+
+    public IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
+        List<Msg> messages,
+        CancellationToken cancellationToken = default)
+    {
+        return GenerateStreamAsync(messages, options: null, cancellationToken: cancellationToken);
     }
 
     /// <summary>

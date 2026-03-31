@@ -68,4 +68,42 @@ public class ToolGroupTests
         Assert.Single(schemas);
         Assert.Equal("calculator", schemas[0].Name);
     }
+
+    [Fact]
+    public void ToolGroupManager_FilterActiveTools_WithoutGroups_ReturnsAllTools()
+    {
+        var m = new ToolGroupManager();
+        var tools = new Dictionary<string, ITool>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["calc"] = new CalculatorTool(),
+            ["time"] = new GetTimeTool()
+        };
+
+        var filtered = m.FilterActiveTools(tools);
+
+        Assert.Equal(2, filtered.Count);
+        Assert.Contains("calc", filtered.Keys);
+        Assert.Contains("time", filtered.Keys);
+    }
+
+    [Fact]
+    public void ToolGroupManager_FilterActiveTools_WithActiveGroups_ReturnsSubset()
+    {
+        var m = new ToolGroupManager();
+        var g = new ToolGroup("readonly") { IsActive = true };
+        g.AddTool("calc");
+        m.RegisterGroup(g);
+
+        var tools = new Dictionary<string, ITool>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["calc"] = new CalculatorTool(),
+            ["time"] = new GetTimeTool()
+        };
+
+        var filtered = m.FilterActiveTools(tools);
+
+        Assert.Single(filtered);
+        Assert.Contains("calc", filtered.Keys);
+        Assert.DoesNotContain("time", filtered.Keys);
+    }
 }

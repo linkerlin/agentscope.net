@@ -1,179 +1,87 @@
-## 📋 AgentScope.NET 工作需求详述
+# AgentScope.NET TODO（校准版）
 
-### 一、现状分析
+## 当前基线
 
-**好消息**：AgentScope.NET 框架已经存在且完成度约 **92%** (v1.1.0)！
+- 校准日期：2026-03-31
+- 当前实测：dotnet test AgentScope.slnx 通过 678 项测试，0 失败，0 个 warning
+- 快速验证路径：pwsh ./scripts/test-fast.ps1 通过 663 项测试，0 失败
+- 外部依赖 smoke 路径：pwsh ./scripts/test-external.ps1 通过 4 项测试，0 失败
+- 外部依赖完整路径：pwsh ./scripts/test-external.ps1 -Full 通过 15 项测试，0 失败
+- 当前问题：文档把多项已有能力误判为缺失，实际优先级需要按成熟度和接入度重排
+- 当前生态：示例已扩展为 QuickStart 与 WebSocketEcho，统一文档入口仍不足
 
-- 仓库地址：https://github.com/linkerlin/agentscope.net
-- 完成度：22/22 模块，537 测试 (100% 通过)，16,500+ 行代码
-- 核心功能全部完成，包括 EnhancedReActAgent、Hook 系统、Tool 系统、ModelFactory、ToolFactory 等
+## 已确认存在的基础能力
 
-**已完成**：
-- ✅ ModelFactory 统一模型工厂（7 种提供商）
-- ✅ ToolFactory 统一工具工厂（4 种内置工具）
-- ✅ 537 个单元测试
+以下能力已在仓库中存在基础实现，不应再按“从零建设”排期：
 
-**问题**：MyClaw.NET 项目中的引用路径 `..\..\..\agentscope.net\src\AgentScope.Core` 不存在，需要正确集成。
+- [x] Event / EventType
+- [x] IStreamableAgent / StreamOptions / AgentStreamAdapter
+- [x] Accumulator
+- [x] Hook 基础事件与 HookManager
+- [x] State 协议与状态对象
+- [x] ToolGroup / ToolGroupManager
+- [x] 文件工具与命令工具
+- [x] SubAgentTool
+- [x] MCP 抽象与 McpTool
+- [x] TTS 接口与 Stub 实现
+- [x] WebSocket 传输底座
+- [x] OpenAI 多模态工具骨架
+- [x] WebSearchTool 与 provider fallback
 
----
+## P0：先修正基线，再打通主链路
 
-### 二、需要完成的工作
+- [x] 将 capability-scan 从“文件存在”升级为“文件存在 / 已测试 / 已接入 / 真实 provider”四级评估
+- [x] 修复 GeminiFormatterTests 中的 2 个可空 warning
+- [x] 修复 LlmSystemTests 中的 1 个可空 warning
+- [x] 为 AgentStreamAdapter 与 streaming 主路径补单测或集成测试
+- [x] 打通真实 chunk 事件流，而不是仅在 CallAsync 结束后合成开始/结束事件
+- [x] 在 EnhancedReActAgent 中接入 ReasoningChunk、ActingChunk、Error 事件
+- [x] 补 Summary 事件链路，打通 SummaryStart / SummaryChunk / SummaryFinish 与对应 hook
+- [x] 增加 stream -> accumulator -> hook 联调测试
 
-#### 🔷 任务 1：获取并集成 AgentScope.NET
+## P1：把已有能力接入运行时入口
 
-**方式 A - 克隆源码（推荐用于开发）**：
-```bash
-# 在 myclaw.net 同级目录克隆
-git clone https://github.com/linkerlin/agentscope.net.git
-```
+- [x] 让 EnhancedReActAgent 正式实现 IStateModule，并补 Save / Load / LoadIfExists 回归测试
+- [x] 将 ToolGroupManager 接入 ReActAgent / EnhancedReActAgent 的实际工具选择流程
+- [x] 扩展 ToolFactory，纳入已稳定的 read_file / write_file / shell_command 工具入口
+- [x] 明确默认工具集与高级工具集的边界
+- [x] 将集成测试拆分为快速验证与外部依赖验证，并为外部路径提供 smoke / Full 两级入口
+- [x] 为 WebSocket transport 增加测试与最小可运行示例
 
-**方式 B - 使用 NuGet 包（发布后）**：
-```xml
-<PackageReference Include="AgentScope.Core" Version="1.0.9" />
-```
+## P2：补齐 Skill 与 MCP 的完整链路
 
-**当前项目引用需要调整**：
-- 修改 [MyClaw.Agent.csproj](file:///c:/GitHub/myclaw.net/src/MyClaw.Agent/MyClaw.Agent.csproj#L9) 中的项目引用
+- [x] 补 MarkdownSkillParser，并让 FileSystemSkillRepository 支持默认 MarkdownSkill 装载
+- [x] 补 Skill 装载、绑定、启停链路
+- [x] 设计并实现 SkillBox 或等价运行时装配能力
+- [ ] 在 SkillBox 基础上补字段校验、richer metadata、绑定规则与更深运行时集成
+- [x] 接入至少一个真实 MCP client（stdio）
+- [x] 为 stdio MCP client 增加真实子进程回归测试
+- [x] 补 MCP manager、content converter、错误映射
+- [x] 为 MCP 增加端到端测试
+- [ ] 补 MCP 多客户端命名隔离、更多 server 兼容性与更高层运行时入口
 
----
+## P3：把骨架能力变成可运行能力
 
-#### 🔷 任务 2：完善 MyClawAgent 实现
+- [ ] 引入至少一个真实 TTS provider
+- [ ] 明确 AudioPlayer 的跨平台策略
+- [ ] 将 OpenAIMultiModalTool 从占位实现改为可配置真实调用
+- [ ] 评估是否需要 TTSHook / Realtime TTS 路线
+- [ ] 决定多模态能力是否进入统一工具入口
 
-**当前代码已具备基础结构** ([MyClawAgent.cs](file:///c:/GitHub/myclaw.net/src/MyClaw.Agent/MyClawAgent.cs))：
+## P4：补生态与对外可用性
 
-| 当前状态 | 需要完善 |
-|---------|---------|
-| ✅ 构造函数已定义 | 需验证 EnhancedReActAgent.Builder() API |
-| ✅ ChatAsync 方法 | 需完善错误处理和流式响应 |
-| ✅ BuildSystemPrompt() | 需支持更多上下文（HEARTBEAT.md 等） |
-| ⚠️ SkillTool 实现 | 需要重新实现 Tool 接口 |
+- [ ] 新增至少 3 个示例项目
+- [ ] 建立独立文档站点
+- [ ] 补中英文使用指南
+- [ ] 将 capability scan 与 smoke tests 接入 CI gate
+- [ ] 让状态文档、TODO、示例与实际发布版本同步更新
 
-**需要实现的功能**：
+## 完成定义
 
-1. **单次消息模式** (`myclaw agent -m "Hello"`)
-   - 接收单条用户消息
-   - 返回 Agent 响应
-   - 退出
+以后新增或补完一项能力，默认同时满足以下条件才可标记为完成：
 
-2. **REPL 交互模式** (`myclaw agent`)
-   - 循环读取用户输入
-   - 保持会话上下文
-   - 支持退出命令 (`/exit`, `/quit`)
-
-3. **系统提示词构建**
-   - 加载 [AGENTS.md](file:///c:/GitHub/myclaw.net/workspace/AGENTS.md)
-   - 加载 [SOUL.md](file:///c:/GitHub/myclaw.net/workspace/SOUL.md)
-   - 加载 Memory 上下文
-   - 加载 HEARTBEAT.md（心跳任务说明）
-
----
-
-#### 🔷 任务 3：重构 SkillTool
-
-**当前实现问题** ([SkillTool.cs](file:///c:/GitHub/myclaw.net/src/MyClaw.Agent/SkillTool.cs))：
-
-```csharp
-// 当前：Skill 作为提示词返回（不正确）
-public override Task<ToolResult> ExecuteAsync(Dictionary<string, object> parameters)
-{
-    var prompt = _skill.GetSystemPrompt();
-    return Task.FromResult(ToolResult.Ok(prompt));
-}
-```
-
-**应该实现的逻辑**：
-- 解析用户意图匹配 Skill 关键词
-- 将 Skill 能力转换为 Agent 可调用的 Tool
-- 执行 Skill 逻辑并返回结构化结果
-
----
-
-#### 🔷 任务 4：完善 ModelFactory
-
-**当前支持的模型** ([ModelFactory.cs](file:///c:/GitHub/myclaw.net/src/MyClaw.Agent/ModelFactory.cs))：
-- ✅ Anthropic (Claude)
-- ✅ OpenAI (GPT-4)
-- ✅ DeepSeek
-
-**AgentScope.NET 还支持**：
-- Azure OpenAI
-- Google Gemini
-- 阿里云 DashScope (通义千问)
-- Ollama (本地模型)
-
-需要根据配置扩展支持。
-
----
-
-#### 🔷 任务 5：CLI 命令完善
-
-**当前 AgentCommand 状态**：需要检查 [AgentCommand.cs](file:///c:/GitHub/myclaw.net/src/MyClaw.CLI/Commands/AgentCommand.cs)
-
-需要实现的 CLI 参数：
-```bash
-myclaw agent                         # REPL 模式
-myclaw agent -m "Hello"              # 单次消息模式
-myclaw agent -m "Hello" --model gpt-4o  # 指定模型
-myclaw agent --repl                  # 显式 REPL 模式
-```
-
----
-
-#### 🔷 任务 6：与 Gateway 集成
-
-在 Gateway 模式下，Agent 需要作为消息处理器：
-
-```
-Telegram/Feishu/WeCom/WebUI → Channel → MessageBus → MyClawAgent → Response
-```
-
-需要实现：
-- `IMessageHandler` 接口
-- 消息路由到 Agent 的逻辑
-- 会话管理（session_id）
-
----
-
-### 三、最终交付物清单
-
-| 交付物 | 文件路径 | 描述 |
-|-------|---------|------|
-| 1. 可运行的 Agent CLI | `src/MyClaw.CLI/Commands/AgentCommand.cs` | 支持单次和 REPL 模式 |
-| 2. MyClawAgent 核心类 | `src/MyClaw.Agent/MyClawAgent.cs` | 继承 EnhancedReActAgent |
-| 3. Skill 工具适配器 | `src/MyClaw.Agent/SkillTool.cs` | 将 Skill 转为 ITool |
-| 4. 模型工厂 | `src/MyClaw.Agent/ModelFactory.cs` | 支持多 LLM 提供商 |
-| 5. REPL 循环组件 | `src/MyClaw.Agent/ReplLoop.cs` | 交互式命令行界面 |
-| 6. Gateway 集成 | `src/MyClaw.Gateway/` | Agent 作为消息处理器 |
-| 7. 单元测试 | `tests/MyClaw.Agent.Tests/` | 覆盖率 ≥ 80% |
-
----
-
-### 四、依赖关系图
-
-```
-MyClaw.CLI (入口)
-    │
-    ├── MyClaw.Agent (本任务)
-    │   ├── EnhancedReActAgent (AgentScope.NET) ✅ 已具备
-    │   ├── IModel (OpenAI/Anthropic/DeepSeek) ✅ 已具备
-    │   ├── ITool/ToolBase (AgentScope.NET) ✅ 已具备
-    │   └── SkillManager (已有)
-    │
-    ├── MyClaw.Gateway (已有框架)
-    │   └── 需要集成 MyClawAgent
-    │
-    ├── MyClaw.Skills (已有)
-    └── MyClaw.Memory (已有)
-```
-
----
-
-### 五、开发建议
-
-1. **先克隆 AgentScope.NET** 到本地并验证构建成功
-2. **先让 Agent 单机模式工作**，再集成到 Gateway
-3. **参考原版 myclaw (Go)** 的行为：https://github.com/stellarlinkco/myclaw
-4. **测试优先级**：单次消息 → REPL 模式 → Gateway 集成
-
----
-
+- [ ] 有稳定 API 与最小实现
+- [ ] 有测试覆盖核心路径
+- [ ] 已接入主链路或统一入口
+- [ ] 依赖外部 provider 的能力具备真实实现、配置说明和错误处理
+- [ ] 文档口径与实际行为一致

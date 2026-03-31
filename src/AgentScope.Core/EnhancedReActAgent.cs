@@ -16,14 +16,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AgentScope.Core.Agent;
+using AgentScope.Core.Events;
 using AgentScope.Core.Hook;
 using AgentScope.Core.Memory;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
+using AgentScope.Core.State;
 using AgentScope.Core.Tool;
+using AgentEvent = AgentScope.Core.Events.Event;
+using AgentEventType = AgentScope.Core.Events.EventType;
 
 namespace AgentScope.Core;
 
@@ -36,12 +41,18 @@ namespace AgentScope.Core;
 /// 2. Acting（行动）：Agent 执行工具或返回最终答案
 /// 3. Observation（观察）：获取行动结果，继续循环或结束
 /// </summary>
-public class EnhancedReActAgent : AgentBase
+public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
 {
+    private const string AgentMetaStateKeyPrefix = "state::enhanced_react::agent_meta::";
+    private const string MemoryStateKeyPrefix = "state::enhanced_react::memory::";
+    private const string ToolkitStateKeyPrefix = "state::enhanced_react::toolkit::";
+
     private readonly IModel _model;
     private readonly IMemory _memory;
     private readonly Dictionary<string, ITool> _tools;
-    private readonly string _systemPrompt;
+    private readonly ToolGroupManager? _toolGroupManager;
+    private string _systemPrompt;
+    private readonly StatePersistence _statePersistence;
     private readonly int _maxIterations;
     private readonly HookManager _hookManager;
     private readonly bool _verbose;
@@ -52,6 +63,8 @@ public class EnhancedReActAgent : AgentBase
         string systemPrompt, 
         IMemory? memory = null, 
         Dictionary<string, ITool>? tools = null, 
+        ToolGroupManager? toolGroupManager = null,
+        StatePersistence? statePersistence = null,
         int maxIterations = 10,
         HookManager? hookManager = null,
         bool verbose = false)
@@ -61,6 +74,8 @@ public class EnhancedReActAgent : AgentBase
         _systemPrompt = systemPrompt;
         _memory = memory ?? new MemoryBase();
         _tools = tools ?? new Dictionary<string, ITool>();
+        _toolGroupManager = toolGroupManager;
+        _statePersistence = statePersistence ?? StatePersistence.All;
         _maxIterations = maxIterations;
         _hookManager = hookManager ?? new HookManager();
         _verbose = verbose;
@@ -75,6 +90,47 @@ public class EnhancedReActAgent : AgentBase
             _memory.Add(response);
             return response;
         });
+    }
+
+    public async IAsyncEnumerable<AgentEvent> StreamAsync(IEnumerable<Msg> messages, StreamOptions options)
+    {
+        options ??= new StreamOptions();
+        options.CancellationToken.ThrowIfCancellationRequested();
+
+        var list = messages as IList<Msg> ?? messages.ToList();
+        if (list.Count == 0)
+        {
+            yield return new AgentEvent(AgentEventType.ReasoningFinish, null, true);
+            yield break;
+        }
+
+        var userMessage = list[list.Count - 1];
+        _memory.Add(userMessage);
+
+        Msg? finalMessage = null;
+        await foreach (var ev in ProcessWithReActLoopStreamAsync(userMessage, options).ConfigureAwait(false))
+        {
+            if (ev.IsLast && ev.Message != null)
+            {
+                finalMessage = ev.Message;
+            }
+
+            yield return ev;
+        }
+
+        if (finalMessage != null)
+        {
+            _memory.Add(finalMessage);
+        }
+    }
+
+    public async IAsyncEnumerable<AgentEvent> StreamAsync(Msg message, StreamOptions? options = null)
+    {
+        options ??= new StreamOptions();
+        await foreach (var ev in StreamAsync(new[] { message }, options).ConfigureAwait(false))
+        {
+            yield return ev;
+        }
     }
 
     /// <summary>
@@ -132,13 +188,344 @@ public class EnhancedReActAgent : AgentBase
             finalResponse = "达到最大迭代次数，无法得出结论。Reached maximum iterations without conclusion.";
         }
 
-        return Msg.Builder()
-            .Name(Name)
-            .Role("assistant")
-            .TextContent(finalResponse)
-            .AddMetadata("iterations", iteration)
-            .AddMetadata("thoughts", string.Join("\n", thoughtHistory))
-            .Build();
+        finalResponse = await ExecuteSummaryPhaseAsync(
+            BuildAssistantChunkMessage(finalResponse),
+            finalResponse).ConfigureAwait(false);
+
+        return CreateFinalResponse(finalResponse, iteration, thoughtHistory);
+    }
+
+    private async IAsyncEnumerable<AgentEvent> ProcessWithReActLoopStreamAsync(Msg userMessage, StreamOptions options)
+    {
+        var iteration = 0;
+        var thoughtHistory = new List<string>();
+
+        while (iteration < _maxIterations)
+        {
+            options.CancellationToken.ThrowIfCancellationRequested();
+            iteration++;
+
+            if (_verbose)
+            {
+                Console.WriteLine($"\n=== ReAct 流式迭代 Iteration {iteration}/{_maxIterations} ===");
+            }
+
+            var reasoningPhase = await ExecuteStreamingReasoningPhaseAsync(userMessage, thoughtHistory, iteration, options).ConfigureAwait(false);
+            foreach (var ev in reasoningPhase.Events)
+            {
+                yield return ev;
+            }
+
+            if (reasoningPhase.ShouldStop)
+            {
+                yield break;
+            }
+
+            var reasoning = reasoningPhase.Result;
+            thoughtHistory.Add($"Thought {iteration}: {reasoning.Thought}");
+
+            var actionPhase = await ExecuteStreamingActionPhaseAsync(userMessage, reasoning, thoughtHistory, iteration, options).ConfigureAwait(false);
+            foreach (var ev in actionPhase.Events)
+            {
+                yield return ev;
+            }
+
+            if (actionPhase.ShouldStop)
+            {
+                yield break;
+            }
+
+            if (!string.IsNullOrEmpty(actionPhase.Observation))
+            {
+                thoughtHistory.Add($"Observation {iteration}: {actionPhase.Observation}");
+            }
+        }
+
+        var finalResponse = "达到最大迭代次数，无法得出结论。Reached maximum iterations without conclusion.";
+        yield return new AgentEvent(
+            AgentEventType.ActingFinish,
+            null,
+            false,
+            CreatePhaseMetadata(iteration, "acting_finish"));
+
+        foreach (var ev in await ExecuteStreamingSummaryPhaseAsync(
+            BuildAssistantChunkMessage(finalResponse),
+            finalResponse,
+            iteration,
+            thoughtHistory).ConfigureAwait(false))
+        {
+            yield return ev;
+        }
+    }
+
+    private async Task<(ReasoningResult Result, List<AgentEvent> Events, bool ShouldStop)> ExecuteStreamingReasoningPhaseAsync(
+        Msg userMessage,
+        List<string> thoughtHistory,
+        int iteration,
+        StreamOptions options)
+    {
+        var events = new List<AgentEvent>();
+
+        try
+        {
+            var preEvent = new PreReasoningEvent
+            {
+                AgentName = Name,
+                CurrentMessage = userMessage,
+                Context = string.Join("\n", thoughtHistory)
+            };
+            await _hookManager.ExecutePreReasoningHooksAsync(preEvent).ConfigureAwait(false);
+
+            if (preEvent.ShouldStop)
+            {
+                const string stopMessage = "Reasoning stopped by hook";
+                await EmitErrorHookAsync(userMessage, stopMessage).ConfigureAwait(false);
+                events.Add(AgentEvent.ErrorEvent(CreateErrorResponse(stopMessage), stopMessage, isLast: true));
+                return (ReasoningResult.Error(stopMessage), events, true);
+            }
+
+            var prompt = BuildReasoningPrompt(userMessage, thoughtHistory, iteration);
+            var requestMessages = new List<Msg> { prompt };
+
+            if (options.IncludeReasoning)
+            {
+                events.Add(new AgentEvent(
+                    AgentEventType.ReasoningStart,
+                    null,
+                    false,
+                    CreatePhaseMetadata(iteration, "reasoning")));
+            }
+
+            var rawResponseBuilder = new StringBuilder();
+            ModelResponse? modelResponse = null;
+
+            if (_model is IStreamingChatModel streamingModel)
+            {
+                await foreach (var chunk in streamingModel.GenerateStreamAsync(requestMessages, options.CancellationToken).ConfigureAwait(false))
+                {
+                    if (!chunk.Success)
+                    {
+                        var error = chunk.Error ?? "Model error";
+                        await EmitErrorHookAsync(userMessage, error).ConfigureAwait(false);
+                        events.Add(AgentEvent.ErrorEvent(CreateErrorResponse(error), error, isLast: true));
+                        return (ReasoningResult.Error(error), events, true);
+                    }
+
+                    modelResponse = chunk;
+                    var chunkText = ExtractChunkText(chunk);
+                    if (string.IsNullOrEmpty(chunkText))
+                    {
+                        continue;
+                    }
+
+                    rawResponseBuilder.Append(chunkText);
+                    await EmitReasoningChunkHookAsync(userMessage, chunkText).ConfigureAwait(false);
+
+                    if (options.IncludeReasoning)
+                    {
+                        events.Add(new AgentEvent(
+                            AgentEventType.ReasoningChunk,
+                            BuildAssistantChunkMessage(chunkText),
+                            false,
+                            CreatePhaseMetadata(iteration, "reasoning_chunk")));
+                    }
+                }
+            }
+            else
+            {
+                var response = await _model.GenerateAsync(new ModelRequest { Messages = requestMessages }).ConfigureAwait(false);
+                if (!response.Success)
+                {
+                    var error = response.Error ?? "Model error";
+                    await EmitErrorHookAsync(userMessage, error).ConfigureAwait(false);
+                    events.Add(AgentEvent.ErrorEvent(CreateErrorResponse(error), error, isLast: true));
+                    return (ReasoningResult.Error(error), events, true);
+                }
+
+                modelResponse = response;
+                var rawText = response.Text ?? string.Empty;
+                rawResponseBuilder.Append(rawText);
+
+                if (!string.IsNullOrEmpty(rawText))
+                {
+                    await EmitReasoningChunkHookAsync(userMessage, rawText).ConfigureAwait(false);
+
+                    if (options.IncludeReasoning)
+                    {
+                        events.Add(new AgentEvent(
+                            AgentEventType.ReasoningChunk,
+                            BuildAssistantChunkMessage(rawText),
+                            false,
+                            CreatePhaseMetadata(iteration, "reasoning_chunk")));
+                    }
+                }
+            }
+
+            var rawResponse = rawResponseBuilder.ToString();
+            var thought = ParseThought(rawResponse);
+
+            var postEvent = new PostReasoningEvent
+            {
+                AgentName = Name,
+                CurrentMessage = userMessage,
+                ReasoningResult = thought
+            };
+            await _hookManager.ExecutePostReasoningHooksAsync(postEvent).ConfigureAwait(false);
+
+            if (options.IncludeReasoning)
+            {
+                events.Add(new AgentEvent(
+                    AgentEventType.ReasoningFinish,
+                    string.IsNullOrEmpty(rawResponse) ? null : BuildAssistantChunkMessage(rawResponse),
+                    false,
+                    CreatePhaseMetadata(iteration, "reasoning_finish")));
+            }
+
+            if (_verbose)
+            {
+                Console.WriteLine($"Thought: {thought}");
+            }
+
+            return (ReasoningResult.Success(thought, modelResponse, rawResponse), events, false);
+        }
+        catch (System.Exception ex)
+        {
+            var error = $"Reasoning error: {ex.Message}";
+            await EmitErrorHookAsync(userMessage, error, ex).ConfigureAwait(false);
+            events.Add(AgentEvent.ErrorEvent(CreateErrorResponse(error), error, isLast: true));
+            return (ReasoningResult.Error(error), events, true);
+        }
+    }
+
+    private async Task<(ActionResult Result, List<AgentEvent> Events, string? Observation, bool ShouldStop)> ExecuteStreamingActionPhaseAsync(
+        Msg userMessage,
+        ReasoningResult reasoning,
+        List<string> thoughtHistory,
+        int iteration,
+        StreamOptions options)
+    {
+        var events = new List<AgentEvent>();
+
+        try
+        {
+            var responseText = reasoning.RawResponseText ?? reasoning.Thought ?? string.Empty;
+            var actionIntent = ParseActionIntent(responseText);
+
+            var preActingEvent = new PreActingEvent
+            {
+                AgentName = Name,
+                Action = actionIntent.Action,
+                ActionParameters = actionIntent.Parameters
+            };
+            await _hookManager.ExecutePreActingHooksAsync(preActingEvent).ConfigureAwait(false);
+
+            if (preActingEvent.ShouldStop)
+            {
+                const string stopMessage = "Action stopped by hook";
+                await EmitErrorHookAsync(userMessage, stopMessage).ConfigureAwait(false);
+                events.Add(AgentEvent.ErrorEvent(CreateErrorResponse(stopMessage), stopMessage, isLast: true));
+                return (ActionResult.Error(stopMessage), events, null, true);
+            }
+
+            if (actionIntent.Action == "finish")
+            {
+                var finalAnswer = actionIntent.Parameters?.ToString();
+                if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
+                {
+                    finalAnswer = ExtractFinalAnswerForFinish(responseText, actionIntent.HasActionLine);
+                }
+
+                var actionResult = ActionResult.Finish(finalAnswer ?? string.Empty);
+                var postActingEvent = new PostActingEvent
+                {
+                    AgentName = Name,
+                    Action = actionIntent.Action,
+                    ActionResult = actionResult,
+                    ActionSuccess = true
+                };
+                await _hookManager.ExecutePostActingHooksAsync(postActingEvent).ConfigureAwait(false);
+
+                events.Add(new AgentEvent(
+                    AgentEventType.ActingFinish,
+                    null,
+                    false,
+                    CreatePhaseMetadata(iteration, "acting_finish")));
+
+                events.AddRange(await ExecuteStreamingSummaryPhaseAsync(
+                    BuildAssistantChunkMessage(finalAnswer ?? string.Empty),
+                    finalAnswer ?? string.Empty,
+                    iteration,
+                    thoughtHistory).ConfigureAwait(false));
+
+                return (actionResult, events, null, true);
+            }
+
+            if (GetAvailableTools().TryGetValue(actionIntent.Action, out var tool))
+            {
+                var parameters = actionIntent.Parameters as Dictionary<string, object>
+                    ?? new Dictionary<string, object>();
+
+                if (options.IncludeToolCalls)
+                {
+                    events.Add(new AgentEvent(
+                        AgentEventType.ToolCallStart,
+                        BuildAssistantChunkMessage(actionIntent.Action),
+                        false,
+                        CreatePhaseMetadata(iteration, "tool_call_start")));
+                }
+
+                var toolResult = await tool.ExecuteAsync(parameters).ConfigureAwait(false);
+                var toolOutput = toolResult.Result?.ToString() ?? toolResult.Error ?? string.Empty;
+
+                if (!string.IsNullOrEmpty(toolOutput))
+                {
+                    await EmitActingChunkHookAsync(userMessage, toolOutput).ConfigureAwait(false);
+                }
+
+                var actionResult = ActionResult.ToolCall(actionIntent.Action, toolResult.Success, toolOutput);
+                var postActingEvent = new PostActingEvent
+                {
+                    AgentName = Name,
+                    Action = actionIntent.Action,
+                    ActionResult = actionResult,
+                    ActionSuccess = !actionResult.IsError
+                };
+                await _hookManager.ExecutePostActingHooksAsync(postActingEvent).ConfigureAwait(false);
+
+                if (options.IncludeToolCalls && !string.IsNullOrEmpty(toolOutput))
+                {
+                    events.Add(new AgentEvent(
+                        AgentEventType.ToolCallChunk,
+                        BuildAssistantChunkMessage(toolOutput),
+                        false,
+                        CreatePhaseMetadata(iteration, "tool_call_chunk")));
+                }
+
+                if (options.IncludeToolCalls)
+                {
+                    events.Add(new AgentEvent(
+                        AgentEventType.ToolCallFinish,
+                        string.IsNullOrEmpty(toolOutput) ? null : BuildAssistantChunkMessage(toolOutput),
+                        false,
+                        CreatePhaseMetadata(iteration, "tool_call_finish")));
+                }
+
+                var observation = await ObservationPhaseAsync(actionResult).ConfigureAwait(false);
+                return (actionResult, events, observation, false);
+            }
+
+            var unknownActionError = $"Unknown action: {actionIntent.Action}";
+            await EmitErrorHookAsync(userMessage, unknownActionError).ConfigureAwait(false);
+            events.Add(AgentEvent.ErrorEvent(CreateErrorResponse(unknownActionError), unknownActionError, isLast: true));
+            return (ActionResult.Error(unknownActionError), events, null, true);
+        }
+        catch (System.Exception ex)
+        {
+            var error = $"Acting error: {ex.Message}";
+            await EmitErrorHookAsync(userMessage, error, ex).ConfigureAwait(false);
+            events.Add(AgentEvent.ErrorEvent(CreateErrorResponse(error), error, isLast: true));
+            return (ActionResult.Error(error), events, null, true);
+        }
     }
 
     /// <summary>
@@ -163,7 +550,9 @@ public class EnhancedReActAgent : AgentBase
 
             if (preEvent.ShouldStop)
             {
-                return ReasoningResult.Error("Reasoning stopped by hook");
+                const string stopMessage = "Reasoning stopped by hook";
+                await EmitErrorHookAsync(userMessage, stopMessage).ConfigureAwait(false);
+                return ReasoningResult.Error(stopMessage);
             }
 
             // 构建推理提示词
@@ -176,11 +565,18 @@ public class EnhancedReActAgent : AgentBase
             
             if (!response.Success)
             {
-                return ReasoningResult.Error(response.Error ?? "Model error");
+                var error = response.Error ?? "Model error";
+                await EmitErrorHookAsync(userMessage, error).ConfigureAwait(false);
+                return ReasoningResult.Error(error);
             }
 
             var rawResponse = response.Text ?? "";
             var thought = ParseThought(rawResponse);
+
+            if (!string.IsNullOrEmpty(rawResponse))
+            {
+                await EmitReasoningChunkHookAsync(userMessage, rawResponse).ConfigureAwait(false);
+            }
 
             // 触发 Post-Reasoning Hook
             var postEvent = new PostReasoningEvent
@@ -200,7 +596,9 @@ public class EnhancedReActAgent : AgentBase
         }
         catch (System.Exception ex)
         {
-            return ReasoningResult.Error($"Reasoning error: {ex.Message}");
+            var error = $"Reasoning error: {ex.Message}";
+            await EmitErrorHookAsync(userMessage, error, ex).ConfigureAwait(false);
+            return ReasoningResult.Error(error);
         }
     }
 
@@ -227,7 +625,9 @@ public class EnhancedReActAgent : AgentBase
 
             if (preEvent.ShouldStop)
             {
-                return ActionResult.Error("Action stopped by hook");
+                const string stopMessage = "Action stopped by hook";
+                await EmitErrorHookAsync(reasoning.ModelResponse == null ? null : BuildAssistantChunkMessage(responseText), stopMessage).ConfigureAwait(false);
+                return ActionResult.Error(stopMessage);
             }
 
             ActionResult result;
@@ -242,22 +642,28 @@ public class EnhancedReActAgent : AgentBase
                 }
                 result = ActionResult.Finish(finalAnswer ?? string.Empty);
             }
-            else if (_tools.ContainsKey(actionIntent.Action))
+            else if (GetAvailableTools().TryGetValue(actionIntent.Action, out var tool))
             {
                 // 执行工具
-                var tool = _tools[actionIntent.Action];
                 var parameters = actionIntent.Parameters as Dictionary<string, object> 
                     ?? new Dictionary<string, object>();
                 var toolResult = await tool.ExecuteAsync(parameters);
+                var toolOutput = toolResult.Result?.ToString() ?? toolResult.Error ?? "";
+                if (!string.IsNullOrEmpty(toolOutput))
+                {
+                    await EmitActingChunkHookAsync(reasoning.ModelResponse == null ? null : BuildAssistantChunkMessage(responseText), toolOutput).ConfigureAwait(false);
+                }
                 
                 result = ActionResult.ToolCall(
                     actionIntent.Action, 
                     toolResult.Success, 
-                    toolResult.Result?.ToString() ?? toolResult.Error ?? "");
+                    toolOutput);
             }
             else
             {
-                result = ActionResult.Error($"Unknown action: {actionIntent.Action}");
+                var error = $"Unknown action: {actionIntent.Action}";
+                await EmitErrorHookAsync(reasoning.ModelResponse == null ? null : BuildAssistantChunkMessage(responseText), error).ConfigureAwait(false);
+                result = ActionResult.Error(error);
             }
 
             // 触发 Post-Acting Hook
@@ -283,7 +689,9 @@ public class EnhancedReActAgent : AgentBase
         }
         catch (System.Exception ex)
         {
-            return ActionResult.Error($"Acting error: {ex.Message}");
+            var error = $"Acting error: {ex.Message}";
+            await EmitErrorHookAsync(reasoning.ModelResponse == null ? null : BuildAssistantChunkMessage(reasoning.RawResponseText ?? reasoning.Thought ?? string.Empty), error, ex).ConfigureAwait(false);
+            return ActionResult.Error(error);
         }
     }
 
@@ -307,12 +715,13 @@ public class EnhancedReActAgent : AgentBase
 
     private Msg BuildReasoningPrompt(Msg userMessage, List<string> thoughtHistory, int iteration)
     {
+        var toolDescriptions = BuildAvailableToolDescriptions();
         var promptText = $@"{_systemPrompt}
 
 用户问题: {userMessage.GetTextContent()}
 
 你可以使用以下工具:
-{string.Join("\n", _tools.Values.Select(t => $"- {t.Name}: {t.Description}"))}
+    {toolDescriptions}
 
 之前的思考:
 {string.Join("\n", thoughtHistory)}
@@ -469,6 +878,279 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
             .Build();
     }
 
+    private Msg CreateFinalResponse(string finalResponse, int iteration, List<string> thoughtHistory)
+    {
+        return Msg.Builder()
+            .Name(Name)
+            .Role("assistant")
+            .TextContent(finalResponse)
+            .AddMetadata("iterations", iteration)
+            .AddMetadata("thoughts", string.Join("\n", thoughtHistory))
+            .Build();
+    }
+
+    private Msg BuildAssistantChunkMessage(string text)
+    {
+        return Msg.Builder()
+            .Name(Name)
+            .Role("assistant")
+            .TextContent(text)
+            .Build();
+    }
+
+    private static Dictionary<string, object> CreatePhaseMetadata(int iteration, string phase)
+    {
+        return new Dictionary<string, object>
+        {
+            ["iteration"] = iteration,
+            ["phase"] = phase
+        };
+    }
+
+    private static string ExtractChunkText(ChatResponse chunk)
+    {
+        return chunk.Text ?? chunk.Content ?? string.Empty;
+    }
+
+    private IReadOnlyDictionary<string, ITool> GetAvailableTools()
+    {
+        return _toolGroupManager?.FilterActiveTools(_tools) ?? _tools;
+    }
+
+    private string BuildAvailableToolDescriptions()
+    {
+        var availableTools = GetAvailableTools();
+        return availableTools.Count == 0
+            ? "(当前没有激活的可用工具)"
+            : string.Join("\n", availableTools.Values.Select(t => $"- {t.Name}: {t.Description}"));
+    }
+
+    private async Task<string> ExecuteSummaryPhaseAsync(Msg currentMessage, string summaryText)
+    {
+        try
+        {
+            var preEvent = new PreSummaryEvent
+            {
+                AgentName = Name,
+                CurrentMessage = currentMessage,
+                SummaryText = summaryText
+            };
+            await _hookManager.ExecutePreSummaryHooksAsync(preEvent).ConfigureAwait(false);
+
+            var effectiveSummary = preEvent.SummaryText ?? string.Empty;
+            if (!string.IsNullOrEmpty(effectiveSummary))
+            {
+                await EmitSummaryChunkHookAsync(BuildAssistantChunkMessage(effectiveSummary), effectiveSummary).ConfigureAwait(false);
+            }
+
+            var postEvent = new PostSummaryEvent
+            {
+                AgentName = Name,
+                CurrentMessage = currentMessage,
+                SummaryText = effectiveSummary
+            };
+            await _hookManager.ExecutePostSummaryHooksAsync(postEvent).ConfigureAwait(false);
+
+            return effectiveSummary;
+        }
+        catch (System.Exception ex)
+        {
+            await EmitErrorHookAsync(currentMessage, $"Summary error: {ex.Message}", ex).ConfigureAwait(false);
+            return summaryText;
+        }
+    }
+
+    private async Task<List<AgentEvent>> ExecuteStreamingSummaryPhaseAsync(
+        Msg currentMessage,
+        string summaryText,
+        int iteration,
+        List<string> thoughtHistory)
+    {
+        var events = new List<AgentEvent>
+        {
+            new(
+                AgentEventType.SummaryStart,
+                null,
+                false,
+                CreatePhaseMetadata(iteration, "summary_start"))
+        };
+
+        var effectiveSummary = summaryText;
+
+        try
+        {
+            var preEvent = new PreSummaryEvent
+            {
+                AgentName = Name,
+                CurrentMessage = currentMessage,
+                SummaryText = summaryText
+            };
+            await _hookManager.ExecutePreSummaryHooksAsync(preEvent).ConfigureAwait(false);
+            effectiveSummary = preEvent.SummaryText ?? string.Empty;
+
+            if (!string.IsNullOrEmpty(effectiveSummary))
+            {
+                await EmitSummaryChunkHookAsync(BuildAssistantChunkMessage(effectiveSummary), effectiveSummary).ConfigureAwait(false);
+                events.Add(new AgentEvent(
+                    AgentEventType.SummaryChunk,
+                    BuildAssistantChunkMessage(effectiveSummary),
+                    false,
+                    CreatePhaseMetadata(iteration, "summary_chunk")));
+            }
+
+            var postEvent = new PostSummaryEvent
+            {
+                AgentName = Name,
+                CurrentMessage = currentMessage,
+                SummaryText = effectiveSummary
+            };
+            await _hookManager.ExecutePostSummaryHooksAsync(postEvent).ConfigureAwait(false);
+        }
+        catch (System.Exception ex)
+        {
+            var error = $"Summary error: {ex.Message}";
+            await EmitErrorHookAsync(currentMessage, error, ex).ConfigureAwait(false);
+            events.Add(AgentEvent.ErrorEvent(CreateErrorResponse(error), error, isLast: true));
+            return events;
+        }
+
+        events.Add(new AgentEvent(
+            AgentEventType.SummaryFinish,
+            CreateFinalResponse(effectiveSummary, iteration, thoughtHistory),
+            true,
+            CreatePhaseMetadata(iteration, "summary_finish")));
+
+        return events;
+    }
+
+    private async Task EmitReasoningChunkHookAsync(Msg userMessage, string chunk)
+    {
+        var hookEvent = new ReasoningChunkEvent
+        {
+            AgentName = Name,
+            CurrentMessage = userMessage,
+            Chunk = chunk
+        };
+        await _hookManager.ExecuteReasoningChunkHooksAsync(hookEvent).ConfigureAwait(false);
+    }
+
+    private async Task EmitActingChunkHookAsync(Msg? currentMessage, string chunk)
+    {
+        var hookEvent = new ActingChunkEvent
+        {
+            AgentName = Name,
+            CurrentMessage = currentMessage,
+            Chunk = chunk
+        };
+        await _hookManager.ExecuteActingChunkHooksAsync(hookEvent).ConfigureAwait(false);
+    }
+
+    private async Task EmitSummaryChunkHookAsync(Msg currentMessage, string chunk)
+    {
+        var hookEvent = new SummaryChunkEvent
+        {
+            AgentName = Name,
+            CurrentMessage = currentMessage,
+            Chunk = chunk
+        };
+        await _hookManager.ExecuteSummaryChunkHooksAsync(hookEvent).ConfigureAwait(false);
+    }
+
+    private async Task EmitErrorHookAsync(Msg? currentMessage, string errorMessage, System.Exception? exception = null)
+    {
+        var hookEvent = new ErrorHookEvent
+        {
+            AgentName = Name,
+            CurrentMessage = currentMessage,
+            ErrorMessage = errorMessage,
+            Exception = exception
+        };
+        await _hookManager.ExecuteErrorHooksAsync(hookEvent).ConfigureAwait(false);
+    }
+
+    public void SaveTo(AgentScope.Core.Session.Session session, string sessionKey)
+    {
+        if (session == null) throw new ArgumentNullException(nameof(session));
+        if (string.IsNullOrWhiteSpace(sessionKey)) throw new ArgumentNullException(nameof(sessionKey));
+
+        session.AgentName = Name;
+        session.SetContext(AgentMetaStateKeyPrefix + sessionKey, new AgentMetaState(session.Id, Name, string.Empty, _systemPrompt));
+
+        if (_statePersistence.MemoryManaged)
+            session.SetContext(MemoryStateKeyPrefix + sessionKey, _memory.GetAll());
+
+        if (_statePersistence.ToolkitManaged && _toolGroupManager != null)
+        {
+            var activeGroups = _toolGroupManager.GetActiveGroupNames().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            session.SetContext(ToolkitStateKeyPrefix + sessionKey, new ToolkitState(activeGroups));
+        }
+    }
+
+    public void LoadFrom(AgentScope.Core.Session.Session session, string sessionKey)
+    {
+        if (session == null) throw new ArgumentNullException(nameof(session));
+        if (string.IsNullOrWhiteSpace(sessionKey)) throw new ArgumentNullException(nameof(sessionKey));
+
+        var meta = session.GetContext<AgentMetaState>(AgentMetaStateKeyPrefix + sessionKey);
+        if (meta == null)
+            throw new InvalidOperationException("State not found: " + sessionKey);
+
+        ApplyAgentMeta(meta);
+
+        if (_statePersistence.MemoryManaged)
+        {
+            var messages = session.GetContext<List<Msg>>(MemoryStateKeyPrefix + sessionKey);
+            if (messages != null)
+                RestoreMemory(messages);
+        }
+
+        if (_statePersistence.ToolkitManaged && _toolGroupManager != null)
+        {
+            var toolkitState = session.GetContext<ToolkitState>(ToolkitStateKeyPrefix + sessionKey);
+            if (toolkitState != null)
+                _toolGroupManager.SetActiveGroups(toolkitState.ActiveGroups);
+        }
+    }
+
+    public void LoadIfExists(AgentScope.Core.Session.Session session, string sessionKey)
+    {
+        if (session == null) throw new ArgumentNullException(nameof(session));
+        if (string.IsNullOrWhiteSpace(sessionKey)) throw new ArgumentNullException(nameof(sessionKey));
+
+        var meta = session.GetContext<AgentMetaState>(AgentMetaStateKeyPrefix + sessionKey);
+        if (meta == null)
+            return;
+
+        ApplyAgentMeta(meta);
+
+        if (_statePersistence.MemoryManaged)
+        {
+            var messages = session.GetContext<List<Msg>>(MemoryStateKeyPrefix + sessionKey);
+            if (messages != null)
+                RestoreMemory(messages);
+        }
+
+        if (_statePersistence.ToolkitManaged && _toolGroupManager != null)
+        {
+            var toolkitState = session.GetContext<ToolkitState>(ToolkitStateKeyPrefix + sessionKey);
+            if (toolkitState != null)
+                _toolGroupManager.SetActiveGroups(toolkitState.ActiveGroups);
+        }
+    }
+
+    private void ApplyAgentMeta(AgentMetaState meta)
+    {
+        Name = meta.Name;
+        _systemPrompt = meta.SystemPrompt;
+    }
+
+    private void RestoreMemory(IEnumerable<Msg> messages)
+    {
+        _memory.Clear();
+        foreach (var message in messages)
+            _memory.Add(message);
+    }
+
     public static EnhancedReActAgentBuilder Builder()
     {
         return new EnhancedReActAgentBuilder();
@@ -530,6 +1212,8 @@ public class EnhancedReActAgentBuilder
     private string _sysPrompt = "你是一个有帮助的AI助手。You are a helpful AI assistant.";
     private IMemory? _memory;
     private readonly Dictionary<string, ITool> _tools = new();
+    private ToolGroupManager? _toolGroupManager;
+    private StatePersistence _statePersistence = AgentScope.Core.State.StatePersistence.All;
     private int _maxIterations = 10;
     private HookManager? _hookManager;
     private bool _verbose = false;
@@ -564,6 +1248,25 @@ public class EnhancedReActAgentBuilder
         return this;
     }
 
+    public EnhancedReActAgentBuilder ToolGroupManager(ToolGroupManager manager)
+    {
+        _toolGroupManager = manager;
+        return this;
+    }
+
+    public EnhancedReActAgentBuilder StatePersistence(StatePersistence statePersistence)
+    {
+        _statePersistence = statePersistence ?? AgentScope.Core.State.StatePersistence.All;
+        return this;
+    }
+
+    public EnhancedReActAgentBuilder AddToolGroup(ToolGroup group)
+    {
+        _toolGroupManager ??= new ToolGroupManager();
+        _toolGroupManager.RegisterGroup(group);
+        return this;
+    }
+
     public EnhancedReActAgentBuilder MaxIterations(int max)
     {
         _maxIterations = max;
@@ -590,7 +1293,7 @@ public class EnhancedReActAgentBuilder
         }
 
         return new EnhancedReActAgent(
-            _name, _model, _sysPrompt, _memory, _tools, 
+            _name, _model, _sysPrompt, _memory, _tools, _toolGroupManager, _statePersistence,
             _maxIterations, _hookManager, _verbose);
     }
 }
