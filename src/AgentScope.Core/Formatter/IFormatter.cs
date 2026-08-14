@@ -110,7 +110,7 @@ public class ExecutionConfig
     /// <summary>最大重试次数</summary>
     public int MaxRetries { get; set; } = 3;
 
-    /// <summary>重试间隔</summary>
+    /// <summary>重试间隔（固定间隔，未启用指数退避时使用）</summary>
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>单次调用超时</summary>
@@ -118,6 +118,21 @@ public class ExecutionConfig
 
     /// <summary>是否指数退避</summary>
     public bool ExponentialBackoff { get; set; } = true;
+
+    /// <summary>指数退避初始间隔</summary>
+    public TimeSpan InitialBackoff { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>指数退避最大间隔</summary>
+    public TimeSpan MaxBackoff { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>退避倍数（每次重试间隔乘以该值）</summary>
+    public double BackoffMultiplier { get; set; } = 2.0;
+
+    /// <summary>
+    /// 判断某个异常是否应触发重试。返回 true 表示重试，返回 false 或 null 表示不重试。
+    /// 未设置时默认对所有异常重试。
+    /// </summary>
+    public Func<System.Exception, bool>? RetryOn { get; set; }
 }
 
 /// <summary>
@@ -129,34 +144,95 @@ public class GenerateOptions
     /// <summary>执行配置（重试/超时/退避）</summary>
     public ExecutionConfig? ExecutionConfig { get; set; }
 
+    public string? ApiKey { get; set; }
+    public string? BaseUrl { get; set; }
+    public string? ModelName { get; set; }
+    public bool? Stream { get; set; }
     public double? Temperature { get; set; }
     public int? MaxTokens { get; set; }
+    public int? MaxCompletionTokens { get; set; }
     public double? TopP { get; set; }
     public int? TopK { get; set; }
     public double? FrequencyPenalty { get; set; }
     public double? PresencePenalty { get; set; }
     public List<string>? Stop { get; set; }
     public int? Seed { get; set; }
+    public int? ThinkingBudget { get; set; }
+    public string? ReasoningEffort { get; set; }
+    public Model.CachePolicy? CacheControl { get; set; }
+    public bool? ParallelToolCalls { get; set; }
     public ResponseFormat? ResponseFormat { get; set; }
     public ToolChoice? ToolChoice { get; set; }
 
-    /// <summary>
-    /// 额外的请求体参数（提供商特定）
-    /// Additional body parameters (provider-specific)
-    /// </summary>
+    /// <summary>额外的请求体参数（提供商特定）</summary>
     public Dictionary<string, object>? AdditionalBodyParams { get; set; }
 
-    /// <summary>
-    /// 额外的请求头
-    /// Additional headers
-    /// </summary>
+    /// <summary>额外的请求头</summary>
     public Dictionary<string, string>? AdditionalHeaders { get; set; }
 
-    /// <summary>
-    /// 额外的查询参数
-    /// Additional query parameters
-    /// </summary>
+    /// <summary>额外的查询参数</summary>
     public Dictionary<string, string>? AdditionalQueryParams { get; set; }
+
+    /// <summary>
+    /// 合并两个 GenerateOptions：primary 优先，fallback 作为默认
+    /// </summary>
+    public static GenerateOptions Merge(GenerateOptions? primary, GenerateOptions? fallback)
+    {
+        var result = new GenerateOptions();
+        if (fallback != null)
+        {
+            result.ApiKey = fallback.ApiKey;
+            result.BaseUrl = fallback.BaseUrl;
+            result.ModelName = fallback.ModelName;
+            result.Stream = fallback.Stream;
+            result.Temperature = fallback.Temperature;
+            result.MaxTokens = fallback.MaxTokens;
+            result.MaxCompletionTokens = fallback.MaxCompletionTokens;
+            result.TopP = fallback.TopP;
+            result.TopK = fallback.TopK;
+            result.FrequencyPenalty = fallback.FrequencyPenalty;
+            result.PresencePenalty = fallback.PresencePenalty;
+            result.Stop = fallback.Stop;
+            result.Seed = fallback.Seed;
+            result.ThinkingBudget = fallback.ThinkingBudget;
+            result.ReasoningEffort = fallback.ReasoningEffort;
+            result.CacheControl = fallback.CacheControl;
+            result.ParallelToolCalls = fallback.ParallelToolCalls;
+            result.ResponseFormat = fallback.ResponseFormat;
+            result.ToolChoice = fallback.ToolChoice;
+            result.ExecutionConfig = fallback.ExecutionConfig;
+            result.AdditionalHeaders = fallback.AdditionalHeaders;
+            result.AdditionalBodyParams = fallback.AdditionalBodyParams;
+            result.AdditionalQueryParams = fallback.AdditionalQueryParams;
+        }
+        if (primary != null)
+        {
+            if (primary.ApiKey != null) result.ApiKey = primary.ApiKey;
+            if (primary.BaseUrl != null) result.BaseUrl = primary.BaseUrl;
+            if (primary.ModelName != null) result.ModelName = primary.ModelName;
+            if (primary.Stream != null) result.Stream = primary.Stream;
+            if (primary.Temperature != null) result.Temperature = primary.Temperature;
+            if (primary.MaxTokens != null) result.MaxTokens = primary.MaxTokens;
+            if (primary.MaxCompletionTokens != null) result.MaxCompletionTokens = primary.MaxCompletionTokens;
+            if (primary.TopP != null) result.TopP = primary.TopP;
+            if (primary.TopK != null) result.TopK = primary.TopK;
+            if (primary.FrequencyPenalty != null) result.FrequencyPenalty = primary.FrequencyPenalty;
+            if (primary.PresencePenalty != null) result.PresencePenalty = primary.PresencePenalty;
+            if (primary.Stop != null) result.Stop = primary.Stop;
+            if (primary.Seed != null) result.Seed = primary.Seed;
+            if (primary.ThinkingBudget != null) result.ThinkingBudget = primary.ThinkingBudget;
+            if (primary.ReasoningEffort != null) result.ReasoningEffort = primary.ReasoningEffort;
+            if (primary.CacheControl != null) result.CacheControl = primary.CacheControl;
+            if (primary.ParallelToolCalls != null) result.ParallelToolCalls = primary.ParallelToolCalls;
+            if (primary.ResponseFormat != null) result.ResponseFormat = primary.ResponseFormat;
+            if (primary.ToolChoice != null) result.ToolChoice = primary.ToolChoice;
+            if (primary.ExecutionConfig != null) result.ExecutionConfig = primary.ExecutionConfig;
+            if (primary.AdditionalHeaders != null) result.AdditionalHeaders = primary.AdditionalHeaders;
+            if (primary.AdditionalBodyParams != null) result.AdditionalBodyParams = primary.AdditionalBodyParams;
+            if (primary.AdditionalQueryParams != null) result.AdditionalQueryParams = primary.AdditionalQueryParams;
+        }
+        return result;
+    }
 }
 
 /// <summary>

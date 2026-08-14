@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>AgentScope.Extensions.Store.Redis</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentScope.Extensions\AgentScope.Extensions.csproj" />    <PackageReference Include="StackExchange.Redis">
+  <Version>3.1.13</Version>
+</PackageReference>  </ItemGroup>
+</Project>
+

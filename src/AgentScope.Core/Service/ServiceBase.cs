@@ -1,7 +1,6 @@
 // Copyright 2024-2026 the original author or authors.
 // Licensed under the Apache License, Version 2.0
 
-using System.Reactive.Linq;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Message;
 
@@ -153,23 +152,21 @@ public abstract class ServiceBase : AgentBase, IService
     }
 
     /// <summary>
-    /// Process a message (implements IAgent)
-    /// 处理消息（实现IAgent接口）
+    /// 实现 AgentBase.DoCallAsync
     /// </summary>
-    public override IObservable<Msg> Call(Msg message)
+    protected override async Task<Msg> DoCallAsync(IReadOnlyList<Msg> messages)
     {
-        return Observable.FromAsync(async ct =>
+        if (Status != ServiceStatus.Running)
         {
-            if (Status != ServiceStatus.Running)
-            {
-                return Msg.Builder()
-                    .Role("system")
-                    .Content($"服务 {Info.Name} 未运行。当前状态：{Status}")
-                    .Build();
-            }
+            return Msg.Builder()
+                .Role("system")
+                .Content($"服务 {Info.Name} 未运行。当前状态：{Status}")
+                .Build();
+        }
 
-            return await ProcessMessageAsync(message, ct);
-        });
+        var msg = messages.Count > 0 ? messages[messages.Count - 1]
+            : Msg.Builder().Role("user").TextContent("").Build();
+        return await ProcessMessageAsync(msg, CancellationToken.None);
     }
 
     /// <summary>

@@ -53,6 +53,16 @@ public interface ITool
 }
 
 /// <summary>
+/// 支持协作式取消的工具契约。实现此接口的工具会接收到 ToolExecutor 的超时/取消令牌，
+/// 从而在超时时真正中止底层工作，而非仅停止等待。
+/// </summary>
+public interface ICancellableTool : ITool
+{
+    /// <summary>带取消令牌的执行。</summary>
+    Task<ToolResult> ExecuteAsync(Dictionary<string, object> parameters, System.Threading.CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// 工具抽象基类
 /// </summary>
 public abstract class ToolBase : ITool

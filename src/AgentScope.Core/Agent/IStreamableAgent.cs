@@ -1,27 +1,36 @@
 // Copyright 2024-2026 the original author or authors.
-// Licensed under the Apache License, Version 2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+using System.Collections.Generic;
 using AgentScope.Core.Events;
 using AgentScope.Core.Message;
 
 namespace AgentScope.Core.Agent;
 
 /// <summary>
-/// 支持流式事件输出的 Agent 接口，与 Java StreamableAgent 对齐。
-/// 增量引入，不破坏现有 IAgent 用法。
+/// 可流式输出的 Agent 接口，对应 Java StreamableAgent
+/// 流式返回使用 IAsyncEnumerable&lt;AgentEvent&gt;（对应 Flux&lt;AgentEvent&gt;）
 /// </summary>
-public interface IStreamableAgent : IAgent
+public interface IStreamableAgent
 {
     /// <summary>
-    /// 流式调用，按事件序列产出（推理/工具调用/行动/摘要等）。
+    /// 流式处理消息列表，逐个产出 AgentEvent
     /// </summary>
-    /// <param name="messages">输入消息</param>
-    /// <param name="options">流选项</param>
-    /// <returns>事件流</returns>
-    IAsyncEnumerable<Event> StreamAsync(IEnumerable<Msg> messages, StreamOptions options);
+    IAsyncEnumerable<Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null);
 
     /// <summary>
-    /// 单条消息流式调用（使用默认选项）
+    /// 流式处理单条消息
     /// </summary>
-    IAsyncEnumerable<Event> StreamAsync(Msg message, StreamOptions? options = null);
+    IAsyncEnumerable<Event> StreamEventsAsync(Msg message, RuntimeContext? context = null);
 }

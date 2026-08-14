@@ -72,6 +72,40 @@ public record ToolResultBlock : ContentBlock
     public required string Id { get; set; }
     public object? Output { get; set; }
     public bool IsError { get; set; }
+
+    /// <summary>
+    /// 产生该结果的工具名。对标 Java <c>ToolResultBlock.getName()</c>。
+    /// 用于按工具名做驱逐排除、遥测归类等。
+    /// </summary>
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// 结果元数据。对标 Java <c>ToolResultBlock.getMetadata()</c>。
+    /// 例如驱逐中间件用 <c>agentscope.tool_result_evicted</c> 标记已驱逐，避免重复驱逐。
+    /// </summary>
+    public Dictionary<string, object>? Metadata { get; set; }
+
+    /// <summary>提取纯文本输出（Output 为字符串或内容块集合时均可）。</summary>
+    public string ExtractText()
+    {
+        switch (Output)
+        {
+            case null:
+                return string.Empty;
+            case string s:
+                return s;
+            case IEnumerable<ContentBlock> blocks:
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var b in blocks)
+                    if (b is TextBlock tb && tb.Text != null)
+                        sb.Append(tb.Text);
+                return sb.ToString();
+            }
+            default:
+                return Output.ToString() ?? string.Empty;
+        }
+    }
 }
 
 /// <summary>
@@ -83,4 +117,30 @@ public record ThinkingBlock : ContentBlock
     public override string Type => "thinking";
     public required string Thinking { get; set; }
     public string? Signature { get; set; }
+}
+
+/// <summary>
+/// Audio content block
+/// 音频内容块
+/// </summary>
+public record AudioBlock : ContentBlock
+{
+    public override string Type => "audio";
+    public required string Url { get; set; }
+    public string? MimeType { get; set; }
+    public byte[]? Data { get; set; }
+    public float? DurationSec { get; set; }
+}
+
+/// <summary>
+/// Video content block
+/// 视频内容块
+/// </summary>
+public record VideoBlock : ContentBlock
+{
+    public override string Type => "video";
+    public required string Url { get; set; }
+    public string? MimeType { get; set; }
+    public byte[]? Data { get; set; }
+    public string? PosterUrl { get; set; }
 }

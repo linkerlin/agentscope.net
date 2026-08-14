@@ -33,6 +33,11 @@ public interface IMemory
     void Clear();
     
     int Count();
+
+    /// <summary>
+    /// 按 Id 删除消息
+    /// </summary>
+    bool Delete(string messageId);
 }
 
 /// <summary>
@@ -80,6 +85,16 @@ public class MemoryBase : IMemory
         lock (_lock)
         {
             return _messages.Count;
+        }
+    }
+
+    /// <inheritdoc />
+    public bool Delete(string messageId)
+    {
+        lock (_lock)
+        {
+            var removed = _messages.RemoveAll(m => m.Id == messageId);
+            return removed > 0;
         }
     }
 }

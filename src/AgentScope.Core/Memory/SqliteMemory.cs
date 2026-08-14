@@ -173,6 +173,22 @@ public class SqliteMemory : IPersistentMemory, IDisposable, IAsyncDisposable
         return _cache.Count();
     }
 
+    /// <inheritdoc />
+    public bool Delete(string messageId)
+    {
+        lock (_lock)
+        {
+            var removed = _cache.Delete(messageId);
+            var entities = _dbContext.Messages.Where(m => m.MessageId == messageId).ToList();
+            if (entities.Count > 0)
+            {
+                _dbContext.Messages.RemoveRange(entities);
+                _dbContext.SaveChanges();
+            }
+            return removed || entities.Count > 0;
+        }
+    }
+
     public async Task<List<Msg>> SearchAsync(string query, int limit = 10)
     {
         var entities = await _dbContext.Messages

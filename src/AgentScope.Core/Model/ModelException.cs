@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using AgentScope.Core.Exception;
+
 namespace AgentScope.Core.Model;
 
 /// <summary>
@@ -20,7 +22,7 @@ namespace AgentScope.Core.Model;
 /// 
 /// Java参考: io.agentscope.core.model.ModelException
 /// </summary>
-public class ModelException : System.Exception
+public class ModelException : AgentScopeException
 {
     /// <summary>
     /// Model name that caused the exception

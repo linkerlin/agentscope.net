@@ -42,4 +42,10 @@ public class SkillRegistry
     {
         return _registered.TryGetValue(skillId ?? "", out var r) ? r : null;
     }
+
+    /// <summary>返回所有已注册技能元数据的快照。</summary>
+    public IReadOnlyCollection<RegisteredSkill> ListSkills()
+    {
+        return _registered.Values.ToArray();
+    }
 }

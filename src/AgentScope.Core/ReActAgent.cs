@@ -30,17 +30,9 @@ namespace AgentScope.Core;
 /// ReAct (Reasoning and Acting) Agent implementation.
 /// ReAct Agent 实现 - 结合推理和行动的迭代循环
 /// 
-/// Features:
-/// - Reasoning: Agent 分析当前情况，决定下一步行动
-/// - Acting: 执行工具调用或返回最终答案
-/// - Observation: 获取行动结果，继续循环或结束
-/// 
-/// ReAct Loop:
-/// 1. Thought: Agent 思考下一步
-/// 2. Action: 选择工具或返回答案
-/// 3. Observation: 观察执行结果
-/// 4. 重复直到完成或达到最大迭代次数
+/// 注意：建议升级到 EnhancedReActAgent，此类仅作向后兼容保留
 /// </summary>
+[Obsolete("请使用 EnhancedReActAgent 替代")]
 public class ReActAgent : AgentBase
 {
     private readonly IModel _model;
@@ -54,7 +46,7 @@ public class ReActAgent : AgentBase
                         IMemory? memory = null, List<ITool>? tools = null,
                         ToolGroupManager? toolGroupManager = null,
                         int maxIterations = 10)
-        : base(name)
+        : base(name, $"ReActAgent: {systemPrompt}")
     {
         _model = model ?? throw new ArgumentNullException(nameof(model));
         _systemPrompt = systemPrompt ?? "You are a helpful AI assistant.";
@@ -64,27 +56,26 @@ public class ReActAgent : AgentBase
         _maxIterations = maxIterations > 0 ? maxIterations : 10;
     }
 
-    public override IObservable<Msg> Call(Msg message)
+    /// <summary>
+    /// 实现 DoCallAsync（新 AgentBase 的抽象方法）
+    /// </summary>
+    protected override async Task<Msg> DoCallAsync(IReadOnlyList<Msg> messages)
     {
-        return Observable.FromAsync(async () =>
-        {
-            _memory.Add(message);
+        var msg = messages.Count > 0 ? messages[messages.Count - 1]
+            : Msg.Builder().Role("user").TextContent("").Build();
 
-            // 如果有工具，执行完整的 ReAct 循环
-            Msg response;
-            if (GetAvailableTools().Count > 0)
-            {
-                response = await ProcessWithReActLoopAsync(message);
-            }
-            else
-            {
-                // 没有工具时，简单调用模型
-                response = await ProcessSimpleAsync(message);
-            }
-            
-            _memory.Add(response);
-            return response;
-        });
+        _memory.Add(msg);
+        Msg response;
+        if (GetAvailableTools().Count > 0)
+        {
+            response = await ProcessWithReActLoopAsync(msg);
+        }
+        else
+        {
+            response = await ProcessSimpleAsync(msg);
+        }
+        _memory.Add(response);
+        return response;
     }
 
     /// <summary>
@@ -460,6 +451,7 @@ public class ReActAgentBuilder
         return this;
     }
 
+#pragma warning disable CS0618
     public ReActAgent Build()
     {
         if (_model == null)
@@ -469,4 +461,5 @@ public class ReActAgentBuilder
 
         return new ReActAgent(_name, _model, _sysPrompt, _memory, _tools, _toolGroupManager, _maxIterations);
     }
+#pragma warning restore CS0618
 }

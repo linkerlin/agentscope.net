@@ -29,18 +29,6 @@ public class AgentScopeException : System.Exception
 }
 
 /// <summary>
-/// 模型错误异常
-/// </summary>
-public class ModelException : AgentScopeException
-{
-    public ModelException() { }
-    
-    public ModelException(string message) : base(message) { }
-    
-    public ModelException(string message, System.Exception inner) : base(message, inner) { }
-}
-
-/// <summary>
 /// 工具执行错误异常
 /// </summary>
 public class ToolException : AgentScopeException
