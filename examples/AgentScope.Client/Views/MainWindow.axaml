@@ -1,0 +1,74 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:AgentScope.Client.ViewModels"
+        xmlns:conv="clr-namespace:AgentScope.Client.Converters"
+        x:Class="AgentScope.Client.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="AgentScope Client"
+        Width="1200" Height="800">
+  <Window.Resources>
+    <conv:PageIdToBrushConverter x:Key="NavBrush" />
+  </Window.Resources>
+
+  <Grid ColumnDefinitions="250,*">
+    <!-- 左侧导航 -->
+    <Border Background="#1E1E2E" Grid.Column="0">
+      <DockPanel LastChildFill="False">
+        <TextBlock Text="AgentScope" FontSize="20" FontWeight="Bold"
+                   Foreground="White" Margin="16"
+                   DockPanel.Dock="Top" />
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="8">
+          <Button Content="新建会话" Command="{Binding NewSessionCommand}"
+                  Background="#7C3AED" Foreground="White"
+                  Height="36" CornerRadius="8" />
+        </StackPanel>
+
+        <!-- 导航按钮 -->
+        <StackPanel Margin="8" Spacing="4">
+          <Button Content="&#x1F4AC; 聊天"
+                  Command="{Binding NavigateToChatCommand}"
+                  Background="{Binding CurrentPageId, Converter={StaticResource NavBrush}, ConverterParameter=chat}"
+                  Height="36" Foreground="White" />
+          <Button Content="&#x1F916; Agent"
+                  Command="{Binding NavigateToAgentsCommand}"
+                  Background="{Binding CurrentPageId, Converter={StaticResource NavBrush}, ConverterParameter=agents}"
+                  Height="36" Foreground="White" />
+          <Button Content="&#x1F527; MCP"
+                  Command="{Binding NavigateToMcpsCommand}"
+                  Background="{Binding CurrentPageId, Converter={StaticResource NavBrush}, ConverterParameter=mcps}"
+                  Height="36" Foreground="White" />
+          <Button Content="&#x1F4D6; Skill"
+                  Command="{Binding NavigateToSkillsCommand}"
+                  Background="{Binding CurrentPageId, Converter={StaticResource NavBrush}, ConverterParameter=skills}"
+                  Height="36" Foreground="White" />
+          <Button Content="&#x2699; LLM设置"
+                  Command="{Binding NavigateToSettingsCommand}"
+                  Background="{Binding CurrentPageId, Converter={StaticResource NavBrush}, ConverterParameter=settings}"
+                  Height="36" Foreground="White" />
+        </StackPanel>
+
+        <!-- 会话列表 -->
+        <ListBox ItemsSource="{Binding Sessions}"
+                 SelectedItem="{Binding SelectedSession}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Margin="8,16,8,8">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding Title}"
+                         TextWrapping="Wrap"
+                         Foreground="White"
+                         Margin="4" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <!-- 右侧内容区域 -->
+    <Border Grid.Column="1" Background="#F5F5F5">
+      <ContentControl Content="{Binding CurrentPage}" />
+    </Border>
+  </Grid>
+</Window>

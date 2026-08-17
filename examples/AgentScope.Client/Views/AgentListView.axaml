@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:AgentScope.Client.ViewModels"
+             xmlns:models="clr-namespace:AgentScope.Client.Models"
+             x:Class="AgentScope.Client.Views.AgentListView"
+             x:DataType="vm:AgentListViewModel">
+  <DockPanel Margin="16">
+    <TextBlock Text="Agent 管理" FontSize="22" FontWeight="Bold"
+               DockPanel.Dock="Top" Margin="0,0,0,16" />
+
+    <Grid ColumnDefinitions="300,*" DockPanel.Dock="Top">
+      <!-- 左侧列表 -->
+      <Border Grid.Column="0" Margin="0,0,16,0">
+        <DockPanel>
+          <Button Content="新增 Agent" Command="{Binding NewAgentCommand}"
+                  DockPanel.Dock="Top" Margin="0,0,0,4" />
+          <Button Content="编辑" Command="{Binding EditAgentCommand}"
+                  DockPanel.Dock="Top" Margin="0,0,0,4" />
+          <Button Content="删除" Command="{Binding DeleteAgentCommand}"
+                  DockPanel.Dock="Top" Margin="0,0,0,8" />
+
+          <ListBox ItemsSource="{Binding Agents}"
+                   SelectedItem="{Binding SelectedAgent}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Name}" FontWeight="Bold" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <!-- 右侧编辑区 -->
+      <ScrollViewer Grid.Column="1" IsVisible="{Binding IsEditing}"
+                    Background="#F9F9F9" CornerRadius="8" Padding="16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="名称" />
+          <TextBox Text="{Binding EditName}" />
+
+          <TextBlock Text="描述" />
+          <TextBox Text="{Binding EditDescription}" />
+
+          <TextBlock Text="System Prompt" />
+          <TextBox Text="{Binding EditSystemPrompt}"
+                   AcceptsReturn="True" Height="100"
+                   TextWrapping="Wrap" />
+
+          <!-- LLM 下拉框 -->
+          <TextBlock Text="关联 LLM 模型" FontWeight="Bold" Margin="0,12,0,0" />
+          <ComboBox ItemsSource="{Binding LlmConfigs}"
+                    SelectedItem="{Binding EditSelectedLlm}"
+                    PlaceholderText="请选择 LLM...">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="models:LlmConfig">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <!-- MCP 下拉框 -->
+          <TextBlock Text="关联 MCP 服务" FontWeight="Bold" Margin="0,12,0,0" />
+          <ComboBox ItemsSource="{Binding McpConfigs}"
+                    SelectedItem="{Binding EditSelectedMcp}"
+                    PlaceholderText="请选择 MCP...">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="models:McpConfig">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <!-- Skill 下拉框 -->
+          <TextBlock Text="关联 Skill" FontWeight="Bold" Margin="0,12,0,0" />
+          <ComboBox ItemsSource="{Binding SkillConfigs}"
+                    SelectedItem="{Binding EditSelectedSkill}"
+                    PlaceholderText="请选择 Skill...">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="models:SkillConfig">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+            <Button Content="保存" Command="{Binding SaveAgentCommand}"
+                    Background="#7C3AED" Foreground="White" />
+            <Button Content="取消" Command="{Binding CancelEditCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </DockPanel>
+</UserControl>
