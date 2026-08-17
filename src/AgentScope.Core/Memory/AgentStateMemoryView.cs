@@ -20,20 +20,36 @@ using AgentScope.Core.State;
 namespace AgentScope.Core.Memory;
 
 /// <summary>
+/// Memory view backed by AgentState.Context: maps IMemory operations directly
+/// to AgentState, keeping the agent runtime context consistent with the
+/// persistable state.
+///
 /// 以 AgentState.Context 为底层存储的内存视图：把 IMemory 操作直接映射到 AgentState，
 /// 使 Agent 运行时上下文与可持久化状态保持一致。
-/// 对应 Java: io.agentscope.core.memory.AgentStateMemoryView
+/// Corresponds to Java: io.agentscope.core.memory.AgentStateMemoryView
 /// </summary>
 public class AgentStateMemoryView : IMemory
 {
+    /// <summary>
+    /// The underlying agent state.
+    /// 底层 Agent 状态。
+    /// </summary>
     private readonly AgentState _state;
 
+    /// <summary>
+    /// Initializes a new instance of AgentStateMemoryView.
+    /// 初始化 AgentStateMemoryView 的新实例。
+    /// </summary>
+    /// <param name="state">The agent state to wrap. / 要包装的 Agent 状态。</param>
     public AgentStateMemoryView(AgentState state)
     {
         _state = state ?? throw new System.ArgumentNullException(nameof(state));
     }
 
-    /// <summary>底层 AgentState。</summary>
+    /// <summary>
+    /// The underlying AgentState.
+    /// 底层 AgentState。
+    /// </summary>
     public AgentState State => _state;
 
     /// <inheritdoc />

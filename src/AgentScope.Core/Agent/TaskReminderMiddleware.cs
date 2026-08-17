@@ -14,18 +14,33 @@
 
 namespace AgentScope.Core.Agent;
 
-/// <summary>任务提醒中间件：确保模型不会忘记关键上下文，对应 Java TaskReminderMiddleware</summary>
+/// <summary>
+/// Middleware that ensures the model does not forget the key task context
+/// by appending a reminder to the system prompt.
+/// Corresponds to Java: io.agentscope.core.agent.middleware.TaskReminderMiddleware
+/// 任务提醒中间件：通过在系统提示词后追加提醒文本，确保模型不会忘记关键任务上下文。
+/// 对应 Java: io.agentscope.core.agent.middleware.TaskReminderMiddleware
+/// </summary>
 public sealed class TaskReminderMiddleware : MiddlewareBase
 {
     private readonly string _reminder;
 
-    public TaskReminderMiddleware(string reminder = "请记住当前任务目标")
+    /// <summary>
+    /// Initializes a new instance of the TaskReminderMiddleware.
+    /// 初始化 TaskReminderMiddleware 的新实例。
+    /// </summary>
+    /// <param name="reminder">The reminder text to append to the system prompt / 要追加到系统提示词的提醒文本</param>
+    public TaskReminderMiddleware(string reminder = "请记住当前任务目标 / Please remember the current task objective")
     {
         _reminder = reminder;
     }
 
+    /// <summary>
+    /// Appends the task reminder to the system prompt.
+    /// 将任务提醒追加到系统提示词末尾。
+    /// </summary>
     public override Task<string> OnSystemPromptAsync(IAgent agent, RuntimeContext ctx, string prompt)
     {
-        return Task.FromResult($"{prompt}\n\n[系统提醒]: {_reminder}");
+        return Task.FromResult($"{prompt}\n\n[系统提醒 / System Reminder]: {_reminder}");
     }
 }

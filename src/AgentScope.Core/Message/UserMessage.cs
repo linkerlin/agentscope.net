@@ -15,8 +15,12 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// User message, representing a message with the user role. Role is fixed to "user".
-/// 用户消息，表示用户角色的消息，role 固定为 "user"。
+/// User message with the role fixed to "user".
+/// Represents messages from the end user.
+/// Corresponds to Java: io.agentscope.core.message.UserMessage
+/// 用户消息，role 固定为 "user"。
+/// 表示来自最终用户的消息。
+/// 对应 Java: io.agentscope.core.message.UserMessage
 /// </summary>
 public class UserMessage : Msg
 {

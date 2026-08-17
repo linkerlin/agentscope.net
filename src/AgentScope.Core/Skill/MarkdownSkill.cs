@@ -16,8 +16,21 @@ using AgentScope.Core.Tool;
 
 namespace AgentScope.Core.Skill;
 
+/// <summary>
+/// A skill implementation loaded from a Markdown file, containing metadata and associated tools.
+/// 从 Markdown 文件加载的技能实现，包含元数据和关联的工具。
+/// Corresponds to Java: io.agentscope.core.skill.MarkdownSkill
+/// </summary>
 public class MarkdownSkill : ISkill
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MarkdownSkill"/> class.
+    /// 初始化 <see cref="MarkdownSkill"/> 类的新实例。
+    /// </summary>
+    /// <param name="registeredSkill">The registration metadata. / 注册元数据。</param>
+    /// <param name="tools">The tools associated with this skill. / 与此技能关联的工具。</param>
+    /// <param name="isActive">Whether the skill is active by default. / 是否默认激活。</param>
+    /// <exception cref="ArgumentNullException">Thrown when registeredSkill is null. / 当 registeredSkill 为 null 时抛出。</exception>
     public MarkdownSkill(RegisteredSkill registeredSkill, IReadOnlyList<ITool>? tools = null, bool isActive = true)
     {
         if (registeredSkill == null)
@@ -33,19 +46,51 @@ public class MarkdownSkill : ISkill
         IsActive = isActive;
     }
 
+    /// <summary>
+    /// Unique identifier for the skill.
+    /// 技能的唯一标识符。
+    /// </summary>
     public string Id { get; }
 
+    /// <summary>
+    /// Display name of the skill.
+    /// 技能的显示名称。
+    /// </summary>
     public string Name { get; }
 
+    /// <summary>
+    /// Description of the skill's purpose and functionality.
+    /// 技能用途和功能的描述。
+    /// </summary>
     public string Description { get; }
 
+    /// <summary>
+    /// Names of the tools referenced by this skill (read-only).
+    /// 此技能引用的工具名称列表（只读）。
+    /// </summary>
     public IReadOnlyList<string> ToolNames { get; }
 
+    /// <summary>
+    /// The tools associated with this skill.
+    /// 与此技能关联的工具实例。
+    /// </summary>
     public IReadOnlyList<ITool> Tools { get; }
 
+    /// <summary>
+    /// Whether this skill is currently active.
+    /// 此技能当前是否处于激活状态。
+    /// </summary>
     public bool IsActive { get; set; }
 
+    /// <summary>
+    /// Source file path from which this skill was loaded.
+    /// 加载此技能的源文件路径。
+    /// </summary>
     public string? SourcePath { get; }
 
+    /// <summary>
+    /// Raw Markdown content of the skill definition.
+    /// 技能定义的原始 Markdown 内容。
+    /// </summary>
     public string RawContent { get; }
 }

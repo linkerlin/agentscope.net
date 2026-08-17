@@ -16,25 +16,31 @@ namespace AgentScope.Core.Model.TTS;
 
 /// <summary>
 /// TTS synthesis response containing audio data or URL.
-/// TTS 合成响应：音频数据或 URL。
+/// Either AudioData (inline bytes) or AudioUrl (remote reference) is populated, depending on the TTS provider.
+/// Corresponds to Java: io.agentscope.core.model.tts.TTSResponse
+/// TTS 合成响应：包含音频数据或 URL。
+/// 根据 TTS 提供商的不同，AudioData（内联字节）或 AudioUrl（远程引用）会被填充。
+/// 对应 Java: io.agentscope.core.model.tts.TTSResponse
 /// </summary>
 public class TTSResponse
 {
     /// <summary>
-    /// Raw audio data bytes. Populated when audio is returned inline.
-    /// 原始音频数据字节。当音频内联返回时填充。
+    /// Gets or sets the raw audio data bytes. Populated when audio is returned inline.
+    /// 获取或设置原始音频数据字节。当音频内联返回时填充。
     /// </summary>
     public byte[]? AudioData { get; set; }
 
     /// <summary>
-    /// URL pointing to the synthesized audio file.
-    /// 指向合成音频文件的 URL。
+    /// Gets or sets the URL pointing to the synthesized audio file.
+    /// Used when the TTS provider returns a downloadable URL instead of inline data.
+    /// 获取或设置指向合成音频文件的 URL。
+    /// 当 TTS 提供商返回可下载的 URL 而非内联数据时使用。
     /// </summary>
     public string? AudioUrl { get; set; }
 
     /// <summary>
-    /// Audio format identifier, e.g. "mp3", "wav", "pcm".
-    /// 音频格式标识，例如 "mp3"、"wav"、"pcm"。
+    /// Gets or sets the audio format identifier (e.g., "mp3", "wav", "pcm", "opus", "aac", "flac").
+    /// 获取或设置音频格式标识（例如 "mp3"、"wav"、"pcm"、"opus"、"aac"、"flac"）。
     /// </summary>
     public string? Format { get; set; }
 }

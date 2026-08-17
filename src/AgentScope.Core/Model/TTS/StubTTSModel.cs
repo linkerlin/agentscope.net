@@ -17,7 +17,9 @@ namespace AgentScope.Core.Model.TTS;
 /// <summary>
 /// Stub TTS implementation that returns empty audio.
 /// Used for testing or when no real TTS model is configured.
+/// Corresponds to Java: io.agentscope.core.model.tts.StubTTSModel
 /// 占位 TTS 实现：返回空音频，用于测试或未配置真实 TTS 时。
+/// 对应 Java: io.agentscope.core.model.tts.StubTTSModel
 /// </summary>
 public class StubTTSModel : ITTSModel
 {
@@ -29,11 +31,13 @@ public class StubTTSModel : ITTSModel
 
     /// <summary>
     /// Synthesizes speech by returning an empty audio response.
+    /// The response format is determined by the options parameter, defaulting to "mp3".
     /// 通过返回空音频响应来合成语音。
+    /// 响应格式由 options 参数决定，默认为 "mp3"。
     /// </summary>
-    /// <param name="text">The text to synthesize (ignored) / 要合成的文本（忽略）</param>
+    /// <param name="text">The text to synthesize (ignored in stub) / 要合成的文本（在占位实现中忽略）</param>
     /// <param name="options">Optional TTS options for response format / 可选的 TTS 选项，指定响应格式</param>
-    /// <param name="cancellationToken">Cancellation token / 取消令牌</param>
+    /// <param name="cancellationToken">Cancellation token for the async operation / 异步操作的取消令牌</param>
     /// <returns>A task with an empty TTS response / 返回空 TTS 响应的任务</returns>
     public Task<TTSResponse> SynthesizeAsync(string text, TTSOptions? options = null, CancellationToken cancellationToken = default)
     {

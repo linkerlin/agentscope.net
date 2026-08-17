@@ -18,7 +18,9 @@ namespace AgentScope.Core.MCP;
 
 /// <summary>
 /// Wraps an MCP tool as an ITool for agent invocation.
+/// Corresponds to Java: io.agentscope.core.mcp.McpTool
 /// 将 MCP 工具封装为 ITool，供 Agent 调用。
+/// 对应 Java: io.agentscope.core.mcp.McpTool
 /// </summary>
 public class McpTool : ToolBase
 {
@@ -65,7 +67,9 @@ public class McpTool : ToolBase
 
     /// <summary>
     /// Executes the MCP tool with the given parameters.
+    /// Automatically initializes the client if not yet initialized.
     /// 使用给定参数执行 MCP 工具。
+    /// 如果客户端尚未初始化，则自动初始化。
     /// </summary>
     /// <param name="parameters">Tool parameters / 工具参数</param>
     /// <returns>Tool execution result / 工具执行结果</returns>

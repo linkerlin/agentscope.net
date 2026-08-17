@@ -16,25 +16,29 @@ namespace AgentScope.Core.Model;
 
 /// <summary>
 /// Cache policy enum for controlling model response caching behavior.
+/// Determines whether model responses are cached and reused for identical requests.
+/// Corresponds to Java: io.agentscope.core.model.CachePolicy
 /// 缓存策略枚举，用于控制模型响应缓存行为。
+/// 决定是否缓存模型响应并在相同请求时重用。
+/// 对应 Java: io.agentscope.core.model.CachePolicy
 /// </summary>
 public enum CachePolicy
 {
     /// <summary>
-    /// Use the system default caching behavior.
-    /// 使用系统默认的缓存行为。
+    /// Use the system default caching behavior (typically enabled).
+    /// 使用系统默认的缓存行为（通常为启用）。
     /// </summary>
     Default = 0,
 
     /// <summary>
-    /// Disable caching entirely.
-    /// 完全禁用缓存。
+    /// Disable caching entirely. Each request will result in a new model call.
+    /// 完全禁用缓存。每个请求都会触发新的模型调用。
     /// </summary>
     Disabled,
 
     /// <summary>
-    /// Enable caching for model responses.
-    /// 启用以缓存模型响应。
+    /// Enable caching for model responses. Identical requests may return cached results.
+    /// 启用以缓存模型响应。相同的请求可能返回缓存结果。
     /// </summary>
     Enabled
 }

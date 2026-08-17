@@ -15,6 +15,8 @@
 namespace AgentScope.Core.Service.Discovery;
 
 /// <summary>
+/// DataPlane self-registration heartbeat service. Corresponds to aistio DataPlaneSelfRegistration.
+/// Periodically sends heartbeats to the control plane via IHostedService and updates the local registry.
 /// DataPlane 自注册心跳服务。对标 aistio DataPlaneSelfRegistration。
 /// 通过 IHostedService 周期性向控制面发送心跳并更新本地注册表。
 /// </summary>
@@ -23,19 +25,37 @@ public sealed class DataPlaneSelfRegistration(
     IDataPlaneControlPlaneClient controlPlane,
     TimeProvider clock) : IDisposable
 {
+    /// <summary>
+    /// Internal timer for periodic heartbeat execution.
+    /// 用于周期性执行心跳的内部定时器。
+    /// </summary>
     private Timer? _timer;
 
+    /// <summary>
+    /// Starts the periodic heartbeat timer. The first heartbeat is scheduled immediately,
+    /// and subsequent heartbeats occur every 15 seconds.
+    /// 启动周期性心跳定时器。首次心跳立即执行，后续每 15 秒执行一次。
+    /// </summary>
     public void Start()
     {
         _timer = new Timer(_ => _ = HeartbeatAsync(), null, clock.GetUtcNow().ToLocalTime().TimeOfDay, TimeSpan.FromSeconds(15));
     }
 
+    /// <summary>
+    /// Stops the periodic heartbeat timer and releases resources.
+    /// 停止周期性心跳定时器并释放资源。
+    /// </summary>
     public void Stop()
     {
         _timer?.Dispose();
         _timer = null;
     }
 
+    /// <summary>
+    /// Executes a single heartbeat cycle: sends capabilities to the control plane
+    /// and updates the local data plane registry with the current agent summary.
+    /// 执行单次心跳周期：向控制面发送能力信息并更新本地数据面注册表中的 Agent 摘要。
+    /// </summary>
     private async Task HeartbeatAsync()
     {
         var caps = new Capabilities("agentscope-dotnet", 3, "1.2.0");
@@ -44,5 +64,9 @@ public sealed class DataPlaneSelfRegistration(
             new AgentSummary(caps.Runtime, caps.Runtime, caps.Endpoint, caps.ContractLevel.ToString()));
     }
 
+    /// <summary>
+    /// Disposes the timer when the service is no longer needed.
+    /// 在服务不再需要时释放定时器资源。
+    /// </summary>
     public void Dispose() => Stop();
 }

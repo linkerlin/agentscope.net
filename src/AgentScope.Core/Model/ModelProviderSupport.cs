@@ -19,7 +19,12 @@ using AgentScope.Core.Model.Spi;
 namespace AgentScope.Core.Model;
 
 /// <summary>
+/// Abstract base class for model provider SPI support.
+/// Provides common capability declaration and model ID prefix matching for IModelProvider implementations.
+/// Subclasses only need to define ProviderId, SupportedPrefixes, and the Create method.
+/// Corresponds to Java: io.agentscope.core.model.ModelProviderSupport
 /// 模型提供程序 SPI 支持基类：为 IModelProvider 提供通用的能力声明与模型标识前缀匹配。
+/// 子类只需定义 ProviderId、SupportedPrefixes 和 Create 方法。
 /// 对应 Java: io.agentscope.core.model.ModelProviderSupport
 /// </summary>
 public abstract class ModelProviderSupport : IModelProvider
@@ -27,7 +32,12 @@ public abstract class ModelProviderSupport : IModelProvider
     /// <inheritdoc />
     public abstract string ProviderId { get; }
 
-    /// <summary>该提供程序支持的模型标识前缀集合（小写）。</summary>
+    /// <summary>
+    /// Gets the collection of model ID prefixes supported by this provider (lowercase).
+    /// Used by the default Supports() implementation for prefix-based matching.
+    /// 获取此提供程序支持的模型标识前缀集合（小写）。
+    /// 由默认的 Supports() 实现用于基于前缀的匹配。
+    /// </summary>
     protected abstract IReadOnlyCollection<string> SupportedPrefixes { get; }
 
     /// <inheritdoc />

@@ -1,4 +1,4 @@
-ï»¿// Copyright 2024-2026 the original author or authors.
+// Copyright 2024-2026 the original author or authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,24 +21,60 @@ using System.Text.Json;
 namespace AgentScope.Core.MCP;
 
 /// <summary>
-/// é€šè¿‡ stdio ä¸ MCP server é€šä¿¡çš„å®¢æˆ·ç«¯å®ç°ã€‚
-/// å½“å‰å®ç°è¦†ç›– initializeã€tools/listã€tools/call ä¸‰æ¡ä¸»é“¾è·¯ã€‚
+/// MCP client implementation based on stdio (standard input/output) transport.
+/// Communicates with an MCP server process via its stdin/stdout streams using JSON-RPC.
+/// Currently covers the three main workflows: initialize, tools/list, tools/call.
+/// Corresponds to Java: io.agentscope.core.mcp.StdioMcpClient
+/// Í¨¹ı±ê×¼ÊäÈë/Êä³ö£¨stdio£©Óë MCP ·şÎñÆ÷Í¨ĞÅµÄ¿Í»§¶ËÊµÏÖ¡£
+/// Í¨¹ı×Ó½ø³ÌµÄ±ê×¼ÊäÈëÊä³öÁ÷½øĞĞ JSON-RPC Í¨ĞÅ¡£
+/// µ±Ç°ÊµÏÖ¸²¸Ç initialize¡¢tools/list¡¢tools/call ÈıÌõÖ÷Á´Â·¡£
+/// ¶ÔÓ¦ Java: io.agentscope.core.mcp.StdioMcpClient
 /// </summary>
 public sealed class StdioMcpClient : McpClientWrapper
 {
+    /// <summary>Client instance name / ¿Í»§¶ËÊµÀıÃû³Æ</summary>
     private readonly string _name;
+
+    /// <summary>Executable file path (e.g., node, python) / ¿ÉÖ´ĞĞÎÄ¼şÂ·¾¶£¨Èç node¡¢python£©</summary>
     private readonly string _fileName;
+
+    /// <summary>Command-line arguments for the executable / ¿ÉÖ´ĞĞÎÄ¼şµÄÃüÁîĞĞ²ÎÊı</summary>
     private readonly string _arguments;
+
+    /// <summary>Optional working directory for the child process / ×Ó½ø³ÌµÄ¿ÉÑ¡¹¤×÷Ä¿Â¼</summary>
     private readonly string? _workingDirectory;
+
+    /// <summary>Environment variables to pass to the child process / ´«µİ¸ø×Ó½ø³ÌµÄ»·¾³±äÁ¿</summary>
     private readonly IReadOnlyDictionary<string, string> _environmentVariables;
+
+    /// <summary>Request timeout duration / ÇëÇó³¬Ê±Ê±¼ä</summary>
     private readonly TimeSpan _requestTimeout;
+
+    /// <summary>Semaphore to guard initialization lifecycle / ±£»¤³õÊ¼»¯ÉúÃüÖÜÆÚµÄĞÅºÅÁ¿</summary>
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+
+    /// <summary>Buffer for collecting stderr output for diagnostics / ÊÕ¼¯±ê×¼´íÎóÊä³öµÄÕï¶Ï»º³åÇø</summary>
     private readonly StringBuilder _stderrBuffer = new();
 
+    /// <summary>The child process running the MCP server / ÔËĞĞ MCP ·şÎñÆ÷µÄ×Ó½ø³Ì</summary>
     private Process? _process;
+
+    /// <summary>JSON-RPC connection over the process stdio streams / »ùÓÚ½ø³Ì stdio Á÷µÄ JSON-RPC Á¬½Ó</summary>
     private McpJsonRpcConnection? _connection;
+
+    /// <summary>Background task that reads stderr output / ¶ÁÈ¡±ê×¼´íÎóÊä³öµÄºóÌ¨ÈÎÎñ</summary>
     private Task? _stderrPumpTask;
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="StdioMcpClient"/>.
+    /// ³õÊ¼»¯ StdioMcpClient µÄĞÂÊµÀı¡£
+    /// </summary>
+    /// <param name="name">Client instance name / ¿Í»§¶ËÊµÀıÃû³Æ</param>
+    /// <param name="fileName">Executable file path (e.g., node, python) / ¿ÉÖ´ĞĞÎÄ¼şÂ·¾¶£¨Èç node¡¢python£©</param>
+    /// <param name="arguments">Command-line arguments (optional) / ÃüÁîĞĞ²ÎÊı£¨¿ÉÑ¡£©</param>
+    /// <param name="workingDirectory">Working directory for the child process (optional) / ×Ó½ø³Ì¹¤×÷Ä¿Â¼£¨¿ÉÑ¡£©</param>
+    /// <param name="environmentVariables">Environment variables for the child process (optional) / ×Ó½ø³Ì»·¾³±äÁ¿£¨¿ÉÑ¡£©</param>
+    /// <param name="requestTimeout">Request timeout (optional, default 30s) / ÇëÇó³¬Ê±£¨¿ÉÑ¡£¬Ä¬ÈÏ 30s£©</param>
     public StdioMcpClient(
         string name,
         string fileName,
@@ -47,16 +83,24 @@ public sealed class StdioMcpClient : McpClientWrapper
         IReadOnlyDictionary<string, string>? environmentVariables = null,
         TimeSpan? requestTimeout = null)
     {
-        _name = string.IsNullOrWhiteSpace(name) ? throw new ArgumentException("åç§°ä¸èƒ½ä¸ºç©º", nameof(name)) : name;
-        _fileName = string.IsNullOrWhiteSpace(fileName) ? throw new ArgumentException("å‘½ä»¤ä¸èƒ½ä¸ºç©º", nameof(fileName)) : fileName;
+        _name = string.IsNullOrWhiteSpace(name) ? throw new ArgumentException("Ãû³Æ²»ÄÜÎª¿Õ", nameof(name)) : name;
+        _fileName = string.IsNullOrWhiteSpace(fileName) ? throw new ArgumentException("ÃüÁî²»ÄÜÎª¿Õ", nameof(fileName)) : fileName;
         _arguments = arguments ?? string.Empty;
         _workingDirectory = workingDirectory;
         _environmentVariables = environmentVariables ?? new Dictionary<string, string>();
         _requestTimeout = requestTimeout ?? TimeSpan.FromSeconds(30);
     }
 
+    /// <summary>Client instance name / ¿Í»§¶ËÊµÀıÃû³Æ</summary>
     public override string Name => _name;
 
+    /// <summary>
+    /// Initializes the MCP session by starting the child process and performing the JSON-RPC handshake.
+    /// Sends "initialize" request and "notifications/initialized" notification.
+    /// Í¨¹ıÆô¶¯×Ó½ø³Ì²¢Ö´ĞĞ JSON-RPC ÎÕÊÖÀ´³õÊ¼»¯ MCP »á»°¡£
+    /// ·¢ËÍ "initialize" ÇëÇóºÍ "notifications/initialized" Í¨Öª¡£
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
     public override async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         if (IsInitialized)
@@ -102,6 +146,12 @@ public sealed class StdioMcpClient : McpClientWrapper
         }
     }
 
+    /// <summary>
+    /// Lists available tools from the MCP server via JSON-RPC.
+    /// Í¨¹ı JSON-RPC ´Ó MCP ·şÎñÆ÷ÁĞ³ö¿ÉÓÃ¹¤¾ß¡£
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
+    /// <returns>List of tool schemas / ¹¤¾ßÄ£Ê½ÁĞ±í</returns>
     public override async Task<IReadOnlyList<McpToolSchema>> ListToolsAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
@@ -113,11 +163,19 @@ public sealed class StdioMcpClient : McpClientWrapper
         return ParseTools(result);
     }
 
+    /// <summary>
+    /// Calls a remote tool via the MCP server using JSON-RPC.
+    /// Í¨¹ı JSON-RPC µ÷ÓÃ MCP ·şÎñÆ÷ÉÏµÄÔ¶³Ì¹¤¾ß¡£
+    /// </summary>
+    /// <param name="toolName">Tool name / ¹¤¾ßÃû³Æ</param>
+    /// <param name="args">Tool arguments / ¹¤¾ß²ÎÊı</param>
+    /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
+    /// <returns>Tool call result / ¹¤¾ßµ÷ÓÃ½á¹û</returns>
     public override async Task<McpCallResult> CallToolAsync(string toolName, Dictionary<string, object> args, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(toolName))
         {
-            throw new ArgumentException("å·¥å…·åä¸èƒ½ä¸ºç©º", nameof(toolName));
+            throw new ArgumentException("¹¤¾ßÃû²»ÄÜÎª¿Õ", nameof(toolName));
         }
 
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
@@ -135,6 +193,10 @@ public sealed class StdioMcpClient : McpClientWrapper
         return ParseCallToolResult(result);
     }
 
+    /// <summary>
+    /// Disposes the session and releases all resources.
+    /// ÊÍ·Å»á»°ºÍËùÓĞ×ÊÔ´¡£
+    /// </summary>
     public override void Dispose()
     {
         DisposeSession();
@@ -142,6 +204,11 @@ public sealed class StdioMcpClient : McpClientWrapper
         base.Dispose();
     }
 
+    /// <summary>
+    /// Ensures the client is initialized before proceeding; auto-initializes if needed.
+    /// È·±£¿Í»§¶ËÒÑ³õÊ¼»¯£¬±ØÒªÊ±×Ô¶¯³õÊ¼»¯¡£
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)
     {
         if (!IsInitialized)
@@ -150,6 +217,15 @@ public sealed class StdioMcpClient : McpClientWrapper
         }
     }
 
+    /// <summary>
+    /// Executes an async operation with a timeout, wrapping timeout errors with diagnostic info.
+    /// Ö´ĞĞ´ø³¬Ê±µÄÒì²½²Ù×÷£¬½«³¬Ê±´íÎó°ü×°Îª°üº¬Õï¶ÏĞÅÏ¢µÄÒì³£¡£
+    /// </summary>
+    /// <typeparam name="T">Return type / ·µ»ØÀàĞÍ</typeparam>
+    /// <param name="action">Async action to execute / ÒªÖ´ĞĞµÄÒì²½²Ù×÷</param>
+    /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
+    /// <returns>Action result / ²Ù×÷½á¹û</returns>
+    /// <exception cref="TimeoutException">Thrown when the operation times out / ²Ù×÷³¬Ê±Ê±Å×³ö</exception>
     private async Task<T> ExecuteWithTimeoutAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken)
     {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -161,10 +237,17 @@ public sealed class StdioMcpClient : McpClientWrapper
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException($"MCP è¯·æ±‚è¶…æ—¶ï¼ˆ{_requestTimeout}ï¼‰: {BuildDiagnostics()}", ex);
+            throw new TimeoutException($"MCP ÇëÇó³¬Ê±£¨{_requestTimeout}£©: {BuildDiagnostics()}", ex);
         }
     }
 
+    /// <summary>
+    /// Executes an async void operation with a timeout, wrapping timeout errors with diagnostic info.
+    /// Ö´ĞĞ´ø³¬Ê±µÄÒì²½ÎŞ·µ»ØÖµ²Ù×÷£¬½«³¬Ê±´íÎó°ü×°Îª°üº¬Õï¶ÏĞÅÏ¢µÄÒì³£¡£
+    /// </summary>
+    /// <param name="action">Async action to execute / ÒªÖ´ĞĞµÄÒì²½²Ù×÷</param>
+    /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
+    /// <exception cref="TimeoutException">Thrown when the operation times out / ²Ù×÷³¬Ê±Ê±Å×³ö</exception>
     private async Task ExecuteWithTimeoutAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken)
     {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -176,10 +259,16 @@ public sealed class StdioMcpClient : McpClientWrapper
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException($"MCP è¯·æ±‚è¶…æ—¶ï¼ˆ{_requestTimeout}ï¼‰: {BuildDiagnostics()}", ex);
+            throw new TimeoutException($"MCP ÇëÇó³¬Ê±£¨{_requestTimeout}£©: {BuildDiagnostics()}", ex);
         }
     }
 
+    /// <summary>
+    /// Starts the child process with the configured executable, arguments, and environment.
+    /// Also starts a background task to capture stderr output for diagnostics.
+    /// Æô¶¯ÅäÖÃÁË¿ÉÖ´ĞĞÎÄ¼ş¡¢²ÎÊıºÍ»·¾³µÄ×Ó½ø³Ì¡£
+    /// Í¬Ê±Æô¶¯ºóÌ¨ÈÎÎñ²¶»ñ±ê×¼´íÎóÊä³öÓÃÓÚÕï¶Ï¡£
+    /// </summary>
     private void StartProcess()
     {
         var psi = new ProcessStartInfo
@@ -213,11 +302,16 @@ public sealed class StdioMcpClient : McpClientWrapper
             }
             catch
             {
-                // å¿½ç•¥ stderr è¯»å–é˜¶æ®µçš„æ¸…ç†å¼‚å¸¸ã€‚
+                // Ignore cleanup exceptions during stderr reading / ºöÂÔ stderr ¶ÁÈ¡½×¶ÎµÄÇåÀíÒì³£
             }
         });
     }
 
+    /// <summary>
+    /// Creates the JSON-RPC initialize parameters with protocol version and client info.
+    /// ´´½¨°üº¬Ğ­Òé°æ±¾ºÍ¿Í»§¶ËĞÅÏ¢µÄ JSON-RPC ³õÊ¼»¯²ÎÊı¡£
+    /// </summary>
+    /// <returns>Initialize parameters dictionary / ³õÊ¼»¯²ÎÊı×Öµä</returns>
     private Dictionary<string, object> CreateInitializeParams()
     {
         return new Dictionary<string, object>
@@ -232,6 +326,11 @@ public sealed class StdioMcpClient : McpClientWrapper
         };
     }
 
+    /// <summary>
+    /// Builds a diagnostic string containing process status and stderr output.
+    /// ¹¹½¨°üº¬½ø³Ì×´Ì¬ºÍ±ê×¼´íÎóÊä³öµÄÕï¶Ï×Ö·û´®¡£
+    /// </summary>
+    /// <returns>Diagnostic information / Õï¶ÏĞÅÏ¢</returns>
     private string BuildDiagnostics()
     {
         var stderr = string.Empty;
@@ -241,19 +340,23 @@ public sealed class StdioMcpClient : McpClientWrapper
         }
 
         var exitInfo = _process == null
-            ? "è¿›ç¨‹æœªå¯åŠ¨"
+            ? "½ø³ÌÎ´Æô¶¯"
             : _process.HasExited
-                ? $"è¿›ç¨‹å·²é€€å‡ºï¼ŒExitCode={_process.ExitCode}"
-                : "è¿›ç¨‹ä»åœ¨è¿è¡Œ";
+                ? $"½ø³ÌÒÑÍË³ö£¬ExitCode={_process.ExitCode}"
+                : "½ø³ÌÈÔÔÚÔËĞĞ";
 
         if (string.IsNullOrWhiteSpace(stderr))
         {
             return exitInfo;
         }
 
-        return exitInfo + "ï¼›stderr=" + stderr;
+        return exitInfo + "£»stderr=" + stderr;
     }
 
+    /// <summary>
+    /// Disposes the current session: closes the connection, kills the process, and cleans up the stderr pump.
+    /// ÊÍ·Åµ±Ç°»á»°£º¹Ø±ÕÁ¬½Ó¡¢ÖÕÖ¹½ø³Ì²¢ÇåÀí±ê×¼´íÎóÊä³ö±Ã¡£
+    /// </summary>
     private void DisposeSession()
     {
         IsInitialized = false;
@@ -264,7 +367,7 @@ public sealed class StdioMcpClient : McpClientWrapper
         }
         catch
         {
-            // å¿½ç•¥é‡Šæ”¾é˜¶æ®µå¼‚å¸¸ã€‚
+            // Ignore cleanup exceptions during disposal / ºöÂÔÊÍ·Å½×¶ÎÒì³£
         }
         finally
         {
@@ -282,7 +385,7 @@ public sealed class StdioMcpClient : McpClientWrapper
             }
             catch
             {
-                // å¿½ç•¥è¿›ç¨‹æ¸…ç†å¼‚å¸¸ã€‚
+                // Ignore process cleanup exceptions / ºöÂÔ½ø³ÌÇåÀíÒì³£
             }
             finally
             {
@@ -297,7 +400,7 @@ public sealed class StdioMcpClient : McpClientWrapper
         }
         catch
         {
-            // å¿½ç•¥åå°æ¸…ç†å¼‚å¸¸ã€‚
+            // Ignore background task cleanup exceptions / ºöÂÔºóÌ¨ÇåÀíÒì³£
         }
         finally
         {
@@ -305,6 +408,12 @@ public sealed class StdioMcpClient : McpClientWrapper
         }
     }
 
+    /// <summary>
+    /// Parses the JSON-RPC "tools/list" result into a list of McpToolSchema.
+    /// ½« JSON-RPC "tools/list" ½á¹û½âÎöÎª McpToolSchema ÁĞ±í¡£
+    /// </summary>
+    /// <param name="result">JSON element containing the tools array / °üº¬¹¤¾ßÊı×éµÄ JSON ÔªËØ</param>
+    /// <returns>List of tool schemas / ¹¤¾ßÄ£Ê½ÁĞ±í</returns>
     private static IReadOnlyList<McpToolSchema> ParseTools(JsonElement result)
     {
         if (!result.TryGetProperty("tools", out var toolsElement) || toolsElement.ValueKind != JsonValueKind.Array)
@@ -335,6 +444,12 @@ public sealed class StdioMcpClient : McpClientWrapper
         return tools;
     }
 
+    /// <summary>
+    /// Parses the JSON-RPC "tools/call" result into an McpCallResult.
+    /// ½« JSON-RPC "tools/call" ½á¹û½âÎöÎª McpCallResult¡£
+    /// </summary>
+    /// <param name="result">JSON element containing the call result / °üº¬µ÷ÓÃ½á¹ûµÄ JSON ÔªËØ</param>
+    /// <returns>Parsed tool call result / ½âÎöºóµÄ¹¤¾ßµ÷ÓÃ½á¹û</returns>
     private static McpCallResult ParseCallToolResult(JsonElement result)
     {
         var isError = result.TryGetProperty("isError", out var isErrorElement)
@@ -376,17 +491,47 @@ public sealed class StdioMcpClient : McpClientWrapper
         return McpCallResult.Ok(string.IsNullOrWhiteSpace(content) ? null : content, parts);
     }
 
+    /// <summary>
+    /// JSON-RPC connection over stdio streams using the MCP message framing protocol (Content-Length headers).
+    /// Manages request/response correlation via a concurrent dictionary of pending requests.
+    /// Corresponds to Java: io.agentscope.core.mcp.StdioMcpClient.McpJsonRpcConnection
+    /// »ùÓÚ stdio Á÷µÄ JSON-RPC Á¬½Ó£¬Ê¹ÓÃ MCP ÏûÏ¢Ö¡Ğ­Òé£¨Content-Length Í·£©¡£
+    /// Í¨¹ı´ı´¦ÀíÇëÇóµÄ²¢·¢×Öµä¹ÜÀíÇëÇó/ÏìÓ¦¹ØÁª¡£
+    /// ¶ÔÓ¦ Java: io.agentscope.core.mcp.StdioMcpClient.McpJsonRpcConnection
+    /// </summary>
     private sealed class McpJsonRpcConnection : IDisposable
     {
+        /// <summary>Input stream (stdout of the child process) / ÊäÈëÁ÷£¨×Ó½ø³ÌµÄ±ê×¼Êä³ö£©</summary>
         private readonly Stream _input;
+
+        /// <summary>Output stream (stdin of the child process) / Êä³öÁ÷£¨×Ó½ø³ÌµÄ±ê×¼ÊäÈë£©</summary>
         private readonly Stream _output;
+
+        /// <summary>Semaphore to serialize write operations / ĞòÁĞ»¯Ğ´²Ù×÷µÄĞÅºÅÁ¿</summary>
         private readonly SemaphoreSlim _writeLock = new(1, 1);
+
+        /// <summary>Pending requests keyed by JSON-RPC ID / °´ JSON-RPC ID Ë÷ÒıµÄ´ı´¦ÀíÇëÇó</summary>
         private readonly ConcurrentDictionary<long, TaskCompletionSource<JsonElement>> _pendingRequests = new();
+
+        /// <summary>Cancellation token source for disposal / ÓÃÓÚÊÍ·ÅµÄÈ¡ÏûÁîÅÆÔ´</summary>
         private readonly CancellationTokenSource _disposeCts = new();
+
+        /// <summary>Provider of diagnostic information for error messages / ´íÎóÏûÏ¢µÄÕï¶ÏĞÅÏ¢Ìá¹©Õß</summary>
         private readonly Func<string> _diagnosticsProvider;
+
+        /// <summary>Background task running the receive loop / ÔËĞĞ½ÓÊÕÑ­»·µÄºóÌ¨ÈÎÎñ</summary>
         private readonly Task _receiveLoopTask;
+
+        /// <summary>Monotonically increasing request ID / µ¥µ÷µİÔöµÄÇëÇó ID</summary>
         private long _nextId;
 
+        /// <summary>
+        /// Initializes a new instance of <see cref="McpJsonRpcConnection"/>.
+        /// ³õÊ¼»¯ McpJsonRpcConnection µÄĞÂÊµÀı¡£
+        /// </summary>
+        /// <param name="input">Input stream (stdout of child process) / ÊäÈëÁ÷£¨×Ó½ø³Ì±ê×¼Êä³ö£©</param>
+        /// <param name="output">Output stream (stdin of child process) / Êä³öÁ÷£¨×Ó½ø³Ì±ê×¼ÊäÈë£©</param>
+        /// <param name="diagnosticsProvider">Diagnostic info provider / Õï¶ÏĞÅÏ¢Ìá¹©Õß</param>
         public McpJsonRpcConnection(Stream input, Stream output, Func<string> diagnosticsProvider)
         {
             _input = input ?? throw new ArgumentNullException(nameof(input));
@@ -395,6 +540,14 @@ public sealed class StdioMcpClient : McpClientWrapper
             _receiveLoopTask = Task.Run(() => ReceiveLoopAsync(_disposeCts.Token));
         }
 
+        /// <summary>
+        /// Sends a JSON-RPC request and waits for the response.
+        /// ·¢ËÍ JSON-RPC ÇëÇó²¢µÈ´ıÏìÓ¦¡£
+        /// </summary>
+        /// <param name="method">JSON-RPC method name / JSON-RPC ·½·¨Ãû</param>
+        /// <param name="params">Method parameters / ·½·¨²ÎÊı</param>
+        /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
+        /// <returns>Response JSON element / ÏìÓ¦ JSON ÔªËØ</returns>
         public async Task<JsonElement> SendRequestAsync(string method, object? @params, CancellationToken cancellationToken)
         {
             var id = Interlocked.Increment(ref _nextId);
@@ -420,6 +573,14 @@ public sealed class StdioMcpClient : McpClientWrapper
             return await tcs.Task.ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Sends a JSON-RPC notification (no response expected).
+        /// ·¢ËÍ JSON-RPC Í¨Öª£¨²»ÆÚÍûÏìÓ¦£©¡£
+        /// </summary>
+        /// <param name="method">JSON-RPC method name / JSON-RPC ·½·¨Ãû</param>
+        /// <param name="params">Method parameters / ·½·¨²ÎÊı</param>
+        /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
+        /// <returns>Task representing the send operation / ±íÊ¾·¢ËÍ²Ù×÷µÄÈÎÎñ</returns>
         public Task SendNotificationAsync(string method, object? @params, CancellationToken cancellationToken)
         {
             return WriteMessageAsync(new Dictionary<string, object?>
@@ -430,6 +591,10 @@ public sealed class StdioMcpClient : McpClientWrapper
             }, cancellationToken);
         }
 
+        /// <summary>
+        /// Disposes the connection, cancelling the receive loop and cleaning up resources.
+        /// ÊÍ·ÅÁ¬½Ó£¬È¡Ïû½ÓÊÕÑ­»·²¢ÇåÀí×ÊÔ´¡£
+        /// </summary>
         public void Dispose()
         {
             _disposeCts.Cancel();
@@ -439,13 +604,21 @@ public sealed class StdioMcpClient : McpClientWrapper
             }
             catch
             {
-                // å¿½ç•¥åå°è¯»å–æ¸…ç†å¼‚å¸¸ã€‚
+                // Ignore background read cleanup exceptions / ºöÂÔºóÌ¨¶ÁÈ¡ÇåÀíÒì³£
             }
 
             _writeLock.Dispose();
             _disposeCts.Dispose();
         }
 
+        /// <summary>
+        /// Writes a JSON-RPC message to the output stream using the MCP framing protocol.
+        /// Format: "Content-Length: {length}\r\n\r\n{body}"
+        /// Ê¹ÓÃ MCP Ö¡Ğ­Òé½« JSON-RPC ÏûÏ¢Ğ´ÈëÊä³öÁ÷¡£
+        /// ¸ñÊ½£º"Content-Length: {length}\r\n\r\n{body}"
+        /// </summary>
+        /// <param name="payload">Message payload / ÏûÏ¢¸ºÔØ</param>
+        /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
         private async Task WriteMessageAsync(Dictionary<string, object?> payload, CancellationToken cancellationToken)
         {
             var bodyBytes = JsonSerializer.SerializeToUtf8Bytes(payload);
@@ -464,6 +637,12 @@ public sealed class StdioMcpClient : McpClientWrapper
             }
         }
 
+        /// <summary>
+        /// Background loop that continuously reads framed messages from the input stream
+        /// and dispatches responses to the corresponding pending requests.
+        /// ºóÌ¨Ñ­»·£¬³ÖĞø´ÓÊäÈëÁ÷¶ÁÈ¡Ö¡ÏûÏ¢²¢½«ÏìÓ¦·Ö·¢¸ø¶ÔÓ¦µÄ´ı´¦ÀíÇëÇó¡£
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
         private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
         {
             try
@@ -473,7 +652,7 @@ public sealed class StdioMcpClient : McpClientWrapper
                     var messageBytes = await ReadFramedMessageAsync(_input, cancellationToken).ConfigureAwait(false);
                     if (messageBytes == null)
                     {
-                        FailPendingRequests(new McpException("MCP è¿æ¥å·²å…³é—­: " + _diagnosticsProvider()));
+                        FailPendingRequests(new McpException("MCP Á¬½ÓÒÑ¹Ø±Õ: " + _diagnosticsProvider()));
                         break;
                     }
 
@@ -498,7 +677,7 @@ public sealed class StdioMcpClient : McpClientWrapper
 
                     if (!root.TryGetProperty("result", out var resultElement))
                     {
-                        pending.TrySetException(new McpException("MCP å“åº”ç¼ºå°‘ result å­—æ®µ"));
+                        pending.TrySetException(new McpException("MCP ÏìÓ¦È±ÉÙ result ×Ö¶Î"));
                         continue;
                     }
 
@@ -507,14 +686,19 @@ public sealed class StdioMcpClient : McpClientWrapper
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                FailPendingRequests(new OperationCanceledException("MCP è¿æ¥å·²é‡Šæ”¾"));
+                FailPendingRequests(new OperationCanceledException("MCP Á¬½ÓÒÑÊÍ·Å"));
             }
             catch (global::System.Exception ex)
             {
-                FailPendingRequests(new McpException("è¯»å– MCP å“åº”å¤±è´¥: " + _diagnosticsProvider(), ex));
+                FailPendingRequests(new McpException("¶ÁÈ¡ MCP ÏìÓ¦Ê§°Ü: " + _diagnosticsProvider(), ex));
             }
         }
 
+        /// <summary>
+        /// Fails all pending requests with the given exception.
+        /// Ê¹ÓÃ¸ø¶¨µÄÒì³£Ê¹ËùÓĞ´ı´¦ÀíÇëÇóÊ§°Ü¡£
+        /// </summary>
+        /// <param name="ex">Exception to set on all pending requests / ÉèÖÃµ½ËùÓĞ´ı´¦ÀíÇëÇóµÄÒì³£</param>
         private void FailPendingRequests(global::System.Exception ex)
         {
             foreach (var pair in _pendingRequests.ToArray())
@@ -526,6 +710,12 @@ public sealed class StdioMcpClient : McpClientWrapper
             }
         }
 
+        /// <summary>
+        /// Parses a JSON-RPC error element into an McpException.
+        /// ½« JSON-RPC ´íÎóÔªËØ½âÎöÎª McpException¡£
+        /// </summary>
+        /// <param name="errorElement">JSON error element / JSON ´íÎóÔªËØ</param>
+        /// <returns>Parsed McpException / ½âÎöºóµÄ McpException</returns>
         private static McpException ParseError(JsonElement errorElement)
         {
             var code = errorElement.TryGetProperty("code", out var codeElement) && codeElement.TryGetInt32(out var errorCode)
@@ -533,14 +723,21 @@ public sealed class StdioMcpClient : McpClientWrapper
                 : (int?)null;
             var message = errorElement.TryGetProperty("message", out var messageElement)
                 ? messageElement.GetString()
-                : "æœªçŸ¥ MCP é”™è¯¯";
+                : "Î´Öª MCP ´íÎó";
 
-            return new McpException(message ?? "æœªçŸ¥ MCP é”™è¯¯")
+            return new McpException(message ?? "Î´Öª MCP ´íÎó")
             {
                 Code = code
             };
         }
 
+        /// <summary>
+        /// Reads a framed message from the stream using the MCP protocol (Content-Length header + JSON body).
+        /// Ê¹ÓÃ MCP Ğ­Òé£¨Content-Length Í· + JSON Ìå£©´ÓÁ÷ÖĞ¶ÁÈ¡Ö¡ÏûÏ¢¡£
+        /// </summary>
+        /// <param name="stream">Input stream / ÊäÈëÁ÷</param>
+        /// <param name="cancellationToken">Cancellation token / È¡ÏûÁîÅÆ</param>
+        /// <returns>Message bytes, or null if the stream is closed / ÏûÏ¢×Ö½Ú£¬Á÷¹Ø±ÕÊ±·µ»Ø null</returns>
         private static async Task<byte[]?> ReadFramedMessageAsync(Stream stream, CancellationToken cancellationToken)
         {
             var headerLines = new List<string>();
@@ -549,7 +746,7 @@ public sealed class StdioMcpClient : McpClientWrapper
                 var line = await ReadLineAsync(stream, cancellationToken).ConfigureAwait(false);
                 if (line == null)
                 {
-                    return headerLines.Count == 0 ? null : throw new EndOfStreamException("MCP æ¶ˆæ¯å¤´ä¸å®Œæ•´");
+                    return headerLines.Count == 0 ? null : throw new EndOfStreamException("MCP ÏûÏ¢Í·²»ÍêÕû");
                 }
 
                 if (line.Length == 0)
@@ -582,7 +779,7 @@ public sealed class StdioMcpClient : McpClientWrapper
 
             if (contentLength <= 0)
             {
-                throw new McpException("MCP æ¶ˆæ¯ç¼ºå°‘æœ‰æ•ˆçš„ Content-Length");
+                throw new McpException("MCP ÏûÏ¢È±ÉÙÓĞĞ§µÄ Content-Length");
             }
 
             var body = new byte[contentLength];
@@ -592,7 +789,7 @@ public sealed class StdioMcpClient : McpClientWrapper
                 var bytesRead = await stream.ReadAsync(body.AsMemory(offset, contentLength - offset), cancellationToken).ConfigureAwait(false);
                 if (bytesRead == 0)
                 {
-                    throw new EndOfStreamException("MCP æ¶ˆæ¯ä½“è¯»å–æœªå®Œæˆ");
+                    throw new EndOfStreamException("MCP ÏûÏ¢Ìå¶ÁÈ¡Î´Íê³É");
                 }
 
                 offset += bytesRead;

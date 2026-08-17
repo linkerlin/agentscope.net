@@ -15,25 +15,38 @@
 namespace AgentScope.Core.Model.Spi;
 
 /// <summary>
-/// 模型提供程序 SPI 接口。
+/// Model provider SPI (Service Provider Interface) for the AgentScope framework.
+/// Each model vendor implements this interface to support model lookup and creation via ModelRegistry.
+/// Corresponds to Java: io.agentscope.core.model.spi.IModelProvider
+/// 模型提供程序 SPI（服务提供程序接口）。
 /// 各厂商实现此接口以支持通过 ModelRegistry 按配置名称查找和创建模型。
+/// 对应 Java: io.agentscope.core.model.spi.IModelProvider
 /// </summary>
 public interface IModelProvider
 {
-    /// <summary>提供商标识符，例如 "openai", "anthropic", "deepseek"</summary>
+    /// <summary>
+    /// Gets the provider identifier (e.g., "openai", "anthropic", "deepseek").
+    /// 获取提供商标识符（例如 "openai"、"anthropic"、"deepseek"）。
+    /// </summary>
     string ProviderId { get; }
 
     /// <summary>
+    /// Determines whether this provider supports the specified model identifier.
+    /// Typically uses prefix matching (e.g., "gpt-4" matches "gpt-4o", "gpt-4-turbo").
     /// 判断此提供程序是否支持指定的模型标识符。
+    /// 通常使用前缀匹配（例如 "gpt-4" 匹配 "gpt-4o"、"gpt-4-turbo"）。
     /// </summary>
-    /// <param name="modelId">模型标识符，例如 "gpt-4o", "claude-3"</param>
+    /// <param name="modelId">Model identifier (e.g., "gpt-4o", "claude-3") / 模型标识符。</param>
+    /// <returns>True if this provider supports the model / 如果此提供程序支持该模型则返回 true。</returns>
     bool Supports(string modelId);
 
     /// <summary>
-    /// 创建一个模型实例。
+    /// Creates a model instance for the specified model identifier.
+    /// 为指定的模型标识符创建模型实例。
     /// </summary>
-    /// <param name="modelId">模型标识符</param>
-    /// <param name="apiKey">API 密钥</param>
-    /// <param name="baseUrl">可选的基础 URL</param>
+    /// <param name="modelId">Model identifier / 模型标识符。</param>
+    /// <param name="apiKey">API key for authentication / API 密钥。</param>
+    /// <param name="baseUrl">Optional custom base URL / 可选的自定义基础 URL。</param>
+    /// <returns>A new model instance / 新的模型实例。</returns>
     IModel Create(string modelId, string apiKey, string? baseUrl = null);
 }

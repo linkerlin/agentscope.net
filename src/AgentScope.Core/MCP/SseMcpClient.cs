@@ -20,11 +20,11 @@ namespace AgentScope.Core.MCP;
 
 /// <summary>
 /// MCP client implementation based on SSE (Server-Sent Events) transport.
-/// Maps to Java SseMcpClient.
 /// Uses HTTP POST to send requests and receives server-pushed responses via SSE stream.
+/// Corresponds to Java: io.agentscope.core.mcp.SseMcpClient
 /// 基于 SSE (Server-Sent Events) 传输的 MCP 客户端实现。
-/// 对标 Java SseMcpClient。
 /// 使用 HTTP POST 发送请求，通过 SSE 流接收服务端推送的响应。
+/// 对应 Java: io.agentscope.core.mcp.SseMcpClient
 /// </summary>
 public sealed class SseMcpClient : McpClientWrapper
 {

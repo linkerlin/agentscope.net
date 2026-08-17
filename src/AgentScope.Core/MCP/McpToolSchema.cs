@@ -16,7 +16,9 @@ namespace AgentScope.Core.MCP;
 
 /// <summary>
 /// MCP tool definition, corresponding to the Tool object returned by the MCP ListTools protocol.
+/// Corresponds to Java: io.agentscope.core.mcp.McpToolSchema
 /// MCP 工具定义（与 MCP 协议 ListTools 返回的 Tool 对应）。
+/// 对应 Java: io.agentscope.core.mcp.McpToolSchema
 /// </summary>
 public class McpToolSchema
 {

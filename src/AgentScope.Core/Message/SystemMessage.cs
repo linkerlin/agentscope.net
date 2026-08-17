@@ -15,8 +15,12 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// System message, representing a message with the system role. Role is fixed to "system".
-/// 系统消息，表示系统角色的消息，role 固定为 "system"。
+/// System message with the role fixed to "system".
+/// Represents system-level messages such as instructions, context, or configuration.
+/// Corresponds to Java: io.agentscope.core.message.SystemMessage
+/// 系统消息，role 固定为 "system"。
+/// 表示系统级消息，例如指令、上下文或配置。
+/// 对应 Java: io.agentscope.core.message.SystemMessage
 /// </summary>
 public class SystemMessage : Msg
 {

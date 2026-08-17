@@ -17,19 +17,37 @@ using AgentScope.Core.Exception;
 namespace AgentScope.Core.MCP;
 
 /// <summary>
+/// Exception representing MCP client or protocol errors.
+/// Corresponds to Java: io.agentscope.core.mcp.McpException
 /// MCP 客户端或协议错误。
+/// 对应 Java: io.agentscope.core.mcp.McpException
 /// </summary>
 public class McpException : AgentScopeException
 {
+    /// <summary>
+    /// Initializes a new instance of <see cref="McpException"/> with a message.
+    /// 使用消息初始化 McpException 的新实例。
+    /// </summary>
+    /// <param name="message">The error message / 错误消息</param>
     public McpException(string message)
         : base(message)
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="McpException"/> with a message and inner exception.
+    /// 使用消息和内部异常初始化 McpException 的新实例。
+    /// </summary>
+    /// <param name="message">The error message / 错误消息</param>
+    /// <param name="innerException">The inner exception / 内部异常</param>
     public McpException(string message, global::System.Exception innerException)
         : base(message, innerException)
     {
     }
 
+    /// <summary>
+    /// Gets or sets the optional error code.
+    /// 获取或设置可选的错误代码。
+    /// </summary>
     public int? Code { get; init; }
 }

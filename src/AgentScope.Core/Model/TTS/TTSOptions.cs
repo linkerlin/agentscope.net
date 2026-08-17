@@ -15,26 +15,35 @@
 namespace AgentScope.Core.Model.TTS;
 
 /// <summary>
-/// TTS synthesis options: voice, speed, output format, etc.
-/// TTS 合成选项：音色、语速、输出格式等。
+/// Options for TTS (Text-to-Speech) synthesis.
+/// Configures voice, speed, and output format for speech generation.
+/// Corresponds to Java: io.agentscope.core.model.tts.TTSOptions
+/// TTS 合成选项：配置语音合成的音色、语速和输出格式。
+/// 对应 Java: io.agentscope.core.model.tts.TTSOptions
 /// </summary>
 public class TTSOptions
 {
     /// <summary>
-    /// Voice identifier. Default is "default".
-    /// 音色标识。默认为 "default"。
+    /// Gets or sets the voice identifier (e.g., "alloy", "echo", "fable", "onyx", "nova", "shimmer").
+    /// Default is "default".
+    /// 获取或设置音色标识（例如 "alloy"、"echo"、"fable"、"onyx"、"nova"、"shimmer"）。
+    /// 默认为 "default"。
     /// </summary>
     public string Voice { get; set; } = "default";
 
     /// <summary>
-    /// Speech speed multiplier. 1.0 is normal speed.
-    /// 语速倍率。1.0 表示正常语速。
+    /// Gets or sets the speech speed multiplier (0.25 to 4.0, default 1.0).
+    /// A value of 1.0 represents normal speed; 2.0 is twice as fast.
+    /// 获取或设置语速倍率（0.25 到 4.0，默认 1.0）。
+    /// 1.0 表示正常语速，2.0 表示两倍速。
     /// </summary>
     public double Speed { get; set; } = 1.0;
 
     /// <summary>
-    /// Response audio format, e.g. "mp3", "wav", "pcm". Default is "mp3".
-    /// 响应音频格式，例如 "mp3"、"wav"、"pcm"。默认为 "mp3"。
+    /// Gets or sets the response audio format (e.g., "mp3", "wav", "pcm", "opus", "aac", "flac").
+    /// Default is "mp3".
+    /// 获取或设置响应音频格式（例如 "mp3"、"wav"、"pcm"、"opus"、"aac"、"flac"）。
+    /// 默认为 "mp3"。
     /// </summary>
     public string ResponseFormat { get; set; } = "mp3";
 }

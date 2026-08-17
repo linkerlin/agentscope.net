@@ -15,8 +15,12 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// Tool result message, representing a message with the tool role. Role is fixed to "tool".
-/// 工具结果消息，表示工具角色的消息，role 固定为 "tool"。
+/// Tool result message with the role fixed to "tool".
+/// Represents messages returned by tool/function calls.
+/// Corresponds to Java: io.agentscope.core.message.ToolResultMessage
+/// 工具结果消息，role 固定为 "tool"。
+/// 表示由工具/函数调用返回的消息。
+/// 对应 Java: io.agentscope.core.message.ToolResultMessage
 /// </summary>
 public class ToolResultMessage : Msg
 {

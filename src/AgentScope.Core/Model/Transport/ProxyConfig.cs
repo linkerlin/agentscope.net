@@ -15,41 +15,90 @@
 namespace AgentScope.Core.Model.Transport;
 
 /// <summary>
-/// 代理类型枚举。对应 Java: io.agentscope.core.model.transport.ProxyType
+/// Enumeration of supported proxy types for the HTTP transport layer.
+/// Supports HTTP, HTTPS, and SOCKS (4, 4a, 5) proxies.
+/// Corresponds to Java: io.agentscope.core.model.transport.ProxyType
+/// HTTP 传输层支持的代理类型枚举。
+/// 支持 HTTP、HTTPS 和 SOCKS（4、4a、5）代理。
+/// 对应 Java: io.agentscope.core.model.transport.ProxyType
 /// </summary>
 public enum ProxyType
 {
+    /// <summary>HTTP proxy / HTTP 代理。</summary>
     Http,
+
+    /// <summary>HTTPS proxy (SSL/TLS) / HTTPS 代理（SSL/TLS）。</summary>
     Https,
+
+    /// <summary>SOCKS4 proxy / SOCKS4 代理。</summary>
     Socks4,
+
+    /// <summary>SOCKS4a proxy (with domain name resolution) / SOCKS4a 代理（支持域名解析）。</summary>
     Socks4a,
+
+    /// <summary>SOCKS5 proxy (with authentication support) / SOCKS5 代理（支持认证）。</summary>
     Socks5
 }
 
 /// <summary>
-/// HTTP 代理配置。对应 Java: io.agentscope.core.model.transport.ProxyConfig
+/// Configuration for HTTP proxy in the transport layer.
+/// Specifies proxy type, host, port, optional authentication, and non-proxy hosts.
+/// Corresponds to Java: io.agentscope.core.model.transport.ProxyConfig
+/// 传输层中 HTTP 代理的配置。
+/// 指定代理类型、主机、端口、可选认证和不经过代理的主机列表。
+/// 对应 Java: io.agentscope.core.model.transport.ProxyConfig
 /// </summary>
 public class ProxyConfig
 {
+    /// <summary>
+    /// The proxy type (HTTP, HTTPS, SOCKS4, SOCKS4a, SOCKS5). Default is HTTP.
+    /// 代理类型（HTTP、HTTPS、SOCKS4、SOCKS4a、SOCKS5）。默认为 HTTP。
+    /// </summary>
     public ProxyType Type { get; set; } = ProxyType.Http;
 
-    /// <summary>代理主机。</summary>
+    /// <summary>
+    /// The proxy hostname or IP address.
+    /// 代理主机名或 IP 地址。
+    /// </summary>
     public string Host { get; set; } = "";
 
-    /// <summary>代理端口。</summary>
+    /// <summary>
+    /// The proxy port number. Default is 8080.
+    /// 代理端口号。默认为 8080。
+    /// </summary>
     public int Port { get; set; } = 8080;
 
-    /// <summary>用户名（可选）。</summary>
+    /// <summary>
+    /// Optional username for proxy authentication.
+    /// 用于代理认证的可选用户名。
+    /// </summary>
     public string? Username { get; set; }
 
-    /// <summary>密码（可选）。</summary>
+    /// <summary>
+    /// Optional password for proxy authentication.
+    /// 用于代理认证的可选密码。
+    /// </summary>
     public string? Password { get; set; }
 
-    /// <summary>不经过代理的主机/域名列表。</summary>
+    /// <summary>
+    /// List of hosts/domains that should bypass the proxy.
+    /// 应绕过代理的主机/域名列表。
+    /// </summary>
     public System.Collections.Generic.List<string> NonProxyHosts { get; } = new();
 
+    /// <summary>
+    /// Initializes a new instance of ProxyConfig with default values.
+    /// 使用默认值初始化 ProxyConfig 的新实例。
+    /// </summary>
     public ProxyConfig() { }
 
+    /// <summary>
+    /// Initializes a new instance of ProxyConfig with specified host, port, and type.
+    /// 使用指定的主机、端口和类型初始化 ProxyConfig 的新实例。
+    /// </summary>
+    /// <param name="host">The proxy host / 代理主机。</param>
+    /// <param name="port">The proxy port / 代理端口。</param>
+    /// <param name="type">The proxy type (default HTTP) / 代理类型（默认 HTTP）。</param>
     public ProxyConfig(string host, int port, ProxyType type = ProxyType.Http)
     {
         Host = host;
@@ -57,7 +106,16 @@ public class ProxyConfig
         Type = type;
     }
 
-    /// <summary>构造代理 URL（如 http://host:port）。</summary>
+    /// <summary>
+    /// Constructs the proxy URL string (e.g., http://host:port).
+    /// Includes authentication credentials if username is provided.
+    /// 构造代理 URL 字符串（例如 http://host:port）。
+    /// 如果提供了用户名，则包含认证凭据。
+    /// </summary>
+    /// <returns>
+    /// The proxy URL in format scheme://host:port or scheme://user:pass@host:port.
+    /// 格式为 scheme://host:port 或 scheme://user:pass@host:port 的代理 URL。
+    /// </returns>
     public string ToProxyUrl()
     {
         var scheme = Type switch

@@ -15,18 +15,40 @@
 namespace AgentScope.Core.Service.Discovery;
 
 /// <summary>
+/// Agent registration interface (A2A SPI). Corresponds to Java AgentRegistry.
 /// Agent 注册接口（A2A SPI）。对标 Java AgentRegistry。
 /// </summary>
 public interface IAgentRegistry
 {
+    /// <summary>
+    /// Registers an agent card in the registry.
+    /// 在注册表中注册一个 Agent 卡片。
+    /// </summary>
     ValueTask RegisterAsync(AgentCard card, CancellationToken ct = default);
+
+    /// <summary>
+    /// Unregisters an agent by its unique identifier.
+    /// 根据唯一标识符注销一个 Agent。
+    /// </summary>
     ValueTask UnregisterAsync(string agentId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves an agent card by its unique identifier.
+    /// 根据唯一标识符解析 Agent 卡片。
+    /// </summary>
     ValueTask<AgentCard?> ResolveAsync(string agentId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lists all registered agent cards as an async stream.
+    /// 以异步流形式列出所有已注册的 Agent 卡片。
+    /// </summary>
     IAsyncEnumerable<AgentCard> ListAsync(CancellationToken ct = default);
 }
 
 /// <summary>
-/// Agent 能力描述卡片
+/// Agent capability description card containing identity, endpoint, and skill information.
+/// Agent 能力描述卡片，包含身份、端点和技能信息。
+/// Corresponds to Java: AgentCard
 /// </summary>
 public sealed record AgentCard(
     string AgentId,

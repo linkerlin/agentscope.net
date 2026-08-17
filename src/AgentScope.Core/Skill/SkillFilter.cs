@@ -19,27 +19,48 @@ using System.Linq;
 namespace AgentScope.Core.Skill;
 
 /// <summary>
+/// Filter for selecting skills before loading/activation, based on name, ID, tags, source path, etc.
 /// 技能过滤器：在加载/激活前按名称、ID、标签、来源等条件筛选已注册技能。
-/// 对应 Java: io.agentscope.core.skill.SkillFilter
+/// Corresponds to Java: io.agentscope.core.skill.SkillFilter
 /// </summary>
 public class SkillFilter
 {
-    /// <summary>包含的技能名（为空表示不按名过滤）。</summary>
+    /// <summary>
+    /// Set of skill names to include (empty means no name-based filtering).
+    /// 包含的技能名集合（为空表示不按名称过滤）。
+    /// </summary>
     public ISet<string>? IncludeNames { get; set; }
 
-    /// <summary>排除的技能名。</summary>
+    /// <summary>
+    /// Set of skill names to exclude.
+    /// 排除的技能名集合。
+    /// </summary>
     public ISet<string>? ExcludeNames { get; set; }
 
-    /// <summary>包含的技能 ID。</summary>
+    /// <summary>
+    /// Set of skill IDs to include.
+    /// 包含的技能 ID 集合。
+    /// </summary>
     public ISet<string>? IncludeIds { get; set; }
 
-    /// <summary>来源路径前缀（如指定目录下）。</summary>
+    /// <summary>
+    /// Source path prefix filter (e.g., skills under a specific directory).
+    /// 来源路径前缀过滤器（如指定目录下的技能）。
+    /// </summary>
     public string? SourcePathPrefix { get; set; }
 
-    /// <summary>是否仅保留默认激活的技能。</summary>
+    /// <summary>
+    /// Whether to only keep skills that are active by default.
+    /// 是否仅保留默认激活的技能。
+    /// </summary>
     public bool? ActiveByDefault { get; set; }
 
-    /// <summary>应用过滤器。</summary>
+    /// <summary>
+    /// Applies the filter to a sequence of registered skills.
+    /// 对已注册技能序列应用过滤器。
+    /// </summary>
+    /// <param name="skills">The input skills to filter. / 要过滤的输入技能。</param>
+    /// <returns>The filtered skills matching all criteria. / 符合所有条件的过滤后技能。</returns>
     public IEnumerable<RegisteredSkill> Apply(IEnumerable<RegisteredSkill> skills)
     {
         var query = skills ?? System.Array.Empty<RegisteredSkill>();

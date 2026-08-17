@@ -15,14 +15,37 @@
 namespace AgentScope.Core.Model.Transport;
 
 /// <summary>
-/// HTTP 传输工厂：根据配置创建 <see cref="IHttpTransport"/> 实例。
+/// Factory for creating IHttpTransport instances based on configuration.
+/// Creates an HttpClient-based transport with configurable handler settings,
+/// proxy support, timeouts, and default headers.
+/// Corresponds to Java: io.agentscope.core.model.transport.HttpTransportFactory
+/// 根据配置创建 IHttpTransport 实例的工厂。
+/// 创建基于 HttpClient 的传输，支持可配置的处理程序设置、
+/// 代理支持、超时和默认标头。
 /// 对应 Java: io.agentscope.core.model.transport.HttpTransportFactory
 /// </summary>
 public static class HttpTransportFactory
 {
     /// <summary>
-    /// 创建一个基于 HttpClient 的 HTTP 传输实例。
+    /// Creates an IHttpTransport instance based on the provided configuration.
+    /// Configures HttpClientHandler with proxy, redirect, and connection settings,
+    /// then wraps it in an HttpClientTransport.
+    /// 根据提供的配置创建 IHttpTransport 实例。
+    /// 使用代理、重定向和连接设置配置 HttpClientHandler，
+    /// 然后将其包装在 HttpClientTransport 中。
     /// </summary>
+    /// <param name="config">
+    /// Transport configuration. If null, default configuration is used.
+    /// 传输配置。如果为 null，则使用默认配置。
+    /// </param>
+    /// <returns>
+    /// An IHttpTransport instance configured with the specified settings.
+    /// 使用指定设置配置的 IHttpTransport 实例。
+    /// </returns>
+    /// <exception cref="System.NotSupportedException">
+    /// Thrown when SOCKS proxy is configured, as the built-in transport only supports HTTP/HTTPS proxies.
+    /// 当配置了 SOCKS 代理时抛出，因为内置传输仅支持 HTTP/HTTPS 代理。
+    /// </exception>
     public static IHttpTransport Create(HttpTransportConfig? config = null)
     {
         config ??= new HttpTransportConfig();
@@ -35,11 +58,14 @@ public static class HttpTransportFactory
 
         if (config.Proxy is { } proxy && !string.IsNullOrEmpty(proxy.Host))
         {
+            // System.Net.WebProxy only supports HTTP/HTTPS proxies; SOCKS requires additional handlers
+            // (e.g., third-party SOCKS handler). Explicitly fail on SOCKS to avoid silent misconfiguration.
             // System.Net.WebProxy 仅支持 HTTP/HTTPS 代理；SOCKS 需额外处理器（如第三方 SOCKS handler），
             // 此处对 SOCKS 配置显式失败，避免静默误配置。
             if (proxy.Type is ProxyType.Socks4 or ProxyType.Socks4a or ProxyType.Socks5)
             {
                 throw new System.NotSupportedException(
+                    $"Current HTTP transport does not support {proxy.Type} proxy; configure HTTP/HTTPS proxy or provide a SOCKS-capable handler. " +
                     $"当前 HTTP 传输不支持 {proxy.Type} 代理；请配置 HTTP/HTTPS 代理或提供支持 SOCKS 的处理器。");
             }
 

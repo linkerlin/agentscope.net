@@ -15,15 +15,51 @@
 namespace AgentScope.Core.Skill;
 
 /// <summary>
-/// Skill 注册元数据（仓库扫描得到的条目，尚未加载为 ISkill）。
+/// Skill registration metadata: an entry obtained from repository scanning, not yet loaded as an ISkill.
+/// Skill 注册元数据：仓库扫描得到的条目，尚未加载为 ISkill。
+/// Corresponds to Java: io.agentscope.core.skill.RegisteredSkill
 /// </summary>
 public class RegisteredSkill
 {
+    /// <summary>
+    /// Unique identifier for the skill.
+    /// 技能的唯一标识符。
+    /// </summary>
     public string Id { get; set; } = "";
+
+    /// <summary>
+    /// Display name of the skill.
+    /// 技能的显示名称。
+    /// </summary>
     public string Name { get; set; } = "";
+
+    /// <summary>
+    /// Description of the skill's purpose and functionality.
+    /// 技能用途和功能的描述。
+    /// </summary>
     public string Description { get; set; } = "";
+
+    /// <summary>
+    /// Names of the tools associated with this skill.
+    /// 与此技能关联的工具名称列表。
+    /// </summary>
     public List<string> ToolNames { get; set; } = new();
+
+    /// <summary>
+    /// Whether this skill is active by default after loading.
+    /// 加载后是否默认激活此技能。
+    /// </summary>
     public bool IsActiveByDefault { get; set; } = true;
+
+    /// <summary>
+    /// Source file path from which this skill was loaded (optional).
+    /// 加载此技能的源文件路径（可选）。
+    /// </summary>
     public string? SourcePath { get; set; }
+
+    /// <summary>
+    /// Raw content of the skill definition (e.g., Markdown content).
+    /// 技能定义的原始内容（例如 Markdown 内容）。
+    /// </summary>
     public string? RawContent { get; set; }
 }

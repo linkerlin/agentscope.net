@@ -16,7 +16,9 @@ namespace AgentScope.Core.MCP;
 
 /// <summary>
 /// MCP tool registration record: tracks discovered client tools and their runtime exposed names.
+/// Corresponds to Java: io.agentscope.core.mcp.McpToolRegistration
 /// MCP 工具注册信息：记录发现到的客户端工具及其运行时暴露名。
+/// 对应 Java: io.agentscope.core.mcp.McpToolRegistration
 /// </summary>
 public class McpToolRegistration
 {

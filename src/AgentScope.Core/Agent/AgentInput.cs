@@ -18,62 +18,105 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Agent;
 
 /// <summary>
-/// Input model for agent middleware, containing input messages and context.
-/// Agent 中间件的输入模型，包含输入消息和上下文。
+/// Input model for the agent middleware pipeline, containing input messages,
+/// runtime context, the target agent, and additional metadata.
+/// This is the primary data transfer object passed through the middleware chain
+/// during agent invocation.
+/// Agent 中间件管道的输入模型，包含输入消息、运行时上下文、目标 Agent 和附加元数据。
+/// 这是在 Agent 调用过程中通过中间件链传递的主要数据传输对象。
 /// </summary>
 public class AgentInput
 {
-    /// <summary>Input messages / 输入消息列表</summary>
+    /// <summary>
+    /// Gets the list of input messages to be processed by the agent.
+    /// 获取待 Agent 处理的输入消息列表。
+    /// </summary>
     public IReadOnlyList<Msg> Messages { get; init; } = [];
 
-    /// <summary>Runtime context / 运行时上下文</summary>
+    /// <summary>
+    /// Gets the optional runtime context for the current invocation.
+    /// 获取当前调用的可选运行时上下文。
+    /// </summary>
     public RuntimeContext? Context { get; init; }
 
-    /// <summary>The agent being invoked / 被调用的 Agent</summary>
+    /// <summary>
+    /// Gets the agent instance being invoked.
+    /// 获取被调用的 Agent 实例。
+    /// </summary>
     public IAgent? Agent { get; init; }
 
-    /// <summary>Additional metadata / 附加元数据</summary>
+    /// <summary>
+    /// Gets additional metadata key-value pairs for extensibility.
+    /// 获取用于扩展的附加元数据键值对。
+    /// </summary>
     public Dictionary<string, object> Metadata { get; init; } = new();
 }
 
 /// <summary>
-/// Middleware input for the reasoning stage.
-/// 推理阶段的中间件输入。
+/// Middleware input for the reasoning stage of agent execution.
+/// Contains the messages and context needed for the agent to perform reasoning.
+/// 中间件在 Agent 执行推理阶段的输入模型。
+/// 包含 Agent 执行推理所需的消息和上下文。
 /// </summary>
 public class ReasoningInput
 {
-    /// <summary>Input messages for reasoning / 推理阶段的输入消息</summary>
+    /// <summary>
+    /// Gets the input messages for the reasoning stage.
+    /// 获取推理阶段的输入消息。
+    /// </summary>
     public IReadOnlyList<Msg> Messages { get; init; } = [];
 
-    /// <summary>Runtime context / 运行时上下文</summary>
+    /// <summary>
+    /// Gets the runtime context for the reasoning stage.
+    /// 获取推理阶段的运行时上下文。
+    /// </summary>
     public RuntimeContext? Context { get; init; }
 }
 
 /// <summary>
-/// Middleware input for the acting stage.
-/// 行动阶段的中间件输入。
+/// Middleware input for the acting (tool execution) stage of agent execution.
+/// Contains the tool calls to be executed and the runtime context.
+/// 中间件在 Agent 执行行动（工具调用）阶段的输入模型。
+    /// 包含待执行的工具调用和运行时上下文。
 /// </summary>
 public class ActingInput
 {
-    /// <summary>Tool calls to execute / 待执行的工具调用</summary>
+    /// <summary>
+    /// Gets the list of tool calls to be executed during the acting stage.
+    /// 获取行动阶段待执行的工具调用列表。
+    /// </summary>
     public List<ToolUseBlock> ToolCalls { get; init; } = [];
 
-    /// <summary>Runtime context / 运行时上下文</summary>
+    /// <summary>
+    /// Gets the runtime context for the acting stage.
+    /// 获取行动阶段的运行时上下文。
+    /// </summary>
     public RuntimeContext? Context { get; init; }
 }
 
 /// <summary>
-/// Middleware input for the model call stage.
-/// 模型调用阶段的中间件输入。
+/// Middleware input for the model call stage of agent execution.
+/// Contains the messages to be sent to the language model and optional call options.
+/// 中间件在 Agent 执行模型调用阶段的输入模型。
+/// 包含待发送给语言模型的消息和可选的调用选项。
 /// </summary>
 public class ModelCallInput
 {
-    /// <summary>Messages to send to the model / 发送给模型的消息</summary>
+    /// <summary>
+    /// Gets the messages to be sent to the language model.
+    /// 获取待发送给语言模型的消息。
+    /// </summary>
     public IReadOnlyList<Msg> Messages { get; init; } = [];
 
-    /// <summary>Optional model call options / 可选的模型调用选项</summary>
+    /// <summary>
+    /// Gets optional model call options (e.g., temperature, max_tokens).
+    /// 获取可选的模型调用选项（如 temperature、max_tokens 等）。
+    /// </summary>
     public Dictionary<string, object>? Options { get; init; }
 
-    /// <summary>Runtime context / 运行时上下文</summary>
+    /// <summary>
+    /// Gets the runtime context for the model call stage.
+    /// 获取模型调用阶段的运行时上下文。
+    /// </summary>
     public RuntimeContext? Context { get; init; }
 }

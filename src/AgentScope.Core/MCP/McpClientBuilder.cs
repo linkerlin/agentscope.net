@@ -17,8 +17,11 @@ using System.Net.Http;
 namespace AgentScope.Core.MCP;
 
 /// <summary>
+/// MCP client builder using a fluent/chained construction pattern.
+/// Corresponds to Java: io.agentscope.core.mcp.McpClientBuilder
+/// Supports three transport modes: Stdio, Streamable HTTP, and SSE.
 /// MCP 客户端构建器，链式构建模式。
-/// 对标 Java McpClientBuilder。
+/// 对标 Java: io.agentscope.core.mcp.McpClientBuilder
 /// 支持 Stdio、Streamable HTTP、SSE 三种传输方式。
 /// </summary>
 public sealed class McpClientBuilder
@@ -37,16 +40,32 @@ public sealed class McpClientBuilder
     {
     }
 
+    /// <summary>
+    /// Creates a new McpClientBuilder instance.
+    /// 创建一个新的 McpClientBuilder 实例。
+    /// </summary>
+    /// <returns>A new McpClientBuilder / 一个新的 McpClientBuilder</returns>
     public static McpClientBuilder Create() => new();
 
-    /// <summary>设置客户端名称。</summary>
+    /// <summary>
+    /// Sets the client name.
+    /// 设置客户端名称。
+    /// </summary>
+    /// <param name="name">The client name / 客户端名称</param>
+    /// <returns>The builder instance for chaining / 用于链式调用的构建器实例</returns>
     public McpClientBuilder Named(string name)
     {
         _name = name;
         return this;
     }
 
-    /// <summary>使用 Stdio 传输方式。</summary>
+    /// <summary>
+    /// Configures the client to use Stdio transport (spawns a subprocess).
+    /// 配置客户端使用 Stdio 传输方式（启动子进程）。
+    /// </summary>
+    /// <param name="command">The command to execute / 要执行的命令</param>
+    /// <param name="args">Optional command-line arguments / 可选的命令行参数</param>
+    /// <returns>The builder instance for chaining / 用于链式调用的构建器实例</returns>
     public McpClientBuilder UseStdio(string command, string? args = null)
     {
         _transportKind = TransportKind.Stdio;
@@ -55,7 +74,12 @@ public sealed class McpClientBuilder
         return this;
     }
 
-    /// <summary>使用 Streamable HTTP 传输方式。</summary>
+    /// <summary>
+    /// Configures the client to use Streamable HTTP transport.
+    /// 配置客户端使用 Streamable HTTP 传输方式。
+    /// </summary>
+    /// <param name="url">The server endpoint URL / 服务器端点 URL</param>
+    /// <returns>The builder instance for chaining / 用于链式调用的构建器实例</returns>
     public McpClientBuilder UseStreamableHttp(string url)
     {
         _transportKind = TransportKind.StreamableHttp;
@@ -63,7 +87,12 @@ public sealed class McpClientBuilder
         return this;
     }
 
-    /// <summary>使用 SSE 传输方式。</summary>
+    /// <summary>
+    /// Configures the client to use SSE (Server-Sent Events) transport.
+    /// 配置客户端使用 SSE（服务器推送事件）传输方式。
+    /// </summary>
+    /// <param name="url">The SSE endpoint URL / SSE 端点 URL</param>
+    /// <returns>The builder instance for chaining / 用于链式调用的构建器实例</returns>
     public McpClientBuilder UseSse(string url)
     {
         _transportKind = TransportKind.Sse;
@@ -71,28 +100,48 @@ public sealed class McpClientBuilder
         return this;
     }
 
-    /// <summary>设置 API 密钥。</summary>
+    /// <summary>
+    /// Sets the API key for authentication (Bearer token).
+    /// 设置 API 密钥用于认证（Bearer token）。
+    /// </summary>
+    /// <param name="apiKey">The API key / API 密钥</param>
+    /// <returns>The builder instance for chaining / 用于链式调用的构建器实例</returns>
     public McpClientBuilder WithApiKey(string apiKey)
     {
         _apiKey = apiKey;
         return this;
     }
 
-    /// <summary>设置工作目录（仅对 Stdio 传输有效）。</summary>
+    /// <summary>
+    /// Sets the working directory (only effective for Stdio transport).
+    /// 设置工作目录（仅对 Stdio 传输有效）。
+    /// </summary>
+    /// <param name="workingDirectory">The working directory path / 工作目录路径</param>
+    /// <returns>The builder instance for chaining / 用于链式调用的构建器实例</returns>
     public McpClientBuilder WithWorkingDirectory(string workingDirectory)
     {
         _workingDirectory = workingDirectory;
         return this;
     }
 
-    /// <summary>设置自定义 HttpClient（仅对 HTTP/SSE 传输有效）。</summary>
+    /// <summary>
+    /// Sets a custom HttpClient (only effective for HTTP/SSE transport).
+    /// 设置自定义 HttpClient（仅对 HTTP/SSE 传输有效）。
+    /// </summary>
+    /// <param name="httpClient">The custom HttpClient / 自定义 HttpClient</param>
+    /// <returns>The builder instance for chaining / 用于链式调用的构建器实例</returns>
     public McpClientBuilder WithHttpClient(HttpClient httpClient)
     {
         _httpClient = httpClient;
         return this;
     }
 
-    /// <summary>设置请求超时。</summary>
+    /// <summary>
+    /// Sets the request timeout.
+    /// 设置请求超时。
+    /// </summary>
+    /// <param name="timeout">The timeout duration / 超时时间</param>
+    /// <returns>The builder instance for chaining / 用于链式调用的构建器实例</returns>
     public McpClientBuilder WithRequestTimeout(TimeSpan timeout)
     {
         _requestTimeout = timeout;
@@ -100,8 +149,14 @@ public sealed class McpClientBuilder
     }
 
     /// <summary>
-    /// 构建并返回 IMcpClient 实例。
+    /// Builds and returns the IMcpClient instance based on the configured transport.
+    /// 根据配置的传输方式构建并返回 IMcpClient 实例。
     /// </summary>
+    /// <returns>An initialized IMcpClient / 一个初始化的 IMcpClient</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when required parameters for the selected transport are missing.
+    /// 当所选传输方式的必需参数缺失时抛出。
+    /// </exception>
     public IMcpClient Build()
     {
         var name = _name ?? $"mcp-{_transportKind}-{Guid.NewGuid():N}";
@@ -117,28 +172,32 @@ public sealed class McpClientBuilder
         {
             TransportKind.Stdio => new StdioMcpClient(
                 name,
-                _command ?? throw new InvalidOperationException("Stdio 传输需要指定命令"),
+                _command ?? throw new InvalidOperationException("Stdio transport requires a command / Stdio 传输需要指定命令"),
                 _arguments,
                 _workingDirectory,
                 requestTimeout: _requestTimeout),
 
             TransportKind.StreamableHttp => new StreamableHttpMcpClient(
                 name,
-                _url ?? throw new InvalidOperationException("Streamable HTTP 传输需要指定 URL"),
+                _url ?? throw new InvalidOperationException("Streamable HTTP transport requires a URL / Streamable HTTP 传输需要指定 URL"),
                 _httpClient,
                 _requestTimeout),
 
             TransportKind.Sse => new SseMcpClient(
                 name,
-                _url ?? throw new InvalidOperationException("SSE 传输需要指定 URL"),
+                _url ?? throw new InvalidOperationException("SSE transport requires a URL / SSE 传输需要指定 URL"),
                 _httpClient,
                 _apiKey,
                 _requestTimeout),
 
-            _ => throw new InvalidOperationException($"不支持的传输方式: {_transportKind}")
+            _ => throw new InvalidOperationException($"Unsupported transport kind: {_transportKind} / 不支持的传输方式: {_transportKind}")
         };
     }
 
+    /// <summary>
+    /// Internal enum for MCP transport types.
+    /// MCP 传输类型内部枚举。
+    /// </summary>
     private enum TransportKind
     {
         Stdio,

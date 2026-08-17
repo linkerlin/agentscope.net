@@ -14,8 +14,20 @@
 
 namespace AgentScope.Core.Skill;
 
+/// <summary>
+/// Parser for Markdown-based skill definitions, extracting front matter metadata and body content.
+/// Markdown 技能定义解析器，提取前置元数据和正文内容。
+/// Corresponds to Java: io.agentscope.core.skill.MarkdownSkillParser
+/// </summary>
 public class MarkdownSkillParser
 {
+    /// <summary>
+    /// Parses a Markdown file into a RegisteredSkill.
+    /// 将 Markdown 文件解析为 RegisteredSkill。
+    /// </summary>
+    /// <param name="path">The file path to parse. / 要解析的文件路径。</param>
+    /// <returns>The parsed skill registration metadata. / 解析后的技能注册元数据。</returns>
+    /// <exception cref="ArgumentNullException">Thrown when path is null or empty. / 当 path 为 null 或空时抛出。</exception>
     public RegisteredSkill ParseFile(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -27,6 +39,14 @@ public class MarkdownSkillParser
         return parsed;
     }
 
+    /// <summary>
+    /// Parses raw Markdown content into a RegisteredSkill.
+    /// 将原始 Markdown 内容解析为 RegisteredSkill。
+    /// </summary>
+    /// <param name="rawContent">The raw Markdown content. / 原始 Markdown 内容。</param>
+    /// <param name="sourcePath">Optional source file path. / 可选的源文件路径。</param>
+    /// <returns>The parsed skill registration metadata. / 解析后的技能注册元数据。</returns>
+    /// <exception cref="ArgumentException">Thrown when rawContent is empty. / 当 rawContent 为空时抛出。</exception>
     public RegisteredSkill Parse(string rawContent, string? sourcePath = null)
     {
         if (string.IsNullOrWhiteSpace(rawContent))
@@ -53,6 +73,10 @@ public class MarkdownSkillParser
         };
     }
 
+    /// <summary>
+    /// Parses YAML-style front matter (--- delimited) from the raw content.
+    /// 从原始内容中解析 YAML 风格的前置元数据（--- 分隔）。
+    /// </summary>
     private static Dictionary<string, string> ParseFrontMatter(string rawContent, out string body)
     {
         var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -87,6 +111,10 @@ public class MarkdownSkillParser
         return metadata;
     }
 
+    /// <summary>
+    /// Resolves the skill name from front matter, first heading, or file name.
+    /// 从前置元数据、第一个标题或文件名中解析技能名称。
+    /// </summary>
     private static string ResolveName(Dictionary<string, string> metadata, string body, string? sourcePath)
     {
         if (metadata.TryGetValue("name", out var name) && !string.IsNullOrWhiteSpace(name))
@@ -105,6 +133,10 @@ public class MarkdownSkillParser
         return "unnamed-skill";
     }
 
+    /// <summary>
+    /// Resolves the skill ID from front matter, name, or file name.
+    /// 从前置元数据、名称或文件名中解析技能 ID。
+    /// </summary>
     private static string ResolveId(Dictionary<string, string> metadata, string name, string? sourcePath)
     {
         if (metadata.TryGetValue("id", out var id) && !string.IsNullOrWhiteSpace(id))
@@ -116,6 +148,10 @@ public class MarkdownSkillParser
         return NormalizeId(name);
     }
 
+    /// <summary>
+    /// Resolves the skill description from front matter or body text.
+    /// 从前置元数据或正文中解析技能描述。
+    /// </summary>
     private static string ResolveDescription(Dictionary<string, string> metadata, string body)
     {
         if (metadata.TryGetValue("description", out var description) && !string.IsNullOrWhiteSpace(description))
@@ -144,6 +180,10 @@ public class MarkdownSkillParser
         return string.Join(" ", collected);
     }
 
+    /// <summary>
+    /// Resolves the list of tool names from front matter.
+    /// 从前置元数据中解析工具名称列表。
+    /// </summary>
     private static List<string> ResolveToolNames(Dictionary<string, string> metadata)
     {
         if (!metadata.TryGetValue("tools", out var rawTools) || string.IsNullOrWhiteSpace(rawTools))
@@ -161,6 +201,10 @@ public class MarkdownSkillParser
             .ToList();
     }
 
+    /// <summary>
+    /// Resolves whether the skill is active by default from front matter.
+    /// 从前置元数据中解析技能是否默认激活。
+    /// </summary>
     private static bool ResolveIsActiveByDefault(Dictionary<string, string> metadata)
     {
         if (!metadata.TryGetValue("active", out var rawActive) || string.IsNullOrWhiteSpace(rawActive))
@@ -171,6 +215,10 @@ public class MarkdownSkillParser
             && !rawActive.Equals("no", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Normalizes a string into a valid skill ID (lowercase, hyphens for separators).
+    /// 将字符串规范化为有效的技能 ID（小写，连字符分隔）。
+    /// </summary>
     private static string NormalizeId(string value)
     {
         if (string.IsNullOrWhiteSpace(value))

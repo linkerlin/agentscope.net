@@ -17,17 +17,24 @@ using System.Collections.Generic;
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// 数据块，用于承载多模态消息内容，可包含文本和多个媒体来源
+/// Data block for carrying multimodal message content.
+/// Can contain text and multiple media sources (images, audio, video, etc.).
+/// Corresponds to Java: io.agentscope.core.message.DataBlock
+/// 数据块，用于承载多模态消息内容。
+/// 可包含文本和多个媒体来源（图片、音频、视频等）。
+/// 对应 Java: io.agentscope.core.message.DataBlock
 /// </summary>
 public record DataBlock
 {
     /// <summary>
-    /// 文本内容
+    /// Text content of the data block.
+    /// 数据块的文本内容。
     /// </summary>
     public string? Text { get; set; }
 
     /// <summary>
-    /// 媒体来源列表（图片、音频、视频等）
+    /// List of media sources (images, audio, video, etc.).
+    /// 媒体来源列表（图片、音频、视频等）。
     /// </summary>
     public List<Source>? Sources { get; set; }
 }

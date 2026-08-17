@@ -17,7 +17,9 @@ using AgentScope.Core.Tool;
 namespace AgentScope.Core.Skill;
 
 /// <summary>
+/// Skill interface: a composite functional unit that can contain multiple Tools and supports dynamic activation.
 /// Skill 接口：复合功能单元，可包含多个 Tool，支持动态激活。
+/// Corresponds to Java: io.agentscope.core.skill.ISkill
 /// </summary>
 public interface ISkill
 {

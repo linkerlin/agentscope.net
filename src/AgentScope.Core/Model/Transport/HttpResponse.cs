@@ -17,30 +17,38 @@ using System.Collections.Generic;
 namespace AgentScope.Core.Model.Transport;
 
 /// <summary>
-/// HTTP response encapsulation for the transport layer.
-/// HTTP 响应封装
-/// 
-/// Java参考: io.agentscope.core.model.transport.HttpResponse
+/// HTTP response encapsulation for the transport layer in the AgentScope framework.
+/// Contains the status code, headers, and body returned from an HTTP request.
+/// Provides a convenience property to check if the response indicates success (2xx).
+/// Corresponds to Java: io.agentscope.core.model.transport.HttpResponse
+/// AgentScope 框架中传输层的 HTTP 响应封装。
+/// 包含 HTTP 请求返回的状态码、标头和正文。
+/// 提供便捷属性来检查响应是否表示成功（2xx）。
+/// 对应 Java: io.agentscope.core.model.transport.HttpResponse
 /// </summary>
 public class HttpResponse
 {
     /// <summary>
-    /// HTTP status code
+    /// The HTTP status code (e.g., 200 for OK, 404 for Not Found, 500 for Server Error).
+    /// HTTP 状态码（例如 200 表示成功、404 表示未找到、500 表示服务器错误）。
     /// </summary>
     public required int StatusCode { get; init; }
 
     /// <summary>
-    /// Response headers
+    /// Dictionary of response headers returned by the server.
+    /// 服务器返回的响应标头字典。
     /// </summary>
     public Dictionary<string, string> Headers { get; init; } = new();
 
     /// <summary>
-    /// Response body
+    /// The response body content as a string (typically JSON).
+    /// 响应正文内容（通常为 JSON 字符串）。
     /// </summary>
     public required string Body { get; init; }
 
     /// <summary>
-    /// Whether the response is successful (2xx status code)
+    /// Gets whether the HTTP response indicates success (status code in the 2xx range).
+    /// 获取 HTTP 响应是否表示成功（状态码在 2xx 范围内）。
     /// </summary>
     public bool IsSuccessStatusCode => StatusCode >= 200 && StatusCode < 300;
 }

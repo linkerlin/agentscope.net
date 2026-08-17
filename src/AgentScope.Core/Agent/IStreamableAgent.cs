@@ -19,22 +19,34 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Agent;
 
 /// <summary>
-/// Streamable Agent interface. Counterpart to Java StreamableAgent.
-/// Streaming uses IAsyncEnumerable&lt;Event&gt; (counterpart to Flux&lt;AgentEvent&gt;).
-/// 可流式输出的 Agent 接口，对应 Java StreamableAgent。
-/// 流式返回使用 IAsyncEnumerable&lt;AgentEvent&gt;（对应 Flux&lt;AgentEvent&gt;）。
+/// Defines the contract for agents that support streaming output of events.
+/// Streaming enables real-time, incremental processing where events are yielded
+/// one by one as they are produced, rather than waiting for the complete result.
+/// Counterpart to Java: io.agentscope.core.agent.StreamableAgent.
+/// Streaming uses IAsyncEnumerable&lt;Event&gt; (counterpart to Flux&lt;AgentEvent&gt; in reactive programming).
+/// 定义支持流式事件输出的 Agent 契约。
+/// 流式输出支持实时、增量处理，事件在产生时逐个产出，无需等待完整结果。
+/// 对应 Java: io.agentscope.core.agent.StreamableAgent。
+/// 流式返回使用 IAsyncEnumerable&lt;Event&gt;（响应式编程中对应 Flux&lt;AgentEvent&gt;）。
 /// </summary>
 public interface IStreamableAgent
 {
     /// <summary>
-    /// Processes a list of messages in streaming mode, yielding events one by one.
-    /// 流式处理消息列表，逐个产出 AgentEvent。
+    /// Processes a list of messages in streaming mode, yielding events one by one
+    /// as they become available during processing.
+    /// 流式处理消息列表，在处理过程中逐个产出事件。
     /// </summary>
+    /// <param name="messages">The list of input messages / 输入消息列表</param>
+    /// <param name="context">Optional runtime context / 可选的运行时上下文</param>
+    /// <returns>An async enumerable of events produced during processing / 处理过程中产生的事件异步枚举</returns>
     IAsyncEnumerable<Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null);
 
     /// <summary>
-    /// Processes a single message in streaming mode.
-    /// 流式处理单条消息。
+    /// Processes a single message in streaming mode, yielding events one by one.
+    /// 流式处理单条消息，逐个产出事件。
     /// </summary>
+    /// <param name="message">The input message / 输入消息</param>
+    /// <param name="context">Optional runtime context / 可选的运行时上下文</param>
+    /// <returns>An async enumerable of events / 事件异步枚举</returns>
     IAsyncEnumerable<Event> StreamEventsAsync(Msg message, RuntimeContext? context = null);
 }

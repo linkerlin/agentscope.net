@@ -16,7 +16,9 @@ namespace AgentScope.Core.Message;
 
 /// <summary>
 /// URL media source, representing media content referenced by a URL.
+/// Corresponds to Java: io.agentscope.core.message.URLSource
 /// URL 媒体来源，表示由 URL 指向的媒体内容。
+/// 对应 Java: io.agentscope.core.message.URLSource
 /// </summary>
 public record URLSource : Source
 {

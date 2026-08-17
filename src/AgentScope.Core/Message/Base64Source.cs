@@ -15,19 +15,25 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// Base64 编码的媒体来源，表示由 Base64 编码数据表示的媒体内容
+/// Base64-encoded media source, representing media content as a Base64 data string.
+/// Corresponds to Java: io.agentscope.core.message.Base64Source
+/// Base64 编码的媒体来源，表示由 Base64 编码数据表示的媒体内容。
+/// 对应 Java: io.agentscope.core.message.Base64Source
 /// </summary>
 public record Base64Source : Source
 {
+    /// <summary>Source type identifier, always "base64" / 来源类型标识，固定为 "base64"。</summary>
     public override string Type => "base64";
 
     /// <summary>
-    /// 媒体类型（如 "image/png", "audio/mpeg"）
+    /// Media type (e.g., "image/png", "audio/mpeg", "video/mp4").
+    /// 媒体类型（例如 "image/png"、"audio/mpeg"、"video/mp4"）。
     /// </summary>
     public required string MediaType { get; set; }
 
     /// <summary>
-    /// Base64 编码的媒体数据
+    /// Base64-encoded media data string.
+    /// Base64 编码的媒体数据字符串。
     /// </summary>
     public required string Data { get; set; }
 }

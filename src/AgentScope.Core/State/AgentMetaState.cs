@@ -15,7 +15,10 @@
 namespace AgentScope.Core.State;
 
 /// <summary>
+/// Agent metadata state for persisting and restoring agent identity and system prompt.
 /// Agent 元数据状态，用于持久化恢复 Agent 身份与系统提示。
+/// Corresponds to Java: io.agentscope.core.state.AgentMetaState
+/// 对应 Java: io.agentscope.core.state.AgentMetaState
 /// </summary>
 public record AgentMetaState(
     string Id,

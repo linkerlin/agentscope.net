@@ -15,8 +15,12 @@
 namespace AgentScope.Core.Model.Transport.WebSocket;
 
 /// <summary>
-/// WebSocket transport layer interface for real-time TTS, streaming model responses, etc.
-/// WebSocket 传输层接口，用于实时 TTS、流式模型响应等。
+/// WebSocket transport layer interface for real-time communication such as TTS streaming,
+/// real-time model responses, and bidirectional data exchange.
+/// Corresponds to Java: io.agentscope.core.model.transport.websocket.WebSocketTransport
+/// WebSocket 传输层接口，用于实时通信，如 TTS 流式传输、
+/// 实时模型响应和双向数据交换。
+/// 对应 Java: io.agentscope.core.model.transport.websocket.WebSocketTransport
 /// </summary>
 public interface IWebSocketTransport
 {
@@ -24,7 +28,7 @@ public interface IWebSocketTransport
     /// Connects to a WebSocket server using the specified request parameters.
     /// 使用指定的请求参数连接到 WebSocket 服务器。
     /// </summary>
-    /// <param name="request">The WebSocket connection request containing URI, headers, etc. / 包含 URI、请求头等的 WebSocket 连接请求</param>
+    /// <param name="request">The WebSocket connection request containing URI, headers, and sub-protocol / 包含 URI、请求头和子协议的 WebSocket 连接请求</param>
     /// <param name="cancellationToken">Cancellation token for the async operation / 异步操作的取消令牌</param>
     /// <returns>A task representing the connection, with an <see cref="IWebSocketConnection"/> result / 表示连接的任务，返回 IWebSocketConnection</returns>
     Task<IWebSocketConnection> ConnectAsync(WebSocketRequest request, CancellationToken cancellationToken = default);

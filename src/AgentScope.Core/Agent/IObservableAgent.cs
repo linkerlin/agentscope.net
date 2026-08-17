@@ -19,22 +19,31 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Agent;
 
 /// <summary>
-/// Observable Agent interface. Counterpart to Java ObservableAgent.
-/// Agents receive and react to messages from other agents via ObserveAsync.
-/// 可观察的 Agent 接口，对应 Java ObservableAgent。
-/// Agent 通过 observe 接收来自其他 Agent 的消息并做出反应。
+/// Defines the contract for agents that can observe and react to messages from other agents.
+/// This enables passive message reception in multi-agent systems, where agents
+/// can monitor and respond to communications without being explicitly called.
+/// Counterpart to Java: io.agentscope.core.agent.ObservableAgent.
+/// 定义可观察 Agent 的契约，允许 Agent 观察并响应来自其他 Agent 的消息。
+/// 这实现了多 Agent 系统中的被动消息接收，Agent 可以监控和响应通信而无需被显式调用。
+/// 对应 Java: io.agentscope.core.agent.ObservableAgent。
 /// </summary>
 public interface IObservableAgent
 {
     /// <summary>
-    /// Observes and processes a single message.
-    /// 观察并处理单条消息。
+    /// Observes and processes a single message from another agent.
+    /// The agent may react to the message based on its internal logic.
+    /// 观察并处理来自其他 Agent 的单条消息。
+    /// Agent 可以根据其内部逻辑对消息做出反应。
     /// </summary>
+    /// <param name="message">The message to observe / 要观察的消息</param>
+    /// <param name="context">Optional runtime context / 可选的运行时上下文</param>
     Task ObserveAsync(Msg message, RuntimeContext? context = null);
 
     /// <summary>
-    /// Observes and processes multiple messages.
-    /// 观察并处理多条消息。
+    /// Observes and processes multiple messages from other agents.
+    /// 观察并处理来自其他 Agent 的多条消息。
     /// </summary>
+    /// <param name="messages">The messages to observe / 要观察的消息列表</param>
+    /// <param name="context">Optional runtime context / 可选的运行时上下文</param>
     Task ObserveAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null);
 }

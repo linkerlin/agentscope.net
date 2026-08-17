@@ -16,7 +16,9 @@ namespace AgentScope.Core.Message;
 
 /// <summary>
 /// Tool call state enum, tracking the lifecycle of a tool call within the agent.
+/// Corresponds to Java: io.agentscope.core.message.ToolCallState
 /// 工具调用状态枚举，跟踪代理内工具调用的生命周期。
+/// 对应 Java: io.agentscope.core.message.ToolCallState
 /// </summary>
 public enum ToolCallState
 {
@@ -53,7 +55,9 @@ public enum ToolCallState
 
 /// <summary>
 /// Tool result state enum, indicating the outcome of a tool execution.
+/// Corresponds to Java: io.agentscope.core.message.ToolResultState
 /// 工具执行结果状态枚举，表示工具执行的结果。
+/// 对应 Java: io.agentscope.core.message.ToolResultState
 /// </summary>
 public enum ToolResultState
 {

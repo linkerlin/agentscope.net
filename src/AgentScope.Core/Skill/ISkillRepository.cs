@@ -15,7 +15,9 @@
 namespace AgentScope.Core.Skill;
 
 /// <summary>
+/// Skill repository: scans to obtain a list of RegisteredSkill entries and loads them as ISkill on demand.
 /// Skill 仓库：扫描得到 RegisteredSkill 列表，并按需加载为 ISkill。
+/// Corresponds to Java: io.agentscope.core.skill.ISkillRepository
 /// </summary>
 public interface ISkillRepository
 {

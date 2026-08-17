@@ -17,6 +17,8 @@ namespace AgentScope.Core.State;
 /// <summary>
 /// Marker interface for persistable state data (aligned with Java State).
 /// 状态标记接口，用于可持久化的状态数据（与 Java State 对齐）。
+/// Corresponds to Java: io.agentscope.core.state.IState
+/// 对应 Java: io.agentscope.core.state.IState
 /// </summary>
 public interface IState
 {
