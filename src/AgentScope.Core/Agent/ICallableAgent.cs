@@ -19,23 +19,28 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Agent;
 
 /// <summary>
-/// 可调用的 Agent 接口，对应 Java CallableAgent
-/// 单值返回使用 Task&lt;T&gt;（对应 Mono&lt;T&gt;）
+/// Callable Agent interface. Counterpart to Java CallableAgent.
+/// Single-value return uses Task&lt;T&gt; (counterpart to Mono&lt;T&gt;).
+/// 可调用的 Agent 接口，对应 Java CallableAgent。
+/// 单值返回使用 Task&lt;T&gt;（对应 Mono&lt;T&gt;）。
 /// </summary>
 public interface ICallableAgent
 {
     /// <summary>
-    /// 使用消息列表调用 Agent，返回结果消息
+    /// Calls the agent with a list of messages and returns the result message.
+    /// 使用消息列表调用 Agent，返回结果消息。
     /// </summary>
     Task<Msg> CallAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null);
 
     /// <summary>
-    /// 使用单条消息调用 Agent，返回结果消息
+    /// Calls the agent with a single message and returns the result message.
+    /// 使用单条消息调用 Agent，返回结果消息。
     /// </summary>
     Task<Msg> CallAsync(Msg message, RuntimeContext? context = null);
 
     /// <summary>
-    /// 使用文本调用 Agent，自动包装为 UserMessage
+    /// Calls the agent with plain text, automatically wrapped as a UserMessage.
+    /// 使用文本调用 Agent，自动包装为 UserMessage。
     /// </summary>
     Task<Msg> CallAsync(string text, RuntimeContext? context = null);
 }

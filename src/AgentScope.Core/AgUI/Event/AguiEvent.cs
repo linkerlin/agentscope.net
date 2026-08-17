@@ -1,9 +1,23 @@
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 using AgentScope.Core.AgUI.Model;
 
 namespace AgentScope.Core.AgUI.Event;
 
 /// <summary>
-/// AG-UI 事件类型枚举。对�?Java AguiEventType�?/// </summary>
+/// AG-UI 事件类型枚举。对�?Java AguiEventType�?/// </summary>
 public enum AguiEventType
 {
     RunStarted, RunFinished, RunError,
@@ -18,7 +32,7 @@ public enum AguiEventType
 }
 
 /// <summary>
-/// AG-UI 事件记录基类。对�?Java sealed interface AguiEvent�?/// </summary>
+/// AG-UI 事件记录基类。对�?Java sealed interface AguiEvent�?/// </summary>
 public abstract record AguiEvent(
     AguiEventType Type,
     string ThreadId,
@@ -43,7 +57,7 @@ public sealed record StepStarted(string ThreadId, string RunId, string StepName,
 public sealed record StepFinished(string ThreadId, string RunId, string StepName,
     long? Timestamp = null) : AguiEvent(AguiEventType.StepFinished, ThreadId, RunId, Timestamp ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
-// ── 文本消杯�?──
+// ── 文本消杯�?──
 public sealed record TextMessageStart(string ThreadId, string RunId, string MessageId, string Role,
     long? Timestamp = null) : AguiEvent(AguiEventType.TextMessageStart, ThreadId, RunId, Timestamp ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
@@ -53,7 +67,7 @@ public sealed record TextMessageContent(string ThreadId, string RunId, string De
 public sealed record TextMessageEnd(string ThreadId, string RunId,
     long? Timestamp = null) : AguiEvent(AguiEventType.TextMessageEnd, ThreadId, RunId, Timestamp ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
-// ── 工具调用�?──
+// ── 工具调用�?──
 public sealed record ToolCallStart(string ThreadId, string RunId, string ToolCallId, string ToolCallName,
     long? Timestamp = null) : AguiEvent(AguiEventType.ToolCallStart, ThreadId, RunId, Timestamp ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
@@ -66,7 +80,7 @@ public sealed record ToolCallEnd(string ThreadId, string RunId,
 public sealed record ToolCallResult(string ThreadId, string RunId, string ToolName, object? Result,
     bool IsError = false, long? Timestamp = null) : AguiEvent(AguiEventType.ToolCallResult, ThreadId, RunId, Timestamp ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
-// ── 推睆�?──
+// ── 推睆�?──
 public sealed record ReasoningStart(string ThreadId, string RunId,
     long? Timestamp = null) : AguiEvent(AguiEventType.ReasoningStart, ThreadId, RunId, Timestamp ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
@@ -82,7 +96,7 @@ public sealed record ReasoningMessageEnd(string ThreadId, string RunId,
 public sealed record ReasoningEnd(string ThreadId, string RunId,
     long? Timestamp = null) : AguiEvent(AguiEventType.ReasoningEnd, ThreadId, RunId, Timestamp ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
-// ── 快照与扩�?──
+// ── 快照与扩�?──
 public sealed record StateSnapshot(string ThreadId, string RunId, object State,
     long? Timestamp = null) : AguiEvent(AguiEventType.StateSnapshot, ThreadId, RunId, Timestamp ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
@@ -95,5 +109,5 @@ public sealed record RunFinishedSuccessOutcome(object? Result) : RunFinishedOutc
 public sealed record RunFinishedInterruptOutcome(Interrupt Interrupt) : RunFinishedOutcome;
 
 /// <summary>
-/// 挂起的中断（等待用户处睆）。对�?Java Interrupt�?/// </summary>
+/// 挂起的中断（等待用户处睆）。对�?Java Interrupt�?/// </summary>
 public sealed record Interrupt(string Reason, string? ReplyId = null, IDictionary<string, object>? Metadata = null);

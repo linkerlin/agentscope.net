@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -26,6 +27,13 @@ public sealed class GatewayBootstrap : IAsyncDisposable
     private readonly ChannelRuntimeContextResolver _resolver;
     private bool _started;
 
+    /// <summary>
+    /// 初始化网关引导器。
+    /// Initialize the gateway bootstrap.
+    /// </summary>
+    /// <param name="gateway">网关实例 / The gateway instance.</param>
+    /// <param name="channelManager">渠道管理器，可选 / Optional channel manager.</param>
+    /// <exception cref="ArgumentNullException">gateway 为 null 时抛出 / Thrown when gateway is null.</exception>
     public GatewayBootstrap(IGateway gateway, ChannelManager? channelManager = null)
     {
         _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
@@ -33,14 +41,23 @@ public sealed class GatewayBootstrap : IAsyncDisposable
         _resolver = new ChannelRuntimeContextResolver();
     }
 
-    /// <summary>注册渠道。</summary>
+    /// <summary>
+    /// 注册一个渠道到引导器。
+    /// Register a channel with the bootstrap.
+    /// </summary>
+    /// <param name="channel">渠道实例 / The channel instance.</param>
+    /// <returns>当前引导器实例（链式调用）/ This bootstrap instance for chaining.</returns>
     public GatewayBootstrap WithChannel(IChannel channel)
     {
         _channelManager.Register(channel);
         return this;
     }
 
-    /// <summary>绑定并启动所有渠道。</summary>
+    /// <summary>
+    /// 绑定网关并启动所有已注册渠道。
+    /// Bind the gateway and start all registered channels.
+    /// </summary>
+    /// <param name="ct">取消令牌 / Cancellation token.</param>
     public async Task StartAsync(CancellationToken ct = default)
     {
         if (_started) return;
@@ -49,7 +66,11 @@ public sealed class GatewayBootstrap : IAsyncDisposable
         _started = true;
     }
 
-    /// <summary>停止所有渠道。</summary>
+    /// <summary>
+    /// 停止所有已启动的渠道。
+    /// Stop all started channels.
+    /// </summary>
+    /// <param name="ct">取消令牌 / Cancellation token.</param>
     public async Task StopAsync(CancellationToken ct = default)
     {
         if (!_started) return;
@@ -57,9 +78,13 @@ public sealed class GatewayBootstrap : IAsyncDisposable
         _started = false;
     }
 
-    /// <summary>暴露渠道运行时上下文解析器。</summary>
+    /// <summary>
+    /// 获取渠道运行时上下文解析器。
+    /// Gets the channel runtime context resolver.
+    /// </summary>
     public ChannelRuntimeContextResolver Resolver => _resolver;
 
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         await StopAsync();

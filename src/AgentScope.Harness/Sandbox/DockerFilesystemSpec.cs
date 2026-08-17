@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,6 +16,7 @@ namespace AgentScope.Harness.Sandbox;
 
 /// <summary>
 /// Docker 沙箱文件系统规格：描述容器内工作目录、绑定挂载与用户映射。
+/// Docker sandbox filesystem spec: describes the container workspace directory, bind mount, and user mapping.
 /// 对应 Java: io.agentscope.harness.agent.sandbox.impl.docker.DockerFilesystemSpec
 /// </summary>
 public sealed record DockerFilesystemSpec(
@@ -23,6 +25,9 @@ public sealed record DockerFilesystemSpec(
     bool ReadOnly = false,
     string? UserId = null)
 {
-    /// <summary>宿主到容器的绑定挂载目标。</summary>
+    /// <summary>
+    /// 宿主到容器的绑定挂载目标（即 ContainerWorkspace 的值）。
+    /// Bind mount target from host to container (the value of ContainerWorkspace).
+    /// </summary>
     public string MountTarget => ContainerWorkspace;
 }

@@ -17,39 +17,65 @@ using System;
 namespace AgentScope.Core.Tool;
 
 /// <summary>
-/// 标记方法为 Agent 可用工具，对应 Java @Tool 注解
+/// Marks a method as an agent-available tool, corresponding to the Java @Tool annotation.
+/// 标记方法为 Agent 可用工具，对应 Java @Tool 注解。
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public class ToolAttribute : Attribute
 {
-    /// <summary>工具名称（默认使用方法名）</summary>
+    /// <summary>
+    /// Tool name (defaults to the method name).
+    /// 工具名称（默认使用方法名）。
+    /// </summary>
     public string? Name { get; init; }
 
-    /// <summary>工具描述</summary>
+    /// <summary>
+    /// Tool description for LLM consumption.
+    /// 工具描述，用于 LLM 理解工具用途。
+    /// </summary>
     public string? Description { get; init; }
 
-    /// <summary>是否启用严格 JSON Schema 模式</summary>
+    /// <summary>
+    /// Whether to enable strict JSON Schema mode for parameter validation.
+    /// 是否启用严格 JSON Schema 模式进行参数校验。
+    /// </summary>
     public bool Strict { get; init; }
 
-    /// <summary>是否为只读工具（不会产生副作用）</summary>
+    /// <summary>
+    /// Whether this is a read-only tool (no side effects).
+    /// 是否为只读工具（不会产生副作用）。
+    /// </summary>
     public bool ReadOnly { get; init; }
 
-    /// <summary>是否为外部工具（需额外配置）</summary>
+    /// <summary>
+    /// Whether this is an external tool requiring additional configuration.
+    /// 是否为外部工具（需额外配置）。
+    /// </summary>
     public bool ExternalTool { get; init; }
 }
 
 /// <summary>
-/// 标记工具方法参数，对应 Java @ToolParam 注解
+/// Marks a tool method parameter, corresponding to the Java @ToolParam annotation.
+/// 标记工具方法参数，对应 Java @ToolParam 注解。
 /// </summary>
 [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false)]
 public class ToolParamAttribute : Attribute
 {
-    /// <summary>参数名称（默认使用参数名）</summary>
+    /// <summary>
+    /// Parameter name (defaults to the parameter name).
+    /// 参数名称（默认使用参数名）。
+    /// </summary>
     public string? Name { get; init; }
 
-    /// <summary>参数描述</summary>
+    /// <summary>
+    /// Parameter description for LLM consumption.
+    /// 参数描述，用于 LLM 理解参数含义。
+    /// </summary>
     public string? Description { get; init; }
 
-    /// <summary>是否必需</summary>
+    /// <summary>
+    /// Whether the parameter is required (default true).
+    /// 是否必需（默认为 true）。
+    /// </summary>
     public bool Required { get; init; } = true;
 }

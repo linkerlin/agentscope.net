@@ -23,19 +23,27 @@ using System.Threading.Tasks;
 namespace AgentScope.Core.Model;
 
 /// <summary>
-/// 用于测试和示例的模拟模型
+/// Mock model for testing and sample purposes — echoes back the last message content.
+/// 用于测试和示例的模拟模型——将最后一条消息的内容回显返回。
 /// </summary>
 public class MockModel : ModelBase, IStreamingChatModel
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MockModel"/> class.
+    /// 初始化 <see cref="MockModel"/> 类的新实例。
+    /// </summary>
+    /// <param name="modelName">Model name (default "mock-model") / 模型名称（默认为 "mock-model"）。</param>
     public MockModel(string modelName = "mock-model") : base(modelName)
     {
     }
 
+    /// <inheritdoc />
     public override IObservable<ModelResponse> Generate(ModelRequest request)
     {
         return Observable.FromAsync(() => GenerateAsync(request));
     }
 
+    /// <inheritdoc />
     public override Task<ModelResponse> GenerateAsync(ModelRequest request)
     {
         var lastMessage = request.Messages.LastOrDefault();
@@ -55,6 +63,7 @@ public class MockModel : ModelBase, IStreamingChatModel
         return Task.FromResult(response);
     }
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
         List<AgentScope.Core.Message.Msg> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -62,6 +71,8 @@ public class MockModel : ModelBase, IStreamingChatModel
         cancellationToken.ThrowIfCancellationRequested();
 
         var response = await GenerateAsync(new ModelRequest { Messages = messages }).ConfigureAwait(false);
+        // 将非流式响应包装为单元素流式响应
+        // Wrap the non-streaming response as a single-element streaming response
         yield return new ChatResponse
         {
             Success = response.Success,
@@ -74,6 +85,10 @@ public class MockModel : ModelBase, IStreamingChatModel
         };
     }
 
+    /// <summary>
+    /// Creates a new <see cref="MockModelBuilder"/> for fluent construction.
+    /// 创建新的 <see cref="MockModelBuilder"/> 以支持流畅构建。
+    /// </summary>
     public static MockModelBuilder Builder()
     {
         return new MockModelBuilder();
@@ -81,18 +96,30 @@ public class MockModel : ModelBase, IStreamingChatModel
 }
 
 /// <summary>
-/// MockModel 构建器
+/// Fluent builder for <see cref="MockModel"/>.
+/// MockModel 的流畅构建器。
 /// </summary>
 public class MockModelBuilder
 {
     private string _modelName = "mock-model";
 
+    /// <summary>
+    /// Sets the model name.
+    /// 设置模型名称。
+    /// </summary>
+    /// <param name="name">Model name / 模型名称。</param>
+    /// <returns>This builder instance for chaining / 当前构建器实例以支持链式调用。</returns>
     public MockModelBuilder ModelName(string name)
     {
         _modelName = name;
         return this;
     }
 
+    /// <summary>
+    /// Builds the <see cref="MockModel"/> instance.
+    /// 构建 <see cref="MockModel"/> 实例。
+    /// </summary>
+    /// <returns>A new <see cref="MockModel"/> instance / 新的 <see cref="MockModel"/> 实例。</returns>
     public MockModel Build()
     {
         return new MockModel(_modelName);

@@ -19,8 +19,17 @@ using System.Threading.Tasks;
 
 namespace AgentScope.Core.Tests.Session;
 
+/// <summary>
+/// Unit tests for the <see cref="Core.Session.Session"/> entity, verifying construction, property accessors,
+/// context/metadata operations, and status transitions.
+/// 对 <see cref="Core.Session.Session"/> 实体的单元测试，验证构造、属性访问器、上下文/元数据操作以及状态转换。
+/// </summary>
 public class SessionTests
 {
+    /// <summary>
+    /// Tests that the default constructor initializes all properties with sensible defaults.
+    /// 测试默认构造函数是否使用合理的默认值初始化所有属性。
+    /// </summary>
     [Fact]
     public void Session_DefaultConstructor_ShouldInitializeProperties()
     {
@@ -38,6 +47,10 @@ public class SessionTests
         Assert.NotNull(session.Context);
     }
 
+    /// <summary>
+    /// Tests that a session created with a custom name uses the provided name.
+    /// 测试使用自定义名称创建的会话是否使用了提供的名称。
+    /// </summary>
     [Fact]
     public void Session_WithCustomName_ShouldUseProvidedName()
     {
@@ -51,6 +64,10 @@ public class SessionTests
         Assert.Equal(name, session.Name);
     }
 
+    /// <summary>
+    /// Tests that a session created with a custom ID uses the provided ID.
+    /// 测试使用自定义 ID 创建的会话是否使用了提供的 ID。
+    /// </summary>
     [Fact]
     public void Session_WithCustomId_ShouldUseProvidedId()
     {
@@ -64,6 +81,10 @@ public class SessionTests
         Assert.Equal(id, session.Id);
     }
 
+    /// <summary>
+    /// Tests that calling <see cref="Core.Session.Session.Touch"/> advances the UpdatedAt timestamp.
+    /// 测试调用 <see cref="Core.Session.Session.Touch"/> 是否更新了 UpdatedAt 时间戳。
+    /// </summary>
     [Fact]
     public void Session_Touch_ShouldUpdateTimestamp()
     {
@@ -71,7 +92,7 @@ public class SessionTests
         var session = new Core.Session.Session();
         var originalTime = session.UpdatedAt;
         
-        // Wait a bit to ensure time difference
+        // 等待一点时间以确保时间差异
         System.Threading.Thread.Sleep(10);
 
         // Act
@@ -81,6 +102,10 @@ public class SessionTests
         Assert.True(session.UpdatedAt > originalTime);
     }
 
+    /// <summary>
+    /// Tests that context values can be stored and retrieved correctly.
+    /// 测试上下文值能否正确存储和读取。
+    /// </summary>
     [Fact]
     public void Session_SetAndGetContext_ShouldWorkCorrectly()
     {
@@ -97,6 +122,10 @@ public class SessionTests
         Assert.Equal(value, retrieved);
     }
 
+    /// <summary>
+    /// Tests that retrieving a context value with the wrong type returns default(T).
+    /// 测试使用错误类型读取上下文值时是否返回 default(T)。
+    /// </summary>
     [Fact]
     public void Session_GetContext_WithWrongType_ShouldReturnDefault()
     {
@@ -111,6 +140,10 @@ public class SessionTests
         Assert.Equal(0, result);
     }
 
+    /// <summary>
+    /// Tests that metadata values can be stored and retrieved correctly.
+    /// 测试元数据值能否正确存储和读取。
+    /// </summary>
     [Fact]
     public void Session_SetAndGetMetadata_ShouldWorkCorrectly()
     {
@@ -127,6 +160,10 @@ public class SessionTests
         Assert.Equal(value, retrieved);
     }
 
+    /// <summary>
+    /// Tests that <see cref="Core.Session.Session.SetContext"/> automatically touches the session (updates UpdatedAt).
+    /// 测试 <see cref="Core.Session.Session.SetContext"/> 是否自动更新会话的 UpdatedAt 时间戳。
+    /// </summary>
     [Fact]
     public void Session_SetContext_ShouldTouchSession()
     {
@@ -142,6 +179,10 @@ public class SessionTests
         Assert.True(session.UpdatedAt > originalTime);
     }
 
+    /// <summary>
+    /// Tests that the AgentName property can be set and read back.
+    /// 测试 AgentName 属性能否正确设置和读取。
+    /// </summary>
     [Fact]
     public void Session_AgentName_ShouldBeSettable()
     {
@@ -156,6 +197,10 @@ public class SessionTests
         Assert.Equal(agentName, session.AgentName);
     }
 
+    /// <summary>
+    /// Tests that the Status property can be changed to a different <see cref="SessionStatus"/>.
+    /// 测试 Status 属性能否切换到不同的 <see cref="SessionStatus"/> 值。
+    /// </summary>
     [Fact]
     public void Session_Status_ShouldBeChangeable()
     {
@@ -170,8 +215,17 @@ public class SessionTests
     }
 }
 
+/// <summary>
+/// Unit tests for the <see cref="SessionManager"/> class, verifying full lifecycle management
+/// including creation, retrieval, deletion, switching, filtering, and thread safety.
+/// 对 <see cref="SessionManager"/> 类的单元测试，验证包括创建、检索、删除、切换、筛选和线程安全的完整生命周期管理。
+/// </summary>
 public class SessionManagerTests
 {
+    /// <summary>
+    /// Tests that <see cref="SessionManager.CreateSession()"/> returns a new session and sets it as current.
+    /// 测试 <see cref="SessionManager.CreateSession()"/> 返回新会话并将其设为当前会话。
+    /// </summary>
     [Fact]
     public void SessionManager_CreateSession_ShouldReturnNewSession()
     {
@@ -187,6 +241,10 @@ public class SessionManagerTests
         Assert.Equal(session, manager.CurrentSession);
     }
 
+    /// <summary>
+    /// Tests that a session created with a custom name retains that name.
+    /// 测试使用自定义名称创建的会话是否保留了该名称。
+    /// </summary>
     [Fact]
     public void SessionManager_CreateSession_WithName_ShouldUseProvidedName()
     {
@@ -201,6 +259,10 @@ public class SessionManagerTests
         Assert.Equal(name, session.Name);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.GetSession"/> retrieves an existing session by ID.
+    /// 测试 <see cref="SessionManager.GetSession"/> 能否通过 ID 检索到已存在的会话。
+    /// </summary>
     [Fact]
     public void SessionManager_GetSession_ShouldReturnExistingSession()
     {
@@ -215,6 +277,10 @@ public class SessionManagerTests
         Assert.Equal(session, retrieved);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.GetSession"/> returns null for an unknown ID.
+    /// 测试 <see cref="SessionManager.GetSession"/> 对未知 ID 是否返回 null。
+    /// </summary>
     [Fact]
     public void SessionManager_GetSession_WithInvalidId_ShouldReturnNull()
     {
@@ -228,6 +294,10 @@ public class SessionManagerTests
         Assert.Null(retrieved);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.DeleteSession"/> removes the session and updates state.
+    /// 测试 <see cref="SessionManager.DeleteSession"/> 是否移除会话并更新状态。
+    /// </summary>
     [Fact]
     public void SessionManager_DeleteSession_ShouldRemoveSession()
     {
@@ -246,6 +316,10 @@ public class SessionManagerTests
         Assert.Equal(SessionStatus.Closed, session.Status);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.DeleteSession"/> returns false for an unknown ID.
+    /// 测试 <see cref="SessionManager.DeleteSession"/> 对未知 ID 是否返回 false。
+    /// </summary>
     [Fact]
     public void SessionManager_DeleteSession_WithInvalidId_ShouldReturnFalse()
     {
@@ -259,6 +333,10 @@ public class SessionManagerTests
         Assert.False(deleted);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.SwitchSession"/> changes the current session.
+    /// 测试 <see cref="SessionManager.SwitchSession"/> 是否切换当前会话。
+    /// </summary>
     [Fact]
     public void SessionManager_SwitchSession_ShouldChangeCurrentSession()
     {
@@ -275,6 +353,10 @@ public class SessionManagerTests
         Assert.Equal(session1, manager.CurrentSession);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.GetAllSessions"/> returns all created sessions.
+    /// 测试 <see cref="SessionManager.GetAllSessions"/> 是否返回所有已创建的会话。
+    /// </summary>
     [Fact]
     public void SessionManager_GetAllSessions_ShouldReturnAllSessions()
     {
@@ -291,6 +373,10 @@ public class SessionManagerTests
         Assert.Equal(3, sessions.Count);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.GetActiveSessions"/> excludes paused sessions.
+    /// 测试 <see cref="SessionManager.GetActiveSessions"/> 是否排除了暂停的会话。
+    /// </summary>
     [Fact]
     public void SessionManager_GetActiveSessions_ShouldReturnOnlyActiveSessions()
     {
@@ -308,6 +394,10 @@ public class SessionManagerTests
         Assert.Equal(session2.Id, activeSessions[0].Id);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.ClearSessions"/> removes all sessions and resets current.
+    /// 测试 <see cref="SessionManager.ClearSessions"/> 是否移除所有会话并重置当前会话。
+    /// </summary>
     [Fact]
     public void SessionManager_ClearSessions_ShouldRemoveAllSessions()
     {
@@ -325,6 +415,10 @@ public class SessionManagerTests
         Assert.Null(manager.CurrentSession);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.SessionExists"/> returns true only for known IDs.
+    /// 测试 <see cref="SessionManager.SessionExists"/> 是否仅对已知 ID 返回 true。
+    /// </summary>
     [Fact]
     public void SessionManager_SessionExists_ShouldReturnCorrectValue()
     {
@@ -337,6 +431,10 @@ public class SessionManagerTests
         Assert.False(manager.SessionExists("invalid-id"));
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.PauseSession"/> changes the session status to Paused.
+    /// 测试 <see cref="SessionManager.PauseSession"/> 是否将会话状态改为 Paused。
+    /// </summary>
     [Fact]
     public void SessionManager_PauseSession_ShouldChangeStatus()
     {
@@ -352,6 +450,10 @@ public class SessionManagerTests
         Assert.Equal(SessionStatus.Paused, session.Status);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.ResumeSession"/> changes the session status back to Active.
+    /// 测试 <see cref="SessionManager.ResumeSession"/> 是否将会话状态恢复为 Active。
+    /// </summary>
     [Fact]
     public void SessionManager_ResumeSession_ShouldChangeStatus()
     {
@@ -368,6 +470,10 @@ public class SessionManagerTests
         Assert.Equal(SessionStatus.Active, session.Status);
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager.GetSessionsByAgent"/> correctly filters sessions by agent name.
+    /// 测试 <see cref="SessionManager.GetSessionsByAgent"/> 是否按 agent 名称正确筛选会话。
+    /// </summary>
     [Fact]
     public void SessionManager_GetSessionsByAgent_ShouldReturnFilteredSessions()
     {
@@ -386,6 +492,10 @@ public class SessionManagerTests
         Assert.All(sessions, s => Assert.Equal(agentName, s.AgentName));
     }
 
+    /// <summary>
+    /// Tests that <see cref="SessionManager"/> handles concurrent session creation correctly (thread safety).
+    /// 测试 <see cref="SessionManager"/> 能否正确处理并发的会话创建（线程安全性）。
+    /// </summary>
     [Fact]
     public async Task SessionManager_ConcurrentAccess_ShouldBeThreadSafe()
     {

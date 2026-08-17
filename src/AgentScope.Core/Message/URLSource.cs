@@ -15,19 +15,26 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// URL 媒体来源，表示由 URL 指向的媒体内容
+/// URL media source, representing media content referenced by a URL.
+/// URL 媒体来源，表示由 URL 指向的媒体内容。
 /// </summary>
 public record URLSource : Source
 {
+    /// <summary>
+    /// Gets the source type identifier, always "url".
+    /// 获取来源类型标识，固定为 "url"。
+    /// </summary>
     public override string Type => "url";
 
     /// <summary>
-    /// 媒体资源 URL 地址
+    /// Gets or sets the URL address of the media resource.
+    /// 获取或设置媒体资源的 URL 地址。
     /// </summary>
     public required string Url { get; set; }
 
     /// <summary>
-    /// 媒体 MIME 类型（可选）
+    /// Gets or sets the optional MIME type of the media (e.g., "image/png", "audio/mp3").
+    /// 获取或设置媒体的可选 MIME 类型（例如 "image/png"、"audio/mp3"）。
     /// </summary>
     public string? MimeType { get; set; }
 }

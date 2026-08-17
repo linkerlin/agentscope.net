@@ -29,9 +29,18 @@ namespace AgentScope.Extensions.Channel.Feishu;
 /// </remarks>
 public sealed class FeishuCrypto
 {
+    /// <summary>Raw encrypt key string for signature calculation / 用于签名计算的原始加密密钥字符串</summary>
     private readonly string _encryptKey;
-    private readonly byte[] _aesKey; // 32 bytes (SHA-256 of encryptKey)
 
+    /// <summary>AES key derived from SHA-256 of encryptKey (32 bytes) / 从 encryptKey 的 SHA-256 派生的 AES 密钥（32 字节）</summary>
+    private readonly byte[] _aesKey;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FeishuCrypto"/> class.
+    /// 初始化 <see cref="FeishuCrypto"/> 类的新实例。
+    /// </summary>
+    /// <param name="encryptKey">The encrypt key configured in Feishu developer console / 飞书开发者后台配置的加密密钥</param>
+    /// <exception cref="ArgumentException">Thrown when encryptKey is null or whitespace / 当 encryptKey 为 null 或空白时抛出</exception>
     public FeishuCrypto(string encryptKey)
     {
         if (string.IsNullOrWhiteSpace(encryptKey))
@@ -43,9 +52,16 @@ public sealed class FeishuCrypto
     }
 
     /// <summary>
+    /// Verifies the SHA-256 signature: <c>hex(SHA-256(timestamp + nonce + encryptKey + body))</c>.
+    /// Returns false if any parameter is null or the digest does not match.
     /// 校验 SHA-256 签名：<c>hex(SHA-256(timestamp + nonce + encryptKey + body))</c>。
     /// 任一参数为 null 或摘要不匹配时返回 false。
     /// </summary>
+    /// <param name="signature">The signature from X-Lark-Signature header / X-Lark-Signature 请求头中的签名</param>
+    /// <param name="timestamp">The timestamp from X-Lark-Request-Timestamp header / X-Lark-Request-Timestamp 请求头中的时间戳</param>
+    /// <param name="nonce">The nonce from X-Lark-Request-Nonce header / X-Lark-Request-Nonce 请求头中的随机数</param>
+    /// <param name="body">The raw request body / 原始请求体</param>
+    /// <returns>True if the signature is valid, false otherwise / 签名有效时返回 true，否则返回 false</returns>
     public bool VerifySignature(string? signature, string? timestamp, string? nonce, string? body)
     {
         if (signature is null || timestamp is null || nonce is null || body is null)
@@ -63,9 +79,14 @@ public sealed class FeishuCrypto
     }
 
     /// <summary>
+    /// Decrypts the Feishu callback <c>encrypt</c> field, returning the UTF-8 JSON plaintext.
+    /// Layout: <c>| 16-byte IV | AES-256-CBC + PKCS#7 padded plaintext |</c>.
     /// 解密飞书回调的 <c>encrypt</c> 字段，返回 JSON 明文的 UTF-8 字符串。
     /// 布局：<c>| 16 字节 IV | AES-256-CBC + PKCS#7 填充明文 |</c>。
     /// </summary>
+    /// <param name="encryptBase64">The base64-encoded encrypted payload / Base64 编码的加密负载</param>
+    /// <returns>Decrypted UTF-8 JSON string / 解密后的 UTF-8 JSON 字符串</returns>
+    /// <exception cref="InvalidOperationException">Thrown when decryption fails / 解密失败时抛出</exception>
     public string Decrypt(string encryptBase64)
     {
         byte[] cipherBytes;
@@ -105,6 +126,12 @@ public sealed class FeishuCrypto
         }
     }
 
+    /// <summary>
+    /// Removes PKCS#7 padding from decrypted byte array.
+    /// 从解密后的字节数组中移除 PKCS#7 填充。
+    /// </summary>
+    /// <param name="input">Decrypted data with PKCS#7 padding / 含 PKCS#7 填充的解密数据</param>
+    /// <returns>Unpadded byte array / 移除填充后的字节数组</returns>
     private static byte[] Pkcs7Unpad(byte[] input)
     {
         if (input.Length == 0)
@@ -121,11 +148,24 @@ public sealed class FeishuCrypto
         return result;
     }
 
+    /// <summary>
+    /// Converts byte array to lowercase hexadecimal string.
+    /// 将字节数组转换为小写十六进制字符串。
+    /// </summary>
+    /// <param name="bytes">Input byte array / 输入字节数组</param>
+    /// <returns>Lowercase hex string / 小写十六进制字符串</returns>
     private static string ToHexLower(byte[] bytes)
     {
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
+    /// <summary>
+    /// Compares two strings in constant time to prevent timing attacks.
+    /// 以常量时间比较两个字符串，防止时序攻击。
+    /// </summary>
+    /// <param name="a">First string / 第一个字符串</param>
+    /// <param name="b">Second string / 第二个字符串</param>
+    /// <returns>True if both strings are equal, false otherwise / 两字符串相等时返回 true，否则 false</returns>
     private static bool ConstantTimeEquals(string? a, string? b)
     {
         if (a is null || b is null)

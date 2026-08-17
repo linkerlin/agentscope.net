@@ -31,10 +31,28 @@ namespace AgentScope.Uno;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    /// <summary>
+    /// Agent 实例引用
+    /// Agent instance reference
+    /// </summary>
     private ReActAgent? _agent;
+
+    /// <summary>
+    /// 记忆存储实例
+    /// Memory storage instance
+    /// </summary>
     private IMemory? _memory;
+
+    /// <summary>
+    /// 聊天消息集合（用于 UI 绑定）
+    /// Chat message collection (for UI binding)
+    /// </summary>
     private ObservableCollection<ChatMessage> _messages;
 
+    /// <summary>
+    /// 初始化主窗口并初始化 Agent
+    /// Initializes the main window and initializes the agent
+    /// </summary>
     public MainWindow()
     {
         this.InitializeComponent();
@@ -46,6 +64,10 @@ public sealed partial class MainWindow : Window
         InitializeAgent();
     }
 
+    /// <summary>
+    /// 初始化 Agent - 创建内存存储、配置模型并构建 Agent
+    /// Initializes the agent - creates memory storage, configures model and builds the agent
+    /// </summary>
     private void InitializeAgent()
     {
         try
@@ -74,11 +96,23 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 发送按钮点击事件处理
+    /// Send button click event handler
+    /// </summary>
+    /// <param name="sender">事件发送者 / Event sender</param>
+    /// <param name="e">路由事件参数 / Routed event arguments</param>
     private async void SendButton_Click(object sender, RoutedEventArgs e)
     {
         await SendMessageAsync();
     }
 
+    /// <summary>
+    /// 输入框按键事件处理（支持 Enter 键发送）
+    /// Input box key down event handler (supports Enter key to send)
+    /// </summary>
+    /// <param name="sender">事件发送者 / Event sender</param>
+    /// <param name="e">按键路由事件参数 / Key routed event arguments</param>
     private async void InputBox_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
         if (e.Key == Windows.System.VirtualKey.Enter)
@@ -88,6 +122,10 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 发送消息 - 创建用户消息、调用 Agent 并显示响应
+    /// Sends a message - creates user message, calls agent and displays response
+    /// </summary>
     private async Task SendMessageAsync()
     {
         var input = InputBox.Text?.Trim();
@@ -132,6 +170,11 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 添加用户消息到聊天列表
+    /// Adds a user message to the chat list
+    /// </summary>
+    /// <param name="text">消息文本 / Message text</param>
     private void AddUserMessage(string text)
     {
         _messages.Add(new ChatMessage
@@ -143,6 +186,11 @@ public sealed partial class MainWindow : Window
         ScrollToBottom();
     }
 
+    /// <summary>
+    /// 添加助手响应消息到聊天列表
+    /// Adds an assistant response message to the chat list
+    /// </summary>
+    /// <param name="text">响应文本 / Response text</param>
     private void AddAssistantMessage(string text)
     {
         _messages.Add(new ChatMessage
@@ -154,6 +202,11 @@ public sealed partial class MainWindow : Window
         ScrollToBottom();
     }
 
+    /// <summary>
+    /// 添加系统消息到聊天列表
+    /// Adds a system message to the chat list
+    /// </summary>
+    /// <param name="text">系统消息文本 / System message text</param>
     private void AddSystemMessage(string text)
     {
         _messages.Add(new ChatMessage
@@ -165,6 +218,10 @@ public sealed partial class MainWindow : Window
         ScrollToBottom();
     }
 
+    /// <summary>
+    /// 滚动聊天列表到底部以显示最新消息
+    /// Scrolls the chat list to the bottom to show the latest message
+    /// </summary>
     private void ScrollToBottom()
     {
         if (ChatListView.Items.Count > 0)
@@ -181,8 +238,27 @@ public sealed partial class MainWindow : Window
 /// </summary>
 public class ChatMessage
 {
+    /// <summary>
+    /// 消息角色（用户/助手/系统）
+    /// Message role (User/Assistant/System)
+    /// </summary>
     public string Role { get; set; } = "";
+
+    /// <summary>
+    /// 消息内容
+    /// Message content
+    /// </summary>
     public string Content { get; set; } = "";
+
+    /// <summary>
+    /// 消息时间戳
+    /// Message timestamp
+    /// </summary>
     public DateTime Timestamp { get; set; }
+
+    /// <summary>
+    /// 格式化的时间字符串（HH:mm:ss）
+    /// Formatted time string (HH:mm:ss)
+    /// </summary>
     public string TimeString => Timestamp.ToString("HH:mm:ss");
 }

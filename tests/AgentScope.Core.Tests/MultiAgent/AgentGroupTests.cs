@@ -8,9 +8,17 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.MultiAgent;
 
+/// <summary>
+/// Tests for <see cref="AgentGroup"/> with various distribution strategies.
+/// 对 AgentGroup 在不同分发策略下的测试。
+/// </summary>
 public class AgentGroupTests
 {
     [Fact]
+    /// <summary>
+    /// Tests that the constructor with a name sets the group name and initializes count to zero.
+    /// 测试带名称的构造函数设置了组名称并将计数初始化为零。
+    /// </summary>
     public void Constructor_WithName_SetsName()
     {
         // Arrange & Act
@@ -22,6 +30,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that a valid agent is added to the group successfully.
+    /// 测试有效的代理被成功添加到组中。
+    /// </summary>
     public void AddAgent_WithValidAgent_AddsSuccessfully()
     {
         // Arrange
@@ -37,6 +49,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that adding a null agent throws <see cref="ArgumentNullException"/>.
+    /// 测试添加 null 代理时抛出 ArgumentNullException。
+    /// </summary>
     public void AddAgent_WithNullAgent_ThrowsArgumentNullException()
     {
         // Arrange
@@ -47,6 +63,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that adding a duplicate agent returns false.
+    /// 测试添加重复代理时返回 false。
+    /// </summary>
     public void AddAgent_DuplicateAgent_ReturnsFalse()
     {
         // Arrange
@@ -62,6 +82,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that an existing agent is removed successfully.
+    /// 测试已存在的代理被成功移除。
+    /// </summary>
     public void RemoveAgent_ExistingAgent_RemovesSuccessfully()
     {
         // Arrange
@@ -78,6 +102,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that removing a non-existent agent returns false.
+    /// 测试移除不存在的代理时返回 false。
+    /// </summary>
     public void RemoveAgent_NonExistingAgent_ReturnsFalse()
     {
         // Arrange
@@ -91,6 +119,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that broadcasting a message to multiple agents returns all responses.
+    /// 测试向多个代理广播消息时返回所有响应。
+    /// </summary>
     public async Task BroadcastAsync_MultipleAgents_ReturnsAllResponses()
     {
         // Arrange
@@ -110,6 +142,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that round-robin distribution cycles through agents sequentially.
+    /// 测试轮询分发策略按顺序循环选择代理。
+    /// </summary>
     public async Task CallAsync_RoundRobin_CyclesThroughAgents()
     {
         // Arrange
@@ -129,6 +165,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that random distribution selects an agent and returns a response.
+    /// 测试随机分发策略选择一个代理并返回响应。
+    /// </summary>
     public async Task CallAsync_Random_ReturnsResponse()
     {
         // Arrange
@@ -147,6 +187,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that load-based distribution selects the least busy agent.
+    /// 测试基于负载的分发策略选择最不繁忙的代理。
+    /// </summary>
     public async Task CallAsync_LoadBased_SelectsLeastBusy()
     {
         // Arrange
@@ -164,6 +208,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that calling an empty group returns an error message.
+    /// 测试调用空组时返回错误消息。
+    /// </summary>
     public async Task CallAsync_EmptyGroup_ReturnsErrorMessage()
     {
         // Arrange
@@ -178,6 +226,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that load statistics are returned correctly for registered agents.
+    /// 测试已注册代理的负载统计信息被正确返回。
+    /// </summary>
     public void GetLoadStatistics_WithAgents_ReturnsStats()
     {
         // Arrange
@@ -193,6 +245,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that <see cref="AgentGroup.AgentNames"/> returns all registered agent names.
+    /// 测试 AgentNames 属性返回所有已注册的代理名称。
+    /// </summary>
     public void AgentNames_WithMultipleAgents_ReturnsAllNames()
     {
         // Arrange
@@ -208,6 +264,10 @@ public class AgentGroupTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that disposing the group clears all agents.
+    /// 测试释放组时清除所有代理。
+    /// </summary>
     public void Dispose_ClearsAllAgents()
     {
         // Arrange
@@ -222,17 +282,33 @@ public class AgentGroupTests
         Assert.Equal(0, group.Count);
     }
 
+    /// <summary>
+    /// A stub <see cref="IAgent"/> implementation for testing purposes.
+    /// 用于测试的存根 IAgent 实现。
+    /// </summary>
     private class TestAgent : IAgent
     {
         private readonly string _name;
 
+        /// <summary>
+        /// Initializes the test agent with an optional name.
+        /// 使用可选名称初始化测试代理。
+        /// </summary>
         public TestAgent(string? name = null)
         {
             _name = name ?? $"TestAgent_{GetHashCode()}";
         }
 
+        /// <summary>
+        /// Gets the agent name.
+        /// 获取代理名称。
+        /// </summary>
         public string Name => _name;
 
+        /// <summary>
+        /// Synchronously returns a response via observable.
+        /// 通过可观察对象同步返回响应。
+        /// </summary>
         public System.IObservable<Msg> Call(Msg message)
         {
             return System.Reactive.Linq.Observable.Return(Msg.Builder()
@@ -242,6 +318,10 @@ public class AgentGroupTests
                 .Build());
         }
 
+        /// <summary>
+        /// Asynchronously returns a response.
+        /// 异步返回响应。
+        /// </summary>
         public Task<Msg> CallAsync(Msg message)
         {
             return Task.FromResult(Msg.Builder()

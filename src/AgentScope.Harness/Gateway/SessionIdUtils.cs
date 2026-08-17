@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -21,14 +22,27 @@ public static class SessionIdUtils
 {
     private const char Sep = '/';
 
-    /// <summary>组合会话ID。</summary>
+    /// <summary>
+    /// 组合用户、渠道、线程三元组为稳定会话 ID。
+    /// Compose a stable session ID from the user, channel, and thread triple.
+    /// </summary>
+    /// <param name="userId">用户 ID / The user ID.</param>
+    /// <param name="channelId">渠道 ID / The channel ID.</param>
+    /// <param name="threadId">线程 ID / The thread ID.</param>
+    /// <returns>组合后的会话 ID / The composed session ID.</returns>
+    /// <exception cref="ArgumentException">userId 为空或空白时抛出 / Thrown when userId is null or whitespace.</exception>
     public static string Compose(string userId, string channelId, string threadId)
     {
         if (string.IsNullOrWhiteSpace(userId)) throw new ArgumentException("userId 必填", nameof(userId));
         return $"{userId}{Sep}{channelId ?? ""}{Sep}{threadId ?? ""}";
     }
 
-    /// <summary>尝试解析会话ID为三元组。</summary>
+    /// <summary>
+    /// 将会话 ID 解析为用户、渠道、线程三元组。
+    /// Parse a session ID into the user, channel, and thread triple.
+    /// </summary>
+    /// <param name="sessionId">会话 ID / The session ID.</param>
+    /// <returns>解析后的三元组 / The parsed triple.</returns>
     public static (string UserId, string ChannelId, string ThreadId) Parse(string sessionId)
     {
         if (string.IsNullOrEmpty(sessionId)) return ("", "", "");
@@ -39,6 +53,10 @@ public static class SessionIdUtils
             parts.Length > 2 ? parts[2] : "");
     }
 
-    /// <summary>生成默认会话ID（基于 GUID）。</summary>
+    /// <summary>
+    /// 生成基于 GUID 的默认会话 ID。
+    /// Generate a default session ID based on a GUID.
+    /// </summary>
+    /// <returns>新的会话 ID / A new session ID.</returns>
     public static string NewId() => Guid.NewGuid().ToString("N");
 }

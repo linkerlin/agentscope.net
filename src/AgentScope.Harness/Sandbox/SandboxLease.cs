@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -15,6 +16,7 @@ namespace AgentScope.Harness.Sandbox;
 
 /// <summary>
 /// 沙箱租约：带过期时间的沙箱持有权，到期自动释放（防止泄漏）。
+/// Sandbox lease: time-bound sandbox ownership that auto-releases on expiry (prevents leaks).
 /// 对应 Java: io.agentscope.harness.agent.sandbox.SandboxLease
 /// </summary>
 public sealed class SandboxLease : IDisposable
@@ -23,17 +25,44 @@ public sealed class SandboxLease : IDisposable
     private readonly Action<SandboxLease>? _onExpire;
     private bool _disposed;
 
-    /// <summary>租约ID。</summary>
+    /// <summary>
+    /// 租约ID。
+    /// Lease ID.
+    /// </summary>
     public string LeaseId { get; }
-    /// <summary>沙箱ID。</summary>
+
+    /// <summary>
+    /// 沙箱ID。
+    /// Sandbox ID.
+    /// </summary>
     public string SandboxId { get; }
-    /// <summary>租约获取时间。</summary>
+
+    /// <summary>
+    /// 租约获取时间。
+    /// Lease acquisition time.
+    /// </summary>
     public DateTimeOffset AcquiredAt { get; }
-    /// <summary>租约有效期。</summary>
+
+    /// <summary>
+    /// 租约有效期。
+    /// Lease time-to-live.
+    /// </summary>
     public TimeSpan Ttl { get; }
-    /// <summary>是否已过期。</summary>
+
+    /// <summary>
+    /// 是否已过期。
+    /// Whether the lease has expired.
+    /// </summary>
     public bool IsExpired => DateTimeOffset.UtcNow >= AcquiredAt + Ttl;
 
+    /// <summary>
+    /// 创建沙箱租约。
+    /// Create a sandbox lease.
+    /// </summary>
+    /// <param name="leaseId">租约ID / Lease ID</param>
+    /// <param name="sandboxId">沙箱ID / Sandbox ID</param>
+    /// <param name="ttl">租约有效期 / Lease time-to-live</param>
+    /// <param name="onExpire">过期回调（可选） / Expiry callback (optional)</param>
     public SandboxLease(string leaseId, string sandboxId, TimeSpan ttl, Action<SandboxLease>? onExpire = null)
     {
         LeaseId = leaseId;
@@ -48,7 +77,11 @@ public sealed class SandboxLease : IDisposable
         }
     }
 
-    /// <summary>续租。</summary>
+    /// <summary>
+    /// 续租。
+    /// Renew the lease.
+    /// </summary>
+    /// <param name="additional">额外延长时间 / Additional time to extend</param>
     public void Renew(TimeSpan additional)
     {
         _timer?.Change(additional, Timeout.InfiniteTimeSpan);
@@ -60,6 +93,7 @@ public sealed class SandboxLease : IDisposable
         _onExpire?.Invoke(this);
     }
 
+    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed) return;

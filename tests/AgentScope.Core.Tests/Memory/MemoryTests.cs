@@ -22,8 +22,17 @@ using System.Threading.Tasks;
 
 namespace AgentScope.Core.Tests.Memory;
 
+/// <summary>
+/// Tests for <see cref="MemoryBase"/> covering add, get-recent, clear,
+/// and thread-safe concurrent access.
+/// <see cref="MemoryBase"/> 的添加、获取最近、清除以及线程安全并发访问测试。
+/// </summary>
 public class MemoryBaseTests
 {
+    /// <summary>
+    /// Verifies that adding a message stores it in memory.
+    /// 验证添加消息后该消息被存储在内存中。
+    /// </summary>
     [Fact]
     public void MemoryBase_Add_ShouldStoreMessage()
     {
@@ -39,6 +48,10 @@ public class MemoryBaseTests
         Assert.Contains(msg, memory.GetAll());
     }
 
+    /// <summary>
+    /// Verifies that <see cref="MemoryBase.GetRecent"/> returns the last N messages.
+    /// 验证 MemoryBase.GetRecent 返回最近的 N 条消息。
+    /// </summary>
     [Fact]
     public void MemoryBase_GetRecent_ShouldReturnLastMessages()
     {
@@ -57,6 +70,10 @@ public class MemoryBaseTests
         Assert.Contains("Message 4", recent.Last().GetTextContent());
     }
 
+    /// <summary>
+    /// Verifies that <see cref="MemoryBase.Clear"/> removes all stored messages.
+    /// 验证 MemoryBase.Clear 移除所有存储的消息。
+    /// </summary>
     [Fact]
     public void MemoryBase_Clear_ShouldRemoveAllMessages()
     {
@@ -72,6 +89,10 @@ public class MemoryBaseTests
         Assert.Equal(0, memory.Count());
     }
 
+    /// <summary>
+    /// Verifies that <see cref="MemoryBase"/> is thread-safe under concurrent access.
+    /// 验证 MemoryBase 在并发访问下是线程安全的。
+    /// </summary>
     [Fact]
     public async Task MemoryBase_ThreadSafe_ShouldHandleConcurrentAccess()
     {
@@ -98,15 +119,28 @@ public class MemoryBaseTests
     }
 }
 
+/// <summary>
+/// Tests for <see cref="SqliteMemory"/> covering persistence, search, get-recent,
+/// clear, and metadata operations.
+/// <see cref="SqliteMemory"/> 的持久化、搜索、获取最近、清除和元数据操作测试。
+/// </summary>
 public class SqliteMemoryTests : IDisposable
 {
     private readonly string _testDbPath;
 
+    /// <summary>
+    /// Initializes a new test instance with a unique temporary database file.
+    /// 使用唯一的临时数据库文件初始化新的测试实例。
+    /// </summary>
     public SqliteMemoryTests()
     {
         _testDbPath = Path.Combine(Path.GetTempPath(), $"test_memory_{Guid.NewGuid()}.db");
     }
 
+    /// <summary>
+    /// Cleans up the temporary database file after each test.
+    /// 每个测试后清理临时数据库文件。
+    /// </summary>
     public void Dispose()
     {
         if (File.Exists(_testDbPath))
@@ -117,11 +151,15 @@ public class SqliteMemoryTests : IDisposable
             }
             catch
             {
-                // Ignore cleanup errors
+                // 忽略清理错误
             }
         }
     }
 
+    /// <summary>
+    /// Verifies that a message added to <see cref="SqliteMemory"/> is persisted.
+    /// 验证添加到 SqliteMemory 的消息已被持久化。
+    /// </summary>
     [Fact]
     public void SqliteMemory_Add_ShouldPersistMessage()
     {
@@ -143,6 +181,10 @@ public class SqliteMemoryTests : IDisposable
         Assert.Equal("Test message", retrieved.GetTextContent());
     }
 
+    /// <summary>
+    /// Verifies that messages survive a dispose-and-recreate cycle (persistence).
+    /// 验证消息在释放和重新创建周期后仍然存在（持久化）。
+    /// </summary>
     [Fact]
     public void SqliteMemory_Persistence_ShouldLoadAfterRestart()
     {
@@ -164,6 +206,10 @@ public class SqliteMemoryTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Verifies that <see cref="SqliteMemory.SearchAsync"/> finds messages matching the query.
+    /// 验证 SqliteMemory.SearchAsync 找到与查询匹配的消息。
+    /// </summary>
     [Fact]
     public async Task SqliteMemory_SearchAsync_ShouldFindMatchingMessages()
     {
@@ -181,6 +227,10 @@ public class SqliteMemoryTests : IDisposable
         Assert.All(results, msg => Assert.Contains("world", msg.GetTextContent()));
     }
 
+    /// <summary>
+    /// Verifies that <see cref="SqliteMemory.GetRecent"/> returns the last N persisted messages.
+    /// 验证 SqliteMemory.GetRecent 返回最近的 N 条持久化消息。
+    /// </summary>
     [Fact]
     public void SqliteMemory_GetRecent_ShouldReturnLastMessages()
     {
@@ -199,6 +249,10 @@ public class SqliteMemoryTests : IDisposable
         Assert.Contains("Message 4", recent.Last().GetTextContent());
     }
 
+    /// <summary>
+    /// Verifies that <see cref="SqliteMemory.Clear"/> removes all persisted messages.
+    /// 验证 SqliteMemory.Clear 移除所有持久化消息。
+    /// </summary>
     [Fact]
     public void SqliteMemory_Clear_ShouldRemoveAllMessages()
     {

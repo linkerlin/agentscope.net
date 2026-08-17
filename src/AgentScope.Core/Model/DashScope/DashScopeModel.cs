@@ -34,13 +34,22 @@ namespace AgentScope.Core.Model.DashScope;
 
 /// <summary>
 /// DashScope (Aliyun Qwen) Model using native HTTP API.
-/// 通义千问模型
-/// 
+/// 通义千问（DashScope）模型，通过原生 HTTP API 调用。
+///
 /// Java参考: io.agentscope.core.model.DashScopeChatModel
 /// </summary>
 public class DashScopeModel : ModelBase, IStreamingChatModel
 {
+    /// <summary>
+    /// Default base URL for DashScope API.
+    /// DashScope API 的默认基础地址。
+    /// </summary>
     public const string DefaultBaseUrl = "https://dashscope.aliyuncs.com";
+
+    /// <summary>
+    /// Chat completion API endpoint path (OpenAI-compatible mode).
+    /// 聊天补全 API 端点路径（OpenAI 兼容模式）。
+    /// </summary>
     public const string ChatEndpoint = "/compatible-mode/v1/chat/completions";
 
     private readonly HttpClient _httpClient;
@@ -51,8 +60,14 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
     private readonly GenerateOptions? _defaultOptions;
 
     /// <summary>
-    /// Creates a new DashScope model instance.
+    /// Create a new DashScope model instance.
+    /// 创建新的 DashScope 模型实例。
     /// </summary>
+    /// <param name="modelName">Model name / 模型名称</param>
+    /// <param name="apiKey">API key (optional, falls back to DASHSCOPE_API_KEY env var) / API 密钥（可选，未提供则读取环境变量 DASHSCOPE_API_KEY）</param>
+    /// <param name="baseUrl">Base URL (optional) / 基础地址（可选）</param>
+    /// <param name="formatter">Custom formatter (optional) / 自定义格式化器（可选）</param>
+    /// <param name="defaultOptions">Default generation options / 默认生成选项</param>
     public DashScopeModel(
         string modelName,
         string? apiKey = null,
@@ -66,7 +81,7 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
         _baseUrl = baseUrl;
         _formatter = formatter ?? new DashScopeChatFormatter(modelName);
         _defaultOptions = defaultOptions;
-        
+
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "AgentScope.NET/1.0");
     }
@@ -83,20 +98,22 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
         var messages = request.Messages;
         var options = MergeOptions(ConvertOptions(request.Options), _defaultOptions);
 
-        // Build request
+        // Convert messages to DashScope format and build request
+        // 将消息转换为 DashScope 格式并构建请求
         var dsMessages = Formatter.DashScope.DashScopeMessageConverter.Convert(messages);
         var dashscopeRequest = BuildRequest(_modelName, dsMessages, false, options);
 
-        // Serialize request
+        // Serialize request to JSON
+        // 将请求序列化为 JSON
         var json = JsonSerializer.Serialize(dashscopeRequest, DashScopeSerializerOptions.Default);
         var url = BuildUrl(_baseUrl, ChatEndpoint);
 
-        // Create HTTP request
+        // Build HTTP request with Bearer token
+        // 构建带有 Bearer 令牌的 HTTP 请求
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         httpRequest.Headers.TryAddWithoutValidation("Authorization", $"Bearer {GetApiKey(_apiKey)}");
         httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        // Send request
         var response = await _httpClient.SendAsync(httpRequest);
         var responseBody = await response.Content.ReadAsStringAsync();
 
@@ -105,7 +122,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
             throw new ModelException($"DashScope API error: {response.StatusCode} - {responseBody}");
         }
 
-        // Parse response
+        // Parse response JSON
+        // 解析响应 JSON
         var parsedResponse = ParseResponse(responseBody);
         if (parsedResponse == null)
         {
@@ -120,6 +138,10 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
         };
     }
 
+    /// <summary>
+    /// Build metadata dictionary from parsed response (tool calls, thinking content).
+    /// 从解析的响应构建元数据字典（工具调用、思考内容）。
+    /// </summary>
     private static Dictionary<string, object>? BuildMetadata(ParsedResponse parsedResponse)
     {
         if (parsedResponse.ToolCalls?.Count > 0 || !string.IsNullOrEmpty(parsedResponse.ThinkingContent))
@@ -139,8 +161,13 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
     }
 
     /// <summary>
-    /// Generate streaming response.
+    /// Generate streaming response using Server-Sent Events (SSE).
+    /// 使用 Server-Sent Events (SSE) 生成流式响应。
     /// </summary>
+    /// <param name="messages">List of messages / 消息列表</param>
+    /// <param name="options">Generation options / 生成选项</param>
+    /// <param name="cancellationToken">Cancellation token / 取消令牌</param>
+    /// <returns>Async enumerable of ChatResponse chunks / ChatResponse 块的异步可枚举序列</returns>
     public async IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
         List<Msg> messages,
         GenerateOptions? options = null,
@@ -149,23 +176,27 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
         var mergedOptions = MergeOptions(options, _defaultOptions);
         mergedOptions ??= new GenerateOptions();
 
-        // Build request
+        // Build streaming request
+        // 构建流式请求
         var dsMessages = Formatter.DashScope.DashScopeMessageConverter.Convert(messages);
         var dashscopeRequest = BuildRequest(_modelName, dsMessages, true, mergedOptions);
 
         // Serialize request
+        // 序列化请求
         var json = JsonSerializer.Serialize(dashscopeRequest, DashScopeSerializerOptions.Default);
         var url = BuildUrl(_baseUrl, ChatEndpoint);
 
-        // Create HTTP request
+        // Build HTTP request
+        // 构建 HTTP 请求
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         httpRequest.Headers.TryAddWithoutValidation("Authorization", $"Bearer {GetApiKey(_apiKey)}");
         httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        // Send request
+        // Send request with response headers read immediately for streaming
+        // 发送请求，立即读取响应头以启用流式处理
         var response = await _httpClient.SendAsync(
-            httpRequest, 
-            HttpCompletionOption.ResponseHeadersRead, 
+            httpRequest,
+            HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
 
         response.EnsureSuccessStatusCode();
@@ -179,6 +210,7 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
             if (string.IsNullOrWhiteSpace(line)) continue;
 
             // Parse SSE format: "data: {...}"
+            // 解析 SSE 格式："data: {...}"
             if (line.StartsWith("data: "))
             {
                 var data = line.Substring(6);
@@ -193,6 +225,10 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
         }
     }
 
+    /// <summary>
+    /// Generate streaming response with default options.
+    /// 使用默认选项生成流式响应。
+    /// </summary>
     public IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
         List<Msg> messages,
         CancellationToken cancellationToken = default)
@@ -201,7 +237,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
     }
 
     /// <summary>
-    /// Build DashScope request.
+    /// Build a DashScope API request with model, messages, streaming flag, and options.
+    /// 构建一个包含模型、消息、流标识和选项的 DashScope API 请求。
     /// </summary>
     private DashScopeRequest BuildRequest(string model, List<DashScopeMessage> messages, bool stream, GenerateOptions? options)
     {
@@ -211,7 +248,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
             IncrementalOutput = stream
         };
 
-        // Apply options
+        // Apply all configured options to parameters
+        // 将所有已配置的选项应用到参数中
         if (options != null)
         {
             if (options.Temperature.HasValue)
@@ -235,7 +273,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
             if (options.Stop?.Count > 0)
                 parameters.Stop = options.Stop;
 
-            // Apply tools
+            // Apply tool definitions if present
+            // 如果存在工具定义，则应用工具
             if (options.Tools?.Count > 0)
             {
                 parameters.Tools = options.Tools.Select(t => new DashScopeTool
@@ -245,12 +284,12 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
                     {
                         Name = t.Name,
                         Description = t.Description,
-                        Parameters = t.Parameters != null 
+                        Parameters = t.Parameters != null
                             ? new Dictionary<string, object>
                             {
                                 ["type"] = t.Parameters.Type,
                                 ["properties"] = t.Parameters.Properties?.ToDictionary(
-                                    p => p.Key, 
+                                    p => p.Key,
                                     p => (object)new { type = p.Value.Type, description = p.Value.Description }) ?? new Dictionary<string, object>(),
                                 ["required"] = t.Parameters.Required ?? new List<string>()
                             }
@@ -269,7 +308,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
     }
 
     /// <summary>
-    /// Parse JSON response string to ParsedResponse.
+    /// Parse a JSON response string into ParsedResponse.
+    /// 将 JSON 响应字符串解析为 ParsedResponse。
     /// </summary>
     private ParsedResponse? ParseResponse(string json)
     {
@@ -297,7 +337,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
                 ThinkingContent = message.ReasoningContent
             };
 
-            // Extract text content
+            // Extract text content - handles both string and list formats
+            // 提取文本内容 - 处理字符串和列表两种格式
             if (message.Content is string strContent)
             {
                 result.TextContent = strContent;
@@ -311,7 +352,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
                 result.TextContent = message.Content?.ToString() ?? "";
             }
 
-            // Extract tool calls
+            // Extract tool calls if present
+            // 提取工具调用（如果存在）
             if (message.ToolCalls?.Count > 0)
             {
                 result.ToolCalls = message.ToolCalls.Select(t => new ToolCall
@@ -335,7 +377,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
     }
 
     /// <summary>
-    /// Merge provided options with default options.
+    /// Merge provided options with default options, where provided values take precedence.
+    /// 将提供的选项与默认选项合并，提供的值优先。
     /// </summary>
     private GenerateOptions? MergeOptions(GenerateOptions? options, GenerateOptions? defaults)
     {
@@ -361,7 +404,8 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
     }
 
     /// <summary>
-    /// Convert Dictionary<string, object> to GenerateOptions.
+    /// Convert Dictionary&lt;string, object&gt; to GenerateOptions.
+    /// 将 Dictionary&lt;string, object&gt; 转换为 GenerateOptions。
     /// </summary>
     private GenerateOptions? ConvertOptions(Dictionary<string, object>? options)
     {
@@ -395,6 +439,7 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
 
     /// <summary>
     /// Convert ParsedResponse to ChatResponse.
+    /// 将 ParsedResponse 转换为 ChatResponse。
     /// </summary>
     private ChatResponse ConvertToChatResponse(ParsedResponse parsed)
     {
@@ -436,6 +481,7 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
 
     /// <summary>
     /// Build full URL from base URL and endpoint.
+    /// 根据基础地址和端点构建完整 URL。
     /// </summary>
     private static string BuildUrl(string? baseUrl, string endpoint)
     {
@@ -445,24 +491,30 @@ public class DashScopeModel : ModelBase, IStreamingChatModel
 
     /// <summary>
     /// Get API key from parameter or environment variable.
+    /// 从参数或环境变量获取 API 密钥。
     /// </summary>
     private static string GetApiKey(string? apiKey)
     {
         if (!string.IsNullOrEmpty(apiKey)) return apiKey;
-        
+
         var envKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
         if (!string.IsNullOrEmpty(envKey)) return envKey;
-        
+
         throw new ModelException(
             "DashScope API key not found. Please set DASHSCOPE_API_KEY environment variable or provide apiKey parameter.");
     }
 }
 
 /// <summary>
-/// Serializer options for DashScope API.
+/// JSON serializer options for DashScope API (snake_case naming, ignore null values).
+/// DashScope API 的 JSON 序列化选项（snake_case 命名，忽略空值）。
 /// </summary>
 public static class DashScopeSerializerOptions
 {
+    /// <summary>
+    /// Default serializer options: snake_case property naming, ignore null values.
+    /// 默认序列化选项：snake_case 属性命名，忽略空值。
+    /// </summary>
     public static readonly JsonSerializerOptions Default = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,

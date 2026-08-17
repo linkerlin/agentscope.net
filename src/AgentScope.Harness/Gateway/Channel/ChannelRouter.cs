@@ -1,3 +1,17 @@
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 using AgentScope.Core.Message;
 namespace AgentScope.Harness.Gateway.Channel;
 
@@ -11,7 +25,7 @@ public sealed class ChannelRouter
         _globalDefaultAgentId = globalDefaultAgentId;
     }
 
-    /// <summary>�?8 层优先级评估路由绑定，返回匹配结�?/summary>
+    /// <summary>按 8 层优先级评估路由绑定，返回匹配结果</summary>
     public RouteResult ResolveRoute(ChannelConfig config, InboundMessage msg)
     {
         var bindings = config.Bindings;
@@ -35,7 +49,7 @@ public sealed class ChannelRouter
                 return CreateResult(b.AgentId, "account", config, msg);
         }
 
-        // 回退：使用默�?agent
+        // 回退：使用默�?agent
         var agentId = msg.PreferredAgentId ?? config.DefaultAgentId;
         if (string.IsNullOrEmpty(agentId)) agentId = _globalDefaultAgentId;
         return CreateResult(agentId, "default", config, msg);

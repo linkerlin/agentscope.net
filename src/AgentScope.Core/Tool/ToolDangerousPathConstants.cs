@@ -17,12 +17,18 @@ using System.Collections.Generic;
 namespace AgentScope.Core.Tool;
 
 /// <summary>
+/// Dangerous path constants for tool safety: defines dangerous paths and keywords that require
+/// additional approval or denial for file/command tools.
 /// 工具危险路径常量：定义文件/命令类工具中需额外审批或拒绝的危险路径与关键字。
-/// 对应 Java: io.agentscope.core.tool.ToolDangerousPathConstants
+/// Corresponds to Java: io.agentscope.core.tool.ToolDangerousPathConstants
 /// </summary>
 public static class ToolDangerousPathConstants
 {
-    /// <summary>系统级危险目录前缀（写入/删除需审批）。</summary>
+    /// <summary>
+    /// System-level sensitive directory prefixes. Writing to or deleting files under these paths
+    /// requires additional approval.
+    /// 系统级危险目录前缀（写入/删除需审批）。
+    /// </summary>
     public static readonly IReadOnlyCollection<string> SystemSensitivePaths = new[]
     {
         "/etc", "/usr", "/bin", "/sbin", "/boot", "/proc", "/sys", "/dev",
@@ -30,24 +36,36 @@ public static class ToolDangerousPathConstants
         "/System", "/Library"
     };
 
-    /// <summary>敏感配置/密钥文件名（读写需审批）。</summary>
+    /// <summary>
+    /// Sensitive configuration/credential file names. Reading or writing these requires approval.
+    /// 敏感配置/密钥文件名（读写需审批）。
+    /// </summary>
     public static readonly IReadOnlyCollection<string> SensitiveFileNames = new[]
     {
         ".env", "id_rsa", "id_dsa", "id_ed25519", ".npmrc", ".pypirc", ".aws/credentials",
         "credentials", "secrets.json", ".git-credentials", ".netrc"
     };
 
-    /// <summary>危险命令关键字（Shell 执行需审批）。</summary>
+    /// <summary>
+    /// Dangerous command keywords. Shell execution containing these requires approval.
+    /// 危险命令关键字（Shell 执行需审批）。
+    /// </summary>
     public static readonly IReadOnlyCollection<string> DangerousCommandKeywords = new[]
     {
         "rm -rf", "mkfs", "dd if=", ":(){:|:&};:", "chmod -R", "shutdown", "reboot",
         "shutdown.exe", "format ", "del /f", "rmdir /s", "reg delete"
     };
 
-    /// <summary>判断路径是否落在系统敏感目录下。</summary>
+    /// <summary>
+    /// Checks whether the given path falls under any system-sensitive directory.
+    /// 判断路径是否落在系统敏感目录下。
+    /// </summary>
+    /// <param name="path">Path to check / 待检查的路径</param>
+    /// <returns>True if sensitive / 若在敏感目录内则返回 true</returns>
     public static bool IsSystemSensitive(string path)
     {
         if (string.IsNullOrEmpty(path)) return false;
+        // 统一路径分隔符为 /，便于跨平台前缀匹配
         var normalized = path.Replace('\\', '/').TrimEnd('/');
         foreach (var sensitive in SystemSensitivePaths)
         {
@@ -61,12 +79,18 @@ public static class ToolDangerousPathConstants
         return false;
     }
 
-    /// <summary>判断文件名是否为敏感密钥/凭据文件。</summary>
+    /// <summary>
+    /// Checks whether the file name matches any sensitive credential/secret file pattern.
+    /// 判断文件名是否为敏感密钥/凭据文件。
+    /// </summary>
+    /// <param name="fileName">File name to check / 待检查的文件名</param>
+    /// <returns>True if it is a sensitive file / 若是敏感文件则返回 true</returns>
     public static bool IsSensitiveFile(string fileName)
     {
         if (string.IsNullOrEmpty(fileName)) return false;
         foreach (var sensitive in SensitiveFileNames)
         {
+            // 子串匹配，可识别路径中的文件名部分
             if (fileName.IndexOf(sensitive, System.StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return true;
@@ -76,7 +100,12 @@ public static class ToolDangerousPathConstants
         return false;
     }
 
-    /// <summary>判断命令字符串是否包含危险关键字。</summary>
+    /// <summary>
+    /// Checks whether the command string contains any dangerous keyword.
+    /// 判断命令字符串是否包含危险关键字。
+    /// </summary>
+    /// <param name="command">Command string to check / 待检查的命令字符串</param>
+    /// <returns>True if dangerous content is found / 若包含危险内容则返回 true</returns>
     public static bool ContainsDangerousCommand(string command)
     {
         if (string.IsNullOrEmpty(command)) return false;

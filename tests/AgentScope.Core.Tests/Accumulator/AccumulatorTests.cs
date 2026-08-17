@@ -7,8 +7,16 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.Accumulator;
 
+/// <summary>
+/// Tests for Accumulator components (TextAccumulator, ThinkingAccumulator, ToolCallsAccumulator, ReasoningContext)
+/// 累加器组件测试（TextAccumulator、ThinkingAccumulator、ToolCallsAccumulator、ReasoningContext）
+/// </summary>
 public class AccumulatorTests
 {
+    /// <summary>
+    /// Tests that TextAccumulator accumulates text blocks and returns merged result, and Reset clears state.
+    /// 测试 TextAccumulator 累加文本块并返回合并结果，Reset 清除状态。
+    /// </summary>
     [Fact]
     public void TextAccumulator_AccumulatesAndReturnsSingleBlock()
     {
@@ -23,6 +31,10 @@ public class AccumulatorTests
         Assert.Null(acc.GetAccumulated());
     }
 
+    /// <summary>
+    /// Tests that ThinkingAccumulator accumulates thinking blocks and returns the concatenated thinking text.
+    /// 测试 ThinkingAccumulator 累加 thinking 块并返回拼接后的思考文本。
+    /// </summary>
     [Fact]
     public void ThinkingAccumulator_AccumulatesThinkingBlocks()
     {
@@ -35,6 +47,10 @@ public class AccumulatorTests
         Assert.Equal("think1think2", block!.Thinking);
     }
 
+    /// <summary>
+    /// Tests that ToolCallsAccumulator collects tool use and tool result blocks.
+    /// 测试 ToolCallsAccumulator 收集工具使用和工具结果块。
+    /// </summary>
     [Fact]
     public void ToolCallsAccumulator_CollectsToolBlocks()
     {
@@ -48,6 +64,10 @@ public class AccumulatorTests
         Assert.Same(blocks[1], acc.GetAccumulated());
     }
 
+    /// <summary>
+    /// Tests that ReasoningContext processes text chunks and builds a final assistant message.
+    /// 测试 ReasoningContext 处理文本块并构建最终的 assistant 消息。
+    /// </summary>
     [Fact]
     public void ReasoningContext_ProcessChunk_And_BuildFinalMessage()
     {
@@ -62,6 +82,10 @@ public class AccumulatorTests
         Assert.Equal("", ctx.AccumulatedText);
     }
 
+    /// <summary>
+    /// Tests that ReasoningContext accumulates thinking blocks separately from text.
+    /// 测试 ReasoningContext 将 thinking 块与文本块分开累加。
+    /// </summary>
     [Fact]
     public void ReasoningContext_ProcessChunk_WithThinking_AccumulatesThinking()
     {

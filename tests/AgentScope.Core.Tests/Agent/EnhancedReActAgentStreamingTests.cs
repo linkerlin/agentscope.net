@@ -20,8 +20,16 @@ using AgentEventType = AgentScope.Core.Events.EventType;
 
 namespace AgentScope.Core.Tests.Agent;
 
+/// <summary>
+/// Tests for EnhancedReActAgent streaming behavior, hooks, and event emission
+/// EnhancedReActAgent 流式行为、钩子和事件发射测试
+/// </summary>
 public class EnhancedReActAgentStreamingTests
 {
+    /// <summary>
+    /// Tests that StreamAsync with a streaming model emits reasoning/summary events and a final response.
+    /// 测试流式模型下 StreamAsync 发射推理/摘要事件并返回最终响应。
+    /// </summary>
     [Fact]
     public async Task StreamAsync_WithStreamingModel_EmitsSummaryEvents_And_FinalResponse()
     {
@@ -50,6 +58,10 @@ public class EnhancedReActAgentStreamingTests
         Assert.Equal("你好！", events[^1].Message?.GetTextContent());
     }
 
+    /// <summary>
+    /// Tests that CallAsync with a non-streaming model still invokes reasoning and summary chunk hooks.
+    /// 测试非流式模型下 CallAsync 仍会触发推理和摘要块钩子。
+    /// </summary>
     [Fact]
     public async Task CallAsync_WithNonStreamingModel_InvokesReasoningAndSummaryChunkHooks()
     {
@@ -74,6 +86,10 @@ public class EnhancedReActAgentStreamingTests
         Assert.Empty(hook.Errors);
     }
 
+    /// <summary>
+    /// Tests that when the model fails, the error hook is invoked and the error message appears in the response.
+    /// 测试模型失败时错误钩子被触发且错误信息出现在响应中。
+    /// </summary>
     [Fact]
     public async Task CallAsync_WhenModelFails_InvokesErrorHook()
     {
@@ -95,6 +111,10 @@ public class EnhancedReActAgentStreamingTests
         Assert.Contains(hook.Errors, error => error.Contains("boom", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Tests that AgentStreamAdapter properly delegates to the inner agent's streaming method.
+    /// 测试 AgentStreamAdapter 正确委托给内部代理的流式方法。
+    /// </summary>
     [Fact]
     public async Task AgentStreamAdapter_WithStreamableAgent_DelegatesToInnerStream()
     {
@@ -115,6 +135,10 @@ public class EnhancedReActAgentStreamingTests
         Assert.Equal("适配完成", events[^1].Message?.GetTextContent());
     }
 
+    /// <summary>
+    /// Tests that StreamAsync with an accumulating hook builds a ReasoningContext from chunk events.
+    /// 测试使用累加钩子时 StreamAsync 从块事件构建 ReasoningContext。
+    /// </summary>
     [Fact]
     public async Task StreamAsync_WithAccumulatingHook_BuildsReasoningContextFromChunks()
     {
@@ -143,6 +167,10 @@ public class EnhancedReActAgentStreamingTests
         Assert.Equal("assistant", finalMessage.Role);
     }
 
+    /// <summary>
+    /// Collects all events from an async enumerable stream into a list.
+    /// 从异步可枚举流中收集所有事件到列表中。
+    /// </summary>
     private static async Task<List<AgentEvent>> CollectEventsAsync(IAsyncEnumerable<AgentEvent> stream)
     {
         var events = new List<AgentEvent>();
@@ -154,6 +182,10 @@ public class EnhancedReActAgentStreamingTests
         return events;
     }
 
+    /// <summary>
+    /// A hook that captures reasoning, acting, summary chunks and errors for assertions.
+    /// 捕获推理、行动、摘要块和错误用于断言的测试钩子。
+    /// </summary>
     private sealed class CaptureHook : HookBase
     {
         public List<string> ReasoningChunks { get; } = new();
@@ -186,6 +218,10 @@ public class EnhancedReActAgentStreamingTests
         }
     }
 
+    /// <summary>
+    /// A hook that accumulates reasoning and summary chunks into a ReasoningContext.
+    /// 将推理和摘要块累加到 ReasoningContext 的测试钩子。
+    /// </summary>
     private sealed class AccumulatingHook : HookBase
     {
         public ReasoningContext Context { get; } = new();
@@ -203,6 +239,10 @@ public class EnhancedReActAgentStreamingTests
         }
     }
 
+    /// <summary>
+    /// A scripted model that returns predefined text responses in queue order for deterministic testing.
+    /// 按队列顺序返回预定义文本响应的脚本化模型，用于确定性测试。
+    /// </summary>
     private sealed class ScriptedModel : IModel
     {
         private readonly Queue<string> _responses;
@@ -235,6 +275,10 @@ public class EnhancedReActAgentStreamingTests
         }
     }
 
+    /// <summary>
+    /// A streaming scripted model that yields predefined chunks via GenerateStreamAsync for testing streaming agents.
+    /// 通过 GenerateStreamAsync 按块产出预定义片段的流式脚本化模型，用于测试流式代理。
+    /// </summary>
     private sealed class StreamingScriptedModel : IModel, IStreamingChatModel
     {
         private readonly IReadOnlyList<string> _chunks;
@@ -286,6 +330,10 @@ public class EnhancedReActAgentStreamingTests
         }
     }
 
+    /// <summary>
+    /// A model that always returns a failure response with a configured error message.
+    /// 始终返回失败响应并携带指定错误信息的测试模型。
+    /// </summary>
     private sealed class FailingModel : IModel
     {
         private readonly string _error;

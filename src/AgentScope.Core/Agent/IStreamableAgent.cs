@@ -19,18 +19,22 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Agent;
 
 /// <summary>
-/// 可流式输出的 Agent 接口，对应 Java StreamableAgent
-/// 流式返回使用 IAsyncEnumerable&lt;AgentEvent&gt;（对应 Flux&lt;AgentEvent&gt;）
+/// Streamable Agent interface. Counterpart to Java StreamableAgent.
+/// Streaming uses IAsyncEnumerable&lt;Event&gt; (counterpart to Flux&lt;AgentEvent&gt;).
+/// 可流式输出的 Agent 接口，对应 Java StreamableAgent。
+/// 流式返回使用 IAsyncEnumerable&lt;AgentEvent&gt;（对应 Flux&lt;AgentEvent&gt;）。
 /// </summary>
 public interface IStreamableAgent
 {
     /// <summary>
-    /// 流式处理消息列表，逐个产出 AgentEvent
+    /// Processes a list of messages in streaming mode, yielding events one by one.
+    /// 流式处理消息列表，逐个产出 AgentEvent。
     /// </summary>
     IAsyncEnumerable<Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null);
 
     /// <summary>
-    /// 流式处理单条消息
+    /// Processes a single message in streaming mode.
+    /// 流式处理单条消息。
     /// </summary>
     IAsyncEnumerable<Event> StreamEventsAsync(Msg message, RuntimeContext? context = null);
 }

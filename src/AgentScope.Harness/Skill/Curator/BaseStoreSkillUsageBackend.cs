@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -17,9 +18,10 @@ using AgentScope.Harness.Filesystem.Remote;
 namespace AgentScope.Harness.Skill.Curator;
 
 /// <summary>
+/// Abstract base class for skill usage backends backed by a remote KV store (IBaseStore).
+/// Subclasses only need to provide a namespace-isolated IBaseStore to gain persistence.
 /// 基于远程 KV 存储（IBaseStore）的技能使用记录后端基类。
 /// 子类只需提供按命名空间隔离的 IBaseStore 即可获得持久化能力。
-/// 对应 Java: io.agentscope.harness.agent.skill.curator.BaseStoreSkillUsageBackend
 /// </summary>
 public abstract class BaseStoreSkillUsageBackend : ISkillUsageBackend
 {
@@ -27,6 +29,13 @@ public abstract class BaseStoreSkillUsageBackend : ISkillUsageBackend
     private readonly string _key;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="BaseStoreSkillUsageBackend"/>.
+    /// 初始化 <see cref="BaseStoreSkillUsageBackend"/> 的新实例。
+    /// </summary>
+    /// <param name="store">The underlying base store / 底层基础存储。</param>
+    /// <param name="key">The storage key / 存储键名。</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> is null.</exception>
     protected BaseStoreSkillUsageBackend(IBaseStore store, string key = "skill-usage")
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

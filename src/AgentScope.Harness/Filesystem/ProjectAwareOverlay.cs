@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,9 +15,11 @@
 namespace AgentScope.Harness.Filesystem;
 
 /// <summary>
-/// 项目感知覆层文件系统：在底层文件系统之上叠加“项目根”视角，
+/// Project-aware overlay filesystem: overlays a "project root" perspective on the underlying filesystem,
+/// automatically anchoring relative paths to the project root and preventing out-of-bounds access.
+/// 项目感知覆层文件系统：在底层文件系统之上叠加"项目根"视角，
 /// 自动把相对路径锚定到项目根目录，限制访问越界。
-/// 对应 Java: io.agentscope.harness.agent.filesystem.ProjectAwareOverlay
+/// Counterpart to Java: io.agentscope.harness.agent.filesystem.ProjectAwareOverlay
 /// </summary>
 public sealed class ProjectAwareOverlay : IFilesystem
 {

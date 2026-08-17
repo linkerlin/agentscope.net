@@ -17,17 +17,32 @@ using System.Collections.Concurrent;
 namespace AgentScope.Core.State;
 
 /// <summary>
+/// In-memory agent state store implementation backed by a concurrent dictionary, supporting versioned optimistic concurrency (CAS).
 /// 基于内存并发字典的 Agent 状态存储实现，支持版本化乐观并发（CAS）。
+/// Corresponds to Java: io.agentscope.core.state.InMemoryAgentStateStore
 /// 对应 Java: io.agentscope.core.state.InMemoryAgentStateStore
 /// </summary>
 public class InMemoryAgentStateStore : IAgentStateStore
 {
+    /// <summary>
+    /// Internal concurrent dictionary storing versioned states.
+    /// 存储版本化状态的内部并发字典。
+    /// </summary>
     private readonly ConcurrentDictionary<string, VersionedState<AgentState>> _store = new();
+
+    /// <summary>
+    /// Lock object for CAS serialization.
+    /// CAS 序列化用的锁对象。
+    /// </summary>
     private readonly object _casLock = new();
 
     /// <inheritdoc />
     public bool SupportsVersioning => true;
 
+    /// <summary>
+    /// Builds a composite key from user ID, session ID, and state key.
+    /// 从用户 ID、会话 ID 和状态键构造复合键。
+    /// </summary>
     private static string Key(string userId, string sessionId, string key) =>
         $"{userId ?? ""}::{sessionId}::{key}";
 
@@ -51,6 +66,8 @@ public class InMemoryAgentStateStore : IAgentStateStore
         var k = Key(userId, sessionId, key);
         lock (_casLock)
         {
+            // Increment version if exists, otherwise start at 1
+            // 如果存在则递增版本，否则从 1 开始
             var existing = _store.TryGetValue(k, out var cur) ? cur.Version + 1 : 1L;
             _store[k] = new VersionedState<AgentState>(existing, state);
         }
@@ -63,9 +80,11 @@ public class InMemoryAgentStateStore : IAgentStateStore
     {
         var k = Key(userId, sessionId, key);
 
+        // Place the entire CAS (validate + write) in one critical section to guarantee versioning semantics
         // 整个 CAS（校验+写入）置于同一临界区，保证版本化承诺
         lock (_casLock)
         {
+            // First write: expectedVersion == Unversioned(0)
             // 首次写入：expectedVersion == Unversioned(0)
             if (expectedVersion == IAgentStateStore.Unversioned)
             {
@@ -79,6 +98,7 @@ public class InMemoryAgentStateStore : IAgentStateStore
                 return Task.FromResult(1L);
             }
 
+            // Version matches: replace
             // 版本匹配替换
             if (_store.TryGetValue(k, out var current) && current.Version == expectedVersion)
             {

@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -26,12 +27,25 @@ public sealed class SubagentMaterializer
     private readonly SubagentFactory _factory;
     private readonly ConcurrentDictionary<string, IAgent> _cache = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// 初始化子 Agent 实例化器。
+    /// Initialize the subagent materializer.
+    /// </summary>
+    /// <param name="factory">子 Agent 工厂委托 / The subagent factory delegate.</param>
+    /// <exception cref="ArgumentNullException">factory 为 null 时抛出 / Thrown when factory is null.</exception>
     public SubagentMaterializer(SubagentFactory factory)
     {
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     }
 
-    /// <summary>按声明实例化子 Agent（同名声明只创建一次）。</summary>
+    /// <summary>
+    /// 按声明实例化子 Agent（同名声明只创建一次，后续返回缓存实例）。
+    /// Materialize a subagent from a declaration (same name creates only once, returns cached instance).
+    /// </summary>
+    /// <param name="declaration">子 Agent 声明 / The subagent declaration.</param>
+    /// <param name="parentRc">父运行时上下文，可选 / Optional parent runtime context.</param>
+    /// <returns>实例化的 Agent / The materialized agent.</returns>
+    /// <exception cref="ArgumentNullException">declaration 为 null 时抛出 / Thrown when declaration is null.</exception>
     public IAgent Materialize(SubagentDeclaration declaration, RuntimeContext? parentRc = null)
     {
         if (declaration == null) throw new ArgumentNullException(nameof(declaration));
@@ -42,7 +56,13 @@ public sealed class SubagentMaterializer
         });
     }
 
-    /// <summary>批量实例化。</summary>
+    /// <summary>
+    /// 批量实例化多个子 Agent 声明。
+    /// Materialize multiple subagent declarations at once.
+    /// </summary>
+    /// <param name="declarations">子 Agent 声明集合 / The declarations to materialize.</param>
+    /// <param name="parentRc">父运行时上下文，可选 / Optional parent runtime context.</param>
+    /// <returns>名称到 Agent 实例的映射 / A mapping of names to agent instances.</returns>
     public IReadOnlyDictionary<string, IAgent> MaterializeAll(
         IEnumerable<SubagentDeclaration> declarations, RuntimeContext? parentRc = null)
     {
@@ -55,6 +75,9 @@ public sealed class SubagentMaterializer
         return result;
     }
 
-    /// <summary>清理缓存的实例。</summary>
+    /// <summary>
+    /// 清理所有缓存的子 Agent 实例。
+    /// Clear all cached subagent instances.
+    /// </summary>
     public void Clear() => _cache.Clear();
 }

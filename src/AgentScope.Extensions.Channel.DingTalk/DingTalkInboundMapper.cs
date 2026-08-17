@@ -28,16 +28,30 @@ namespace AgentScope.Extensions.Channel.DingTalk;
 /// </remarks>
 public sealed class DingTalkInboundMapper
 {
+    /// <summary>Channel identifier / 渠道标识</summary>
     private readonly string _channelId;
+
+    /// <summary>Account identifier (appKey) / 账户标识（appKey）</summary>
     private readonly string _accountId;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DingTalkInboundMapper"/> class.
+    /// 初始化 <see cref="DingTalkInboundMapper"/> 类的新实例。
+    /// </summary>
+    /// <param name="channelId">Channel identifier / 渠道标识</param>
+    /// <param name="accountId">Account identifier (appKey) / 账户标识（appKey）</param>
     public DingTalkInboundMapper(string channelId, string accountId)
     {
         _channelId = channelId;
         _accountId = accountId;
     }
 
-    /// <summary>映射为入站消息；非 text 或内容为空时返回 null。</summary>
+    /// <summary>
+    /// Maps a DingTalk payload to an inbound message; returns null for non-text or empty content.
+    /// 映射为入站消息；非 text 或内容为空时返回 null。
+    /// </summary>
+    /// <param name="payload">DingTalk callback JSON payload / 钉钉回调 JSON 负载</param>
+    /// <returns>Mapped inbound message, or null if not mappable / 映射后的入站消息，不可映射时返回 null</returns>
     public InboundMessage? Map(JsonNode? payload)
     {
         if (payload is null)
@@ -93,7 +107,12 @@ public sealed class DingTalkInboundMapper
         return new InboundMessage(senderId, content, _channelId, metadata);
     }
 
-    /// <summary>返回 <c>msgId</c>（幂等去重键），缺失时返回 null。</summary>
+    /// <summary>
+    /// Extracts the <c>msgId</c> field for idempotency deduplication; returns null if missing.
+    /// 返回 <c>msgId</c>（幂等去重键），缺失时返回 null。
+    /// </summary>
+    /// <param name="payload">DingTalk callback JSON payload / 钉钉回调 JSON 负载</param>
+    /// <returns>Message ID string, or null / 消息 ID 字符串，或 null</returns>
     public static string? ExtractMsgId(JsonNode? payload)
     {
         if (payload is null)
@@ -104,6 +123,13 @@ public sealed class DingTalkInboundMapper
         return string.IsNullOrWhiteSpace(id) ? null : id;
     }
 
+    /// <summary>
+    /// Safely extracts a string field from a JSON node.
+    /// 安全地从 JSON 节点中提取字符串字段。
+    /// </summary>
+    /// <param name="node">Source JSON node / 源 JSON 节点</param>
+    /// <param name="field">Field name / 字段名</param>
+    /// <returns>The field value as string, or null if missing / 字段值的字符串形式，缺失时返回 null</returns>
     private static string? TextValue(JsonNode? node, string field)
     {
         var v = node?[field];

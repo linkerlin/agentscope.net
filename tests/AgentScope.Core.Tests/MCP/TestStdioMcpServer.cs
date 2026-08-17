@@ -8,12 +8,32 @@ using AgentScope.Core.MCP;
 
 namespace AgentScope.Core.Tests.MCP;
 
+/// <summary>
+/// An in-process test helper that starts a fake MCP server via PowerShell
+/// for integration testing of <see cref="StdioMcpClient"/>.
+/// 一个进程内测试辅助工具，通过 PowerShell 启动一个模拟 MCP 服务器，用于 StdioMcpClient 的集成测试。
+/// </summary>
 internal sealed class TestStdioMcpServer : IDisposable
 {
+    /// <summary>
+    /// Tracks temporary script files to clean up on dispose.
+    /// 跟踪临时脚本文件以在释放时清理。
+    /// </summary>
     private readonly List<string> _tempFiles = new();
 
+    /// <summary>
+    /// Gets whether PowerShell (pwsh) is available on the current system.
+    /// 获取当前系统上是否可用 PowerShell (pwsh)。
+    /// </summary>
     public bool IsAvailable => ResolvePowerShellExecutable() != null;
 
+    /// <summary>
+    /// Creates a new <see cref="StdioMcpClient"/> connected to the fake MCP server.
+    /// 创建一个连接到模拟 MCP 服务器的新 StdioMcpClient。
+    /// </summary>
+    /// <param name="name">The client name / 客户端名称。</param>
+    /// <param name="requestTimeout">Optional request timeout / 可选的请求超时时间。</param>
+    /// <returns>A configured <see cref="StdioMcpClient"/> / 已配置的 StdioMcpClient。</returns>
     public StdioMcpClient CreateClient(string name = "fake-mcp", TimeSpan? requestTimeout = null)
     {
         var executable = ResolvePowerShellExecutable();
@@ -30,6 +50,10 @@ internal sealed class TestStdioMcpServer : IDisposable
             requestTimeout: requestTimeout ?? TimeSpan.FromSeconds(10));
     }
 
+    /// <summary>
+    /// Cleans up all temporary PowerShell script files created during testing.
+    /// 清理测试期间创建的所有临时 PowerShell 脚本文件。
+    /// </summary>
     public void Dispose()
     {
         foreach (var tempFile in _tempFiles)
@@ -48,6 +72,13 @@ internal sealed class TestStdioMcpServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Resolves the PowerShell executable path (pwsh) on the current platform.
+    /// 解析当前平台上的 PowerShell 可执行文件路径 (pwsh)。
+    /// </summary>
+    /// <returns>
+    /// The executable name if found; otherwise null / 如果找到则返回可执行文件名，否则返回 null。
+    /// </returns>
     private static string? ResolvePowerShellExecutable()
     {
         var executable = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "pwsh.exe" : "pwsh";
@@ -59,6 +90,12 @@ internal sealed class TestStdioMcpServer : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// Checks whether the given executable can be launched successfully.
+    /// 检查给定的可执行文件是否能成功启动。
+    /// </summary>
+    /// <param name="fileName">The executable name / 可执行文件名。</param>
+    /// <returns>true if the executable runs and exits with code 0 / 如果可执行文件运行并返回退出码 0 则为 true。</returns>
     private static bool CanRun(string fileName)
     {
         try
@@ -86,6 +123,12 @@ internal sealed class TestStdioMcpServer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Creates a temporary PowerShell script that acts as a fake MCP server
+    /// supporting initialize, tools/list, and tools/call methods.
+    /// 创建一个充当模拟 MCP 服务器的临时 PowerShell 脚本，支持 initialize、tools/list 和 tools/call 方法。
+    /// </summary>
+    /// <returns>The path to the created script file / 创建的脚本文件路径。</returns>
     private string CreateServerScript()
     {
         const string script = @"

@@ -7,8 +7,17 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.MCP;
 
+/// <summary>
+/// Tests for <see cref="McpTool"/> covering name/description mapping,
+/// execution success/failure, and <see cref="McpClientWrapper"/> disposal.
+/// <see cref="McpTool"/> 的名称/描述映射、执行成功/失败以及 McpClientWrapper 释放的测试。
+/// </summary>
 public class McpToolTests
 {
+    /// <summary>
+    /// Verifies that <see cref="McpTool"/> reads Name and Description from the schema.
+    /// 验证 McpTool 从架构中读取 Name 和 Description。
+    /// </summary>
     [Fact]
     public void McpTool_Name_And_Description_FromSchema()
     {
@@ -19,6 +28,10 @@ public class McpToolTests
         Assert.Equal("A test", tool.Description);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="McpTool.ExecuteAsync"/> calls the client and returns a successful result.
+    /// 验证 McpTool.ExecuteAsync 调用客户端并返回成功结果。
+    /// </summary>
     [Fact]
     public async Task McpTool_ExecuteAsync_CallsClient_ReturnsOk()
     {
@@ -30,6 +43,11 @@ public class McpToolTests
         Assert.Equal("hello", result.Result);
     }
 
+    /// <summary>
+    /// Verifies that <see cref="McpTool.ExecuteAsync"/> returns a failed result
+    /// when the client returns an error.
+    /// 验证当客户端返回错误时，McpTool.ExecuteAsync 返回失败结果。
+    /// </summary>
     [Fact]
     public async Task McpTool_ExecuteAsync_WhenClientReturnsError_ReturnsFail()
     {
@@ -41,6 +59,10 @@ public class McpToolTests
         Assert.Contains("denied", result.Error);
     }
 
+    /// <summary>
+    /// Verifies that disposing an <see cref="McpClientWrapper"/> does not throw any exception.
+    /// 验证释放 McpClientWrapper 不会抛出任何异常。
+    /// </summary>
     [Fact]
     public void McpClientWrapper_Dispose_DoesNotThrow()
     {
@@ -48,6 +70,10 @@ public class McpToolTests
         w.Dispose();
     }
 
+    /// <summary>
+    /// A stub <see cref="IMcpClient"/> for testing that returns a configurable <see cref="CallResult"/>.
+    /// 用于测试的 IMcpClient 存根，返回可配置的 CallResult。
+    /// </summary>
     private sealed class StubMcpClient : IMcpClient
     {
         public bool IsInitialized { get; set; } = true;
@@ -62,6 +88,10 @@ public class McpToolTests
         public void Dispose() { }
     }
 
+    /// <summary>
+    /// A concrete implementation of <see cref="McpClientWrapper"/> for testing disposal behavior.
+    /// 用于测试释放行为的 McpClientWrapper 具体实现。
+    /// </summary>
     private sealed class ConcreteMcpClientWrapper : McpClientWrapper
     {
         public override string Name => "Concrete";

@@ -1,3 +1,17 @@
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 using AgentScope.Core;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Events;
@@ -14,7 +28,10 @@ using AgentScope.Harness.Team;
 namespace AgentScope.Harness;
 
 /// <summary>
+/// Harness main agent. Counterpart to Java HarnessAgent.
 /// Harness 主 Agent。对标 Java HarnessAgent。
+/// Composes EnhancedReActAgent with subsystems (bus/filesystem/team/gateway/middleware)
+/// to provide a complete agent runtime environment.
 /// 组合 EnhancedReActAgent + 各子系统（总线/文件系统/团队/网关/中间件），
 /// 提供完整的 Agent 运行时环境。
 /// </summary>
@@ -26,10 +43,22 @@ public sealed class HarnessAgent : IAgent
     private readonly IFilesystem _filesystem;
     private readonly IGateway _gateway;
 
+    /// <summary>Agent unique identifier. / Agent 唯一标识。</summary>
     public string AgentId => _inner.AgentId;
+    /// <summary>Agent display name. / Agent 显示名称。</summary>
     public string Name => _inner.Name;
+    /// <summary>Agent description. / Agent 描述。</summary>
     public string Description => _inner.Description;
 
+    /// <summary>
+    /// Internal constructor. Use <see cref="HarnessAgentBuilder"/> to create instances.
+    /// 内部构造函数。请使用 <see cref="HarnessAgentBuilder"/> 创建实例。
+    /// </summary>
+    /// <param name="inner">The inner EnhancedReActAgent. / 内部的 EnhancedReActAgent。</param>
+    /// <param name="bus">Message bus. / 消息总线。</param>
+    /// <param name="filesystem">Filesystem abstraction. / 文件系统抽象。</param>
+    /// <param name="gateway">Gateway. / 网关。</param>
+    /// <param name="middlewares">Optional middleware collection. / 可选的中间件集合。</param>
     internal HarnessAgent(
         EnhancedReActAgent inner,
         IMessageBus bus,
@@ -44,29 +73,72 @@ public sealed class HarnessAgent : IAgent
         if (middlewares != null) _middlewares.AddRange(middlewares);
     }
 
+    /// <summary>
+    /// Sends messages to the agent and returns a response, running through the middleware pipeline.
+    /// 向 Agent 发送消息并返回响应，经过中间件管道处理。
+    /// </summary>
+    /// <param name="messages">Input messages. / 输入消息列表。</param>
+    /// <param name="context">Optional runtime context. / 可选的运行时上下文。</param>
+    /// <returns>The response message. / 响应消息。</returns>
     public Task<Msg> CallAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
         => ExecuteWithMiddlewareAsync(messages, () => _inner.CallAsync(messages, context), context);
 
+    /// <summary>
+    /// Sends a single message to the agent.
+    /// 向 Agent 发送单条消息。
+    /// </summary>
+    /// <param name="message">The message to send. / 要发送的消息。</param>
+    /// <param name="context">Optional runtime context. / 可选的运行时上下文。</param>
+    /// <returns>The response message. / 响应消息。</returns>
     public Task<Msg> CallAsync(Msg message, RuntimeContext? context = null)
         => CallAsync([message], context);
 
+    /// <summary>
+    /// Sends a plain text message to the agent.
+    /// 向 Agent 发送纯文本消息。
+    /// </summary>
+    /// <param name="text">The text content. / 文本内容。</param>
+    /// <param name="context">Optional runtime context. / 可选的运行时上下文。</param>
+    /// <returns>The response message. / 响应消息。</returns>
     public Task<Msg> CallAsync(string text, RuntimeContext? context = null)
     {
         var msg = Msg.Builder().Role("user").TextContent(text).Build();
         return CallAsync([msg], context);
     }
 
+    /// <summary>
+    /// Streams events generated from the given messages.
+    /// 从给定消息流式获取事件。
+    /// </summary>
+    /// <param name="messages">Input messages. / 输入消息列表。</param>
+    /// <param name="context">Optional runtime context. / 可选的运行时上下文。</param>
+    /// <returns>An async sequence of events. / 事件的异步序列。</returns>
     public IAsyncEnumerable<Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
         => _inner.StreamEventsAsync(messages, context);
 
+    /// <summary>
+    /// Streams events from a single message.
+    /// 从单条消息流式获取事件。
+    /// </summary>
+    /// <param name="message">The message. / 消息。</param>
+    /// <param name="context">Optional runtime context. / 可选的运行时上下文。</param>
+    /// <returns>An async sequence of events. / 事件的异步序列。</returns>
     public IAsyncEnumerable<Event> StreamEventsAsync(Msg message, RuntimeContext? context = null)
         => _inner.StreamEventsAsync(message, context);
 
+    /// <inheritdoc cref="CallAsync(Msg, RuntimeContext?)" />
     public Task ObserveAsync(Msg message, RuntimeContext? context = null) => CallAsync(message, context);
+    /// <inheritdoc cref="CallAsync(IReadOnlyList{Msg}, RuntimeContext?)" />
     public Task ObserveAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null) => CallAsync(messages, context);
+    /// <summary>Interrupts the current agent execution. / 中断当前 Agent 执行。</summary>
     public void Interrupt() => _inner.Interrupt();
+    /// <summary>Interrupts the current agent execution with a message. / 用一条消息中断当前 Agent 执行。</summary>
     public void Interrupt(Msg message) => _inner.Interrupt(message);
 
+    /// <summary>
+    /// Executes the core agent call wrapped in the middleware pipeline (onion model).
+    /// 在中间件管道（洋葱模型）包裹下执行核心 Agent 调用。
+    /// </summary>
     private async Task<Msg> ExecuteWithMiddlewareAsync(IReadOnlyList<Msg> messages,
         Func<Task<Msg>> coreFn, RuntimeContext? context)
     {
@@ -80,11 +152,12 @@ public sealed class HarnessAgent : IAgent
         mctx.Items["bus"] = _bus;
         mctx.Items["session_id"] = context?.SessionId ?? "default";
 
-        // 按 Order 排序执行中间件链
+        // 按 Order 排序执行中间件链 // Sort middlewares by Order for deterministic chain execution
         var sorted = _middlewares.OrderBy(m => m.Order).ToList();
         if (sorted.Count == 0) return await coreFn().ConfigureAwait(false);
 
         // 系统提示词拦截链：依次让每个中间件改写提示词，最终写回内层 Agent。
+        // System prompt interception: let each middleware rewrite the prompt in order.
         var prompt = _inner.SystemPrompt;
         foreach (var mw in sorted)
         {
@@ -94,13 +167,15 @@ public sealed class HarnessAgent : IAgent
             }
             catch
             {
-                // 提示词注入失败不得中断主流程
+                // 提示词注入失败不得中断主流程 // Prompt injection failure must not break the main flow
             }
         }
         _inner.SystemPrompt = prompt;
 
         // 洋葱模型：每个中间件真正包裹核心调用，因此可以在 next() 前后做事，
         // 也可以选择不调用 next() 来短路整个回合。
+        // Onion model: each middleware wraps the core call, so it can act before/after next(),
+        // or skip next() entirely to short-circuit the round.
         Msg? result = null;
         var coreInvoked = false;
 
@@ -118,6 +193,7 @@ public sealed class HarnessAgent : IAgent
         await RunChain(0).ConfigureAwait(false);
 
         // 有中间件短路了链条：回退为直接执行核心，保持既有调用语义不被破坏。
+        // Middleware short-circuited the chain: fall back to direct core execution.
         if (!coreInvoked) result = await coreFn().ConfigureAwait(false);
 
         return result!;

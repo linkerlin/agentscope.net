@@ -15,13 +15,14 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// 多态媒体来源基类
-/// 媒体来源抽象基类，表示图片、音频、视频等媒体的来源
+/// Abstract base class for polymorphic media sources (e.g., images, audio, video).
+/// 多态媒体来源抽象基类，表示图片、音频、视频等媒体的来源。
 /// </summary>
 public abstract record Source
 {
     /// <summary>
-    /// 来源类型标识
+    /// Gets the type identifier of this source.
+    /// 获取当前来源的类型标识符。
     /// </summary>
     public abstract string Type { get; }
 }

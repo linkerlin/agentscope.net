@@ -20,6 +20,10 @@ using System.Threading.Tasks;
 namespace AgentScope.Extensions.Document;
 
 /// <summary>
+/// Universal text extraction reader (the .NET equivalent of Apache Tika).
+/// Handles text-extractable formats: txt / md / html / htm / csv / json / xml / log / source code, etc.
+/// Maps to Java: io.agentscope.core.rag.reader.TikaReader (based on Apache Tika for universal format parsing).
+/// Note: For binary formats like PDF / Word, use dedicated PdfReader / WordReader.
 /// 通用文本抽取阅读器（.NET 版 Apache Tika 等价物）。
 /// 处理纯文本可抽取格式：txt / md / html / htm / csv / json / xml / log / 源码等。
 /// 对应 Java: io.agentscope.core.rag.reader.TikaReader（基于 Apache Tika 的通用格式解析）。
@@ -33,9 +37,14 @@ public sealed class TikaReader : AbstractChunkingReader
         "json", "xml", "log", "cs", "java", "py", "js", "ts", "go", "rs", "yaml", "yml"
     };
 
+    /// <summary>
+    /// Creates a TikaReader with the specified chunking parameters.
+    /// 使用指定的分块参数创建 TikaReader。
+    /// </summary>
     public TikaReader(int chunkSize = 1000, SplitStrategy strategy = SplitStrategy.Paragraph, int overlap = 200)
         : base(chunkSize, strategy, overlap) { }
 
+    /// <inheritdoc />
     public override IAsyncEnumerable<string> SupportedFormats => ToAsync();
 
     private static async IAsyncEnumerable<string> ToAsync()
@@ -43,10 +52,13 @@ public sealed class TikaReader : AbstractChunkingReader
         foreach (var f in _textFormats) yield return f;
     }
 
+    /// <inheritdoc />
     public override Task<IReadOnlyList<DocumentChunk>> ReadAsync(ReaderInput input, CancellationToken ct = default)
     {
         return Task.Run(() =>
         {
+            // Extract text content based on input type
+            // 根据输入类型提取文本内容
             var text = input.Type switch
             {
                 ReaderInput.InputType.String => input.Content,

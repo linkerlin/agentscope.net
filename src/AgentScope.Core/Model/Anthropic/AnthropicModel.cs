@@ -32,13 +32,22 @@ namespace AgentScope.Core.Model.Anthropic;
 
 /// <summary>
 /// Anthropic Claude Model using native HTTP API.
-/// Anthropic Claude 模型
-/// 
+/// Anthropic Claude 模型，通过原生 HTTP API 调用。
+///
 /// Java参考: io.agentscope.core.model.AnthropicChatModel
 /// </summary>
 public class AnthropicModel : ModelBase, IStreamingChatModel
 {
+    /// <summary>
+    /// Default base URL for Anthropic API.
+    /// Anthropic API 的默认基础地址。
+    /// </summary>
     public const string DefaultBaseUrl = "https://api.anthropic.com";
+
+    /// <summary>
+    /// Messages API endpoint path.
+    /// 消息 API 的端点路径。
+    /// </summary>
     public const string MessagesEndpoint = "/v1/messages";
 
     private readonly HttpClient _httpClient;
@@ -48,9 +57,15 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
     private readonly string _modelName;
     private readonly GenerateOptions? _defaultOptions;
 
-/// <summary>
+    /// <summary>
+    /// Create a new Anthropic model instance.
     /// 创建新的 Anthropic 模型实例。
     /// </summary>
+    /// <param name="modelName">Model name / 模型名称</param>
+    /// <param name="apiKey">API key (optional, falls back to ANTHROPIC_API_KEY env var) / API 密钥（可选，未提供则读取环境变量 ANTHROPIC_API_KEY）</param>
+    /// <param name="baseUrl">Base URL (optional) / 基础地址（可选）</param>
+    /// <param name="formatter">Custom formatter (optional) / 自定义格式化器（可选）</param>
+    /// <param name="defaultOptions">Default generation options / 默认生成选项</param>
     public AnthropicModel(
         string modelName,
         string? apiKey = null,
@@ -64,7 +79,7 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
         _baseUrl = baseUrl;
         _formatter = formatter ?? new AnthropicChatFormatter(modelName);
         _defaultOptions = defaultOptions;
-        
+
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "AgentScope.NET/1.0");
     }
@@ -81,13 +96,15 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
         var messages = request.Messages;
         var options = MergeOptions(ConvertOptions(request.Options), _defaultOptions);
 
-        // Format messages
+        // Format messages into Anthropic API request format
+        // 将消息格式化为 Anthropic API 请求格式
         var anthropicRequest = _formatter.Format(messages, options);
 
-        // Make API call
+        // Serialize request body to JSON
+        // 将请求体序列化为 JSON
         var json = JsonSerializer.Serialize(anthropicRequest, AnthropicSerializerOptions.Default);
         var url = BuildUrl(_baseUrl, MessagesEndpoint);
-        
+
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         httpRequest.Headers.TryAddWithoutValidation("x-api-key", GetApiKey(_apiKey));
         httpRequest.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
@@ -101,7 +118,8 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
             throw new ModelException($"Anthropic API 错误：{response.StatusCode} - {responseBody}");
         }
 
-        // Parse response
+        // Parse the response body into ParsedResponse
+        // 将响应体解析为 ParsedResponse
         var parsedResponse = _formatter.Parse(responseBody);
         if (parsedResponse == null)
         {
@@ -111,16 +129,21 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
         return new ModelResponse
         {
             Text = parsedResponse.TextContent,
-            Metadata = parsedResponse.ToolCalls?.Count > 0 
+            Metadata = parsedResponse.ToolCalls?.Count > 0
                 ? new Dictionary<string, object> { ["toolCalls"] = parsedResponse.ToolCalls }
                 : null,
             Success = true
         };
     }
 
-/// <summary>
-    /// 生成流式响应。
+    /// <summary>
+    /// Generate streaming response using Server-Sent Events (SSE).
+    /// 使用 Server-Sent Events (SSE) 生成流式响应。
     /// </summary>
+    /// <param name="messages">List of messages / 消息列表</param>
+    /// <param name="options">Generation options / 生成选项</param>
+    /// <param name="cancellationToken">Cancellation token / 取消令牌</param>
+    /// <returns>Async enumerable of ChatResponse chunks / ChatResponse 块的异步可枚举序列</returns>
     public async IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
         List<Msg> messages,
         GenerateOptions? options = null,
@@ -131,22 +154,26 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
         mergedOptions.Stream = true;
 
         // Format messages
+        // 格式化消息
         var anthropicRequest = _formatter.Format(messages, mergedOptions);
 
         // Serialize request
+        // 序列化请求
         var json = JsonSerializer.Serialize(anthropicRequest, AnthropicSerializerOptions.Default);
         var url = BuildUrl(_baseUrl, MessagesEndpoint);
 
-        // Create HTTP request
+        // Build HTTP request
+        // 构建 HTTP 请求
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         httpRequest.Headers.TryAddWithoutValidation("x-api-key", GetApiKey(_apiKey));
         httpRequest.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
         httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        // Send request
+        // Send request with streaming response headers
+        // 发送请求，使用流式响应头
         var response = await _httpClient.SendAsync(
-            httpRequest, 
-            HttpCompletionOption.ResponseHeadersRead, 
+            httpRequest,
+            HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
 
         response.EnsureSuccessStatusCode();
@@ -159,6 +186,7 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
             var line = await reader.ReadLineAsync(cancellationToken);
             if (string.IsNullOrWhiteSpace(line)) continue;
 
+            // Parse SSE format: "data: {...}"
             // 解析 SSE 格式："data: {...}"
             if (line.StartsWith("data: "))
             {
@@ -174,6 +202,10 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
         }
     }
 
+    /// <summary>
+    /// Generate streaming response with default options.
+    /// 使用默认选项生成流式响应。
+    /// </summary>
     public IAsyncEnumerable<ChatResponse> GenerateStreamAsync(
         List<Msg> messages,
         CancellationToken cancellationToken = default)
@@ -182,7 +214,8 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
     }
 
     /// <summary>
-    /// Merge provided options with default options.
+    /// Merge provided options with default options, where provided values take precedence.
+    /// 将提供的选项与默认选项合并，提供的值优先。
     /// </summary>
     private GenerateOptions? MergeOptions(GenerateOptions? options, GenerateOptions? defaults)
     {
@@ -204,7 +237,8 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
     }
 
     /// <summary>
-    /// Convert Dictionary<string, object> to GenerateOptions.
+    /// Convert Dictionary&lt;string, object&gt; to GenerateOptions.
+    /// 将 Dictionary&lt;string, object&gt; 转换为 GenerateOptions。
     /// </summary>
     private GenerateOptions? ConvertOptions(Dictionary<string, object>? options)
     {
@@ -230,6 +264,7 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
 
     /// <summary>
     /// Convert ParsedResponse to ChatResponse.
+    /// 将 ParsedResponse 转换为 ChatResponse。
     /// </summary>
     private ChatResponse ConvertToChatResponse(ParsedResponse parsed)
     {
@@ -272,6 +307,7 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
 
     /// <summary>
     /// Build full URL from base URL and endpoint.
+    /// 根据基础地址和端点构建完整 URL。
     /// </summary>
     private static string BuildUrl(string? baseUrl, string endpoint)
     {
@@ -281,24 +317,30 @@ public class AnthropicModel : ModelBase, IStreamingChatModel
 
     /// <summary>
     /// Get API key from parameter or environment variable.
+    /// 从参数或环境变量获取 API 密钥。
     /// </summary>
     private static string GetApiKey(string? apiKey)
     {
         if (!string.IsNullOrEmpty(apiKey)) return apiKey;
-        
+
         var envKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
         if (!string.IsNullOrEmpty(envKey)) return envKey;
-        
-throw new ModelException(
+
+        throw new ModelException(
             "未找到 Anthropic API 密钥。请设置 ANTHROPIC_API_KEY 环境变量或提供 apiKey 参数。");
     }
 }
 
 /// <summary>
-/// Anthropic API 的序列化选项。
+/// JSON serializer options for Anthropic API (snake_case naming, ignore null values).
+/// Anthropic API 的 JSON 序列化选项（snake_case 命名，忽略空值）。
 /// </summary>
 public static class AnthropicSerializerOptions
 {
+    /// <summary>
+    /// Default serializer options: snake_case property naming, ignore null values.
+    /// 默认序列化选项：snake_case 属性命名，忽略空值。
+    /// </summary>
     public static readonly JsonSerializerOptions Default = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,

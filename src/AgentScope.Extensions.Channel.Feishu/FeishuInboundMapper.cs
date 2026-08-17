@@ -27,16 +27,28 @@ namespace AgentScope.Extensions.Channel.Feishu;
 /// </remarks>
 public sealed class FeishuInboundMapper
 {
+    /// <summary>JSON serializer options with case-insensitive property matching / 不区分大小写的 JSON 序列化选项</summary>
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    /// <summary>Channel identifier / 渠道标识</summary>
     private readonly string _channelId;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FeishuInboundMapper"/> class.
+    /// 初始化 <see cref="FeishuInboundMapper"/> 类的新实例。
+    /// </summary>
+    /// <param name="channelId">Channel identifier / 渠道标识</param>
     public FeishuInboundMapper(string channelId)
     {
         _channelId = channelId;
     }
 
-    /// <summary>返回 <c>header.event_id</c>（幂等去重键），缺失时返回 null。</summary>
+    /// <summary>
+    /// Extracts <c>header.event_id</c> for idempotency deduplication; returns null if missing.
+    /// 返回 <c>header.event_id</c>（幂等去重键），缺失时返回 null。
+    /// </summary>
+    /// <param name="envelope">Feishu event envelope JSON / 飞书事件信封 JSON</param>
+    /// <returns>Event ID string, or null / 事件 ID 字符串，或 null</returns>
     public static string? ExtractEventId(JsonNode? envelope)
     {
         if (envelope is null)
@@ -47,7 +59,12 @@ public sealed class FeishuInboundMapper
         return string.IsNullOrWhiteSpace(id) ? null : id;
     }
 
-    /// <summary>若 envelope 为 url_verification 请求，返回 challenge；否则返回 null。</summary>
+    /// <summary>
+    /// Returns the challenge string if the envelope is a url_verification request; otherwise null.
+    /// 若 envelope 为 url_verification 请求，返回 challenge；否则返回 null。
+    /// </summary>
+    /// <param name="envelope">Feishu event envelope JSON / 飞书事件信封 JSON</param>
+    /// <returns>Challenge string, or null if not a url_verification request / challenge 字符串，非 url_verification 请求时返回 null</returns>
     public static string? ExtractUrlChallenge(JsonNode? envelope)
     {
         if (envelope is null)
@@ -74,7 +91,12 @@ public sealed class FeishuInboundMapper
         return string.IsNullOrWhiteSpace(id) ? null : id;
     }
 
-    /// <summary>返回 <c>header.tenant_key</c>（多租户 id）。</summary>
+    /// <summary>
+    /// Extracts <c>header.tenant_key</c> (multi-tenant id).
+    /// 返回 <c>header.tenant_key</c>（多租户 id）。
+    /// </summary>
+    /// <param name="envelope">Feishu event envelope JSON / 飞书事件信封 JSON</param>
+    /// <returns>Tenant key string, or null / 租户 key 字符串，或 null</returns>
     public static string? ExtractTenantKey(JsonNode? envelope)
     {
         if (envelope is null)

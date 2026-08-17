@@ -19,18 +19,22 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Agent;
 
 /// <summary>
-/// 可观察的 Agent 接口，对应 Java ObservableAgent
-/// Agent 通过 observe 接收来自其他 Agent 的消息并做出反应
+/// Observable Agent interface. Counterpart to Java ObservableAgent.
+/// Agents receive and react to messages from other agents via ObserveAsync.
+/// 可观察的 Agent 接口，对应 Java ObservableAgent。
+/// Agent 通过 observe 接收来自其他 Agent 的消息并做出反应。
 /// </summary>
 public interface IObservableAgent
 {
     /// <summary>
-    /// 观察并处理消息
+    /// Observes and processes a single message.
+    /// 观察并处理单条消息。
     /// </summary>
     Task ObserveAsync(Msg message, RuntimeContext? context = null);
 
     /// <summary>
-    /// 观察并处理多条消息
+    /// Observes and processes multiple messages.
+    /// 观察并处理多条消息。
     /// </summary>
     Task ObserveAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null);
 }

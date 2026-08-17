@@ -16,17 +16,35 @@ namespace AgentScope.Core;
 
 /// <summary>
 /// Version information for AgentScope.NET
+/// AgentScope.NET 版本信息
 /// </summary>
 public static class Version
 {
-    public const string VERSION = "1.2.0";
-    public const string BUILD_DATE = "2026-03-15";
+    /// <summary>
+    /// Current version string (SemVer).
+    /// 当前版本号（语义化版本）
+    /// </summary>
+    public const string VERSION = "2.0.1";
+
+    /// <summary>
+    /// Build date in ISO 8601 format (yyyy-MM-dd).
+    /// 构建日期（ISO 8601 格式 yyyy-MM-dd）
+    /// </summary>
+    public const string BUILD_DATE = "2026-08-17";
     
+    /// <summary>
+    /// Gets the version string only.
+    /// 仅获取版本号
+    /// </summary>
     public static string GetVersion()
     {
         return VERSION;
     }
     
+    /// <summary>
+    /// Gets the full version string including product name and build date.
+    /// 获取包含产品名和构建日期的完整版本字符串
+    /// </summary>
     public static string GetFullVersion()
     {
         return $"AgentScope.NET {VERSION} (Built on {BUILD_DATE})";

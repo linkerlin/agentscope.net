@@ -15,25 +15,75 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// 工具调用状态枚举
+/// Tool call state enum, tracking the lifecycle of a tool call within the agent.
+/// 工具调用状态枚举，跟踪代理内工具调用的生命周期。
 /// </summary>
 public enum ToolCallState
 {
+    /// <summary>
+    /// Tool call is pending and has not been processed yet.
+    /// 工具调用待处理，尚未被处理。
+    /// </summary>
     Pending,
+
+    /// <summary>
+    /// Awaiting user confirmation to execute the tool.
+    /// 等待用户确认执行工具。
+    /// </summary>
     Asking,
+
+    /// <summary>
+    /// Tool call has been allowed / approved.
+    /// 工具调用已被允许/批准。
+    /// </summary>
     Allowed,
+
+    /// <summary>
+    /// Tool call has been submitted for execution.
+    /// 工具调用已提交执行。
+    /// </summary>
     Submitted,
+
+    /// <summary>
+    /// Tool call has finished execution.
+    /// 工具调用已完成执行。
+    /// </summary>
     Finished
 }
 
 /// <summary>
-/// 工具执行结果状态枚举
+/// Tool result state enum, indicating the outcome of a tool execution.
+/// 工具执行结果状态枚举，表示工具执行的结果。
 /// </summary>
 public enum ToolResultState
 {
+    /// <summary>
+    /// Execution completed successfully.
+    /// 执行成功完成。
+    /// </summary>
     Success,
+
+    /// <summary>
+    /// Execution encountered an error.
+    /// 执行遇到错误。
+    /// </summary>
     Error,
+
+    /// <summary>
+    /// Execution was interrupted before completion.
+    /// 执行在完成前被中断。
+    /// </summary>
     Interrupted,
+
+    /// <summary>
+    /// Execution was denied / rejected.
+    /// 执行被拒绝。
+    /// </summary>
     Denied,
+
+    /// <summary>
+    /// Execution is currently running.
+    /// 执行正在进行中。
+    /// </summary>
     Running
 }

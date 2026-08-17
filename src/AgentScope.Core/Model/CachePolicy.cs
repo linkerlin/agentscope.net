@@ -15,16 +15,26 @@
 namespace AgentScope.Core.Model;
 
 /// <summary>
-/// 缓存策略
+/// Cache policy enum for controlling model response caching behavior.
+/// 缓存策略枚举，用于控制模型响应缓存行为。
 /// </summary>
 public enum CachePolicy
 {
-    /// <summary>使用系统默认行为</summary>
+    /// <summary>
+    /// Use the system default caching behavior.
+    /// 使用系统默认的缓存行为。
+    /// </summary>
     Default = 0,
 
-    /// <summary>禁用缓存</summary>
+    /// <summary>
+    /// Disable caching entirely.
+    /// 完全禁用缓存。
+    /// </summary>
     Disabled,
 
-    /// <summary>启用缓存</summary>
+    /// <summary>
+    /// Enable caching for model responses.
+    /// 启用以缓存模型响应。
+    /// </summary>
     Enabled
 }

@@ -15,15 +15,26 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// 系统消息，表示系统角色的消息，role 固定为 "system"
+/// System message, representing a message with the system role. Role is fixed to "system".
+/// 系统消息，表示系统角色的消息，role 固定为 "system"。
 /// </summary>
 public class SystemMessage : Msg
 {
+    /// <summary>
+    /// Initializes a new instance of <see cref="SystemMessage"/> with the system role.
+    /// 使用系统角色初始化 <see cref="SystemMessage"/> 新实例。
+    /// </summary>
     public SystemMessage()
     {
         Role = "system";
     }
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="SystemMessage"/> with the specified name and content.
+    /// 使用指定的名称和内容初始化 <see cref="SystemMessage"/> 新实例。
+    /// </summary>
+    /// <param name="name">Optional sender name / 可选的发送者名称。</param>
+    /// <param name="content">Message content / 消息内容。</param>
     public SystemMessage(string? name, object? content)
         : base(name, content, "system")
     {

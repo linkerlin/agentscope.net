@@ -15,15 +15,26 @@
 namespace AgentScope.Core.Message;
 
 /// <summary>
-/// 工具结果消息，表示工具角色的消息，role 固定为 "tool"
+/// Tool result message, representing a message with the tool role. Role is fixed to "tool".
+/// 工具结果消息，表示工具角色的消息，role 固定为 "tool"。
 /// </summary>
 public class ToolResultMessage : Msg
 {
+    /// <summary>
+    /// Initializes a new instance of <see cref="ToolResultMessage"/> with the tool role.
+    /// 使用工具角色初始化 <see cref="ToolResultMessage"/> 新实例。
+    /// </summary>
     public ToolResultMessage()
     {
         Role = "tool";
     }
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="ToolResultMessage"/> with the specified name and content.
+    /// 使用指定的名称和内容初始化 <see cref="ToolResultMessage"/> 新实例。
+    /// </summary>
+    /// <param name="name">Optional sender name / 可选的发送者名称。</param>
+    /// <param name="content">Message content / 消息内容。</param>
     public ToolResultMessage(string? name, object? content)
         : base(name, content, "tool")
     {

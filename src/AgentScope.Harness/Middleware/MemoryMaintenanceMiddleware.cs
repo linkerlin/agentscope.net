@@ -20,18 +20,8 @@ using AgentScope.Harness.Workspace;
 namespace AgentScope.Harness.Middleware;
 
 /// <summary>
-/// 记忆维护中间件：在每次 Agent 调用完成后按最小间隔节流地执行记忆维护。
-/// <para>对标 Java: io.agentscope.harness.agent.middleware.MemoryMaintenanceMiddleware</para>
-/// <para>维护步骤（顺序固定）：</para>
-/// <list type="number">
-///   <item>把超过 <c>dailyFileRetentionDays</c> 的日记忆文件归档到 <c>memory/archive/</c>；</item>
-///   <item>调用 <see cref="MemoryConsolidator"/> 做 LLM 记忆整合（若已配置）；</item>
-///   <item>清理超过 <c>sessionRetentionDays</c> 的会话日志文件。</item>
-/// </list>
-/// <para>
-/// 节流窗口按<b>隔离键</b>划分：USER → userId；SESSION → sessionId；
-/// AGENT/GLOBAL → 整个 Agent 实例共享一个窗口（避免并发维护竞争同一批文件）。
-/// </para>
+/// Memory maintenance middleware that throttles memory housekeeping after each agent call.
+/// 记忆维护中间件，在每次 Agent 调用完成后按最小间隔节流地执行记忆维护。
 /// </summary>
 public sealed class MemoryMaintenanceMiddleware(
     WorkspaceManager workspaceManager,
@@ -42,7 +32,10 @@ public sealed class MemoryMaintenanceMiddleware(
     IsolationScope isolationScope = IsolationScope.User,
     IPeriodicGate? periodicGate = null) : IHarnessMiddleware
 {
-    /// <summary>两次维护之间的默认最小间隔。对标 Java <c>DEFAULT_MIN_GAP</c>。</summary>
+    /// <summary>
+    /// Default minimum interval between maintenance runs.
+    /// 两次维护之间的默认最小间隔。
+    /// </summary>
     public static readonly TimeSpan DefaultMinGap = TimeSpan.FromMinutes(30);
 
     private readonly TimeSpan _minGap = minGap ?? DefaultMinGap;

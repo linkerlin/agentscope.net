@@ -6,9 +6,17 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.Tracing;
 
+/// <summary>
+/// Tests for tracing samplers (AlwaysOnSampler, AlwaysOffSampler, ProbabilitySampler)
+/// 跟踪采样器（AlwaysOnSampler、AlwaysOffSampler、ProbabilitySampler）的测试
+/// </summary>
 public class SamplerTests
 {
     [Fact]
+    /// <summary>
+    /// AlwaysOnSampler.ShouldSample always returns true
+    /// 测试 AlwaysOnSampler.ShouldSample 始终返回 true
+    /// </summary>
     public void AlwaysOnSampler_ShouldSample_ReturnsTrue()
     {
         // Arrange
@@ -27,6 +35,10 @@ public class SamplerTests
     }
 
     [Fact]
+    /// <summary>
+    /// AlwaysOffSampler.ShouldSample always returns false
+    /// 测试 AlwaysOffSampler.ShouldSample 始终返回 false
+    /// </summary>
     public void AlwaysOffSampler_ShouldSample_ReturnsFalse()
     {
         // Arrange
@@ -48,6 +60,10 @@ public class SamplerTests
     [InlineData(0.0)]
     [InlineData(0.5)]
     [InlineData(1.0)]
+    /// <summary>
+    /// ProbabilitySampler constructor accepts valid probability values
+    /// 测试 ProbabilitySampler 构造器接受有效的概率值
+    /// </summary>
     public void ProbabilitySampler_Constructor_ValidProbability(double probability)
     {
         // Arrange & Act
@@ -60,6 +76,10 @@ public class SamplerTests
     [Theory]
     [InlineData(-0.1)]
     [InlineData(1.1)]
+    /// <summary>
+    /// ProbabilitySampler constructor throws for invalid probability values
+    /// 测试 ProbabilitySampler 构造器对无效概率值抛出异常
+    /// </summary>
     public void ProbabilitySampler_Constructor_InvalidProbability_Throws(double probability)
     {
         // Arrange, Act & Assert
@@ -67,6 +87,10 @@ public class SamplerTests
     }
 
     [Fact]
+    /// <summary>
+    /// ProbabilitySampler with probability 0.0 always returns false
+    /// 测试 ProbabilitySampler 在概率为 0.0 时始终返回 false
+    /// </summary>
     public void ProbabilitySampler_ShouldSample_ProbabilityZero_AlwaysFalse()
     {
         // Arrange
@@ -85,6 +109,10 @@ public class SamplerTests
     }
 
     [Fact]
+    /// <summary>
+    /// ProbabilitySampler with probability 1.0 always returns true
+    /// 测试 ProbabilitySampler 在概率为 1.0 时始终返回 true
+    /// </summary>
     public void ProbabilitySampler_ShouldSample_ProbabilityOne_AlwaysTrue()
     {
         // Arrange
@@ -103,6 +131,10 @@ public class SamplerTests
     }
 
     [Fact]
+    /// <summary>
+    /// ProbabilitySampler with probability 0.5 returns approximately 50% true over 1000 iterations
+    /// 测试 ProbabilitySampler 在概率为 0.5 时，1000 次迭代中约 50% 返回 true
+    /// </summary>
     public void ProbabilitySampler_ShouldSample_ProbabilityHalf_ApproximatelyHalf()
     {
         // Arrange
@@ -126,6 +158,10 @@ public class SamplerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer with AlwaysOffSampler does not export spans
+    /// 测试 Tracer 使用 AlwaysOffSampler 时不导出 span
+    /// </summary>
     public void Tracer_WithAlwaysOffSampler_DoesNotSample()
     {
         // Arrange
@@ -141,6 +177,10 @@ public class SamplerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer with AlwaysOnSampler exports spans
+    /// 测试 Tracer 使用 AlwaysOnSampler 时导出 span
+    /// </summary>
     public void Tracer_WithAlwaysOnSampler_Samples()
     {
         // Arrange

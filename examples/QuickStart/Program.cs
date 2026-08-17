@@ -26,8 +26,17 @@ using DotNetEnv;
 
 namespace QuickStart;
 
+/// <summary>
+/// QuickStart 示例程序 - 展示 AgentScope.NET Core 的基本用法
+/// QuickStart example - demonstrates basic usage of AgentScope.NET Core
+/// </summary>
 class Program
 {
+    /// <summary>
+    /// 应用程序入口点 - 演示 Agent 创建、模型配置和对话循环
+    /// Application entry point - demonstrates agent creation, model configuration and chat loop
+    /// </summary>
+    /// <param name="args">命令行参数 / Command-line arguments</param>
     static async Task Main(string[] args)
     {
         Console.WriteLine($"{CoreVersion.GetFullVersion()}\n");
@@ -86,7 +95,7 @@ class Program
         var memory = new SqliteMemory("example.db");
 
         // 创建 ReActAgent
-        var agent = ReActAgent.Builder()
+        var agent = EnhancedReActAgent.Builder()
             .Name("Assistant")
             .SysPrompt("You are a helpful AI assistant.")
             .Model(model)

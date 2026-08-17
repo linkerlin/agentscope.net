@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -22,7 +23,13 @@ namespace AgentScope.Harness.Gateway;
 /// </summary>
 public sealed class ChannelRuntimeContextResolver
 {
-    /// <summary>根据入站消息构造 RuntimeContext。</summary>
+    /// <summary>
+    /// 根据入站消息解析并构造运行时上下文。
+    /// Resolve and construct a RuntimeContext from an inbound message.
+    /// </summary>
+    /// <param name="message">入站消息 / The inbound message.</param>
+    /// <returns>解析后的运行时上下文 / The resolved runtime context.</returns>
+    /// <exception cref="ArgumentNullException">message 为 null 时抛出 / Thrown when message is null.</exception>
     public RuntimeContext Resolve(InboundMessage message)
     {
         if (message == null) throw new ArgumentNullException(nameof(message));

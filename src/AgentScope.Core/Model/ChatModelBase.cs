@@ -20,32 +20,51 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.Model;
 
 /// <summary>
-/// 聊天模型抽象基类：在 ModelBase 基础上提供聊天语义（消息列表 -> ChatResponse）的统一抽象。
+/// Abstract base class for chat models, providing a unified abstraction over chat semantics (message list → ChatResponse).
+/// 聊天模型抽象基类，在 ModelBase 基础上提供聊天语义（消息列表 → ChatResponse）的统一抽象。
 /// 对应 Java: io.agentscope.core.model.ChatModelBase
 /// </summary>
 public abstract class ChatModelBase : ModelBase
 {
-    /// <summary>提供商标识（如 openai/anthropic）。</summary>
+    /// <summary>
+    /// Gets the provider identifier (e.g., "openai", "anthropic").
+    /// 获取提供商标识（如 "openai"、"anthropic"）。
+    /// </summary>
     public string Provider { get; }
 
-    /// <summary>是否在请求中携带结构化输出提醒。</summary>
+    /// <summary>
+    /// Gets or sets whether to include structured output reminders in requests.
+    /// 获取或设置是否在请求中携带结构化输出提醒。
+    /// </summary>
     public bool StructuredOutputEnabled { get; set; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ChatModelBase"/> class.
+    /// 初始化 <see cref="ChatModelBase"/> 类的新实例。
+    /// </summary>
+    /// <param name="modelName">Model name / 模型名称。</param>
+    /// <param name="provider">Provider identifier / 提供商标识。</param>
     protected ChatModelBase(string modelName, string provider) : base(modelName)
     {
         Provider = provider ?? "";
     }
 
     /// <summary>
+    /// Subclass implementation: sends a chat request and returns the full response.
     /// 子类实现：发送聊天请求并返回完整响应。
     /// </summary>
+    /// <param name="messages">List of messages in the conversation / 对话中的消息列表。</param>
+    /// <param name="options">Optional request parameters / 可选的请求参数。</param>
+    /// <param name="cancellationToken">Cancellation token / 取消令牌。</param>
+    /// <returns>Chat response / 聊天响应。</returns>
     public abstract Task<ChatResponse> ChatAsync(
         List<Msg> messages,
         Dictionary<string, object>? options = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 默认把 GenerateAsync 代理到 ChatAsync 并取 Content。
+    /// Default implementation: delegates <see cref="GenerateAsync"/> to <see cref="ChatAsync"/> and extracts the content.
+    /// 默认实现：将 <see cref="GenerateAsync"/> 代理到 <see cref="ChatAsync"/> 并提取 Content 内容。
     /// </summary>
     public override async Task<ModelResponse> GenerateAsync(ModelRequest request)
     {

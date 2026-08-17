@@ -8,8 +8,16 @@ using EventType = AgentScope.Core.Events.EventType;
 
 namespace AgentScope.Core.Tests.Event;
 
+/// <summary>
+/// Tests for Event and EventType types
+/// Event 和 EventType 类型测试
+/// </summary>
 public class EventTests
 {
+    /// <summary>
+    /// Tests that the Event constructor properly sets Type, Message, IsLast, and Metadata properties.
+    /// 测试 Event 构造函数正确设置 Type、Message、IsLast 和 Metadata 属性。
+    /// </summary>
     [Fact]
     public void Event_Constructor_SetsProperties()
     {
@@ -22,6 +30,10 @@ public class EventTests
         Assert.Empty(ev.Metadata);
     }
 
+    /// <summary>
+    /// Tests that Event stores and retrieves metadata correctly.
+    /// 测试 Event 正确存储和检索元数据。
+    /// </summary>
     [Fact]
     public void Event_WithMetadata_StoresMetadata()
     {
@@ -30,6 +42,10 @@ public class EventTests
         Assert.Equal("value", ev.Metadata["key"]);
     }
 
+    /// <summary>
+    /// Tests that IsLast=true correctly indicates this is the terminal event in a sequence.
+    /// 测试 IsLast=true 正确表示这是序列中的终止事件。
+    /// </summary>
     [Fact]
     public void Event_IsLast_True_IndicatesTermination()
     {
@@ -37,6 +53,10 @@ public class EventTests
         Assert.True(ev.IsLast);
     }
 
+    /// <summary>
+    /// Tests that IsReasoning returns true for reasoning-related EventTypes and false for others.
+    /// 测试 IsReasoning 对推理相关的事件类型返回 true，其他返回 false。
+    /// </summary>
     [Fact]
     public void Event_IsReasoning_ForReasoningTypes()
     {
@@ -46,6 +66,10 @@ public class EventTests
         Assert.False(new EventItem(EventType.ToolCallStart, null).IsReasoning);
     }
 
+    /// <summary>
+    /// Tests that IsToolCall returns true for tool-call-related EventTypes and false for others.
+    /// 测试 IsToolCall 对工具调用相关的事件类型返回 true，其他返回 false。
+    /// </summary>
     [Fact]
     public void Event_IsToolCall_ForToolCallTypes()
     {
@@ -55,6 +79,10 @@ public class EventTests
         Assert.False(new EventItem(EventType.ActingStart, null).IsToolCall);
     }
 
+    /// <summary>
+    /// Tests that IsActing returns true for acting-related EventTypes.
+    /// 测试 IsActing 对行动相关的事件类型返回 true。
+    /// </summary>
     [Fact]
     public void Event_IsActing_ForActingTypes()
     {

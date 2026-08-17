@@ -1,4 +1,5 @@
-// Copyright 2024-2026 the original author or authors.
+﻿// Copyright 2024-2026 the original author or authors.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,17 +15,27 @@
 namespace AgentScope.Core.Shutdown;
 
 /// <summary>
+/// Policy for handling partial reasoning results produced by the model after interruption or shutdown.
 /// 中断/关闭后，对模型已产出的部分推理结果的处理策略。
-/// 对应 Java: io.agentscope.core.shutdown.PartialReasoningPolicy
+/// Corresponds to Java: io.agentscope.core.shutdown.PartialReasoningPolicy
 /// </summary>
 public enum PartialReasoningPolicy
 {
-    /// <summary>丢弃部分推理结果（默认）。</summary>
+    /// <summary>
+    /// Discard the partial reasoning result (default).
+    /// 丢弃部分推理结果（默认）。
+    /// </summary>
     Discard,
 
-    /// <summary>保留部分推理结果，作为最终回复返回。</summary>
+    /// <summary>
+    /// Keep the partial reasoning result and return it as the final reply.
+    /// 保留部分推理结果，作为最终回复返回。
+    /// </summary>
     Keep,
 
-    /// <summary>保留并以“被中断”标记返回，交由上层处理。</summary>
+    /// <summary>
+    /// Keep the partial result with an "interrupted" marker, delegating to the upper layer.
+    /// 保留并以"被中断"标记返回，交由上层处理。
+    /// </summary>
     KeepAsInterrupted
 }

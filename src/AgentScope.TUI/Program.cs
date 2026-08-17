@@ -25,8 +25,17 @@ using DotNetEnv;
 
 namespace AgentScope.TUI;
 
+/// <summary>
+/// AgentScope.NET TUI（终端用户界面）主程序 - 基于 Terminal.Gui 的聊天界面
+/// AgentScope.NET TUI (Terminal User Interface) main program - Terminal.Gui based chat interface
+/// </summary>
 class Program
 {
+    /// <summary>
+    /// 应用程序入口点 - 初始化终端 GUI、配置模型、创建 Agent 并启动聊天界面
+    /// Application entry point - initializes terminal GUI, configures model, creates agent and starts chat interface
+    /// </summary>
+    /// <param name="args">命令行参数 / Command-line arguments</param>
     static void Main(string[] args)
     {
         // 加载 .env 文件

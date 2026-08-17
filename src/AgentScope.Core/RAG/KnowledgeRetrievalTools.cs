@@ -24,11 +24,21 @@ namespace AgentScope.Core.RAG;
 /// Tool for searching knowledge base.
 /// 知识库搜索工具
 /// </summary>
+/// <summary>
+/// Tool for searching the knowledge base with query text and optional filters.
+/// 知识库搜索工具，支持文本查询和可选过滤器。
+/// </summary>
 public class KnowledgeSearchTool : ToolBase
 {
     private readonly IKnowledge _knowledge;
     private readonly int _defaultTopK;
 
+    /// <summary>
+    /// Creates a new KnowledgeSearchTool.
+    /// 创建新的知识库搜索工具。
+    /// </summary>
+    /// <param name="knowledge">The knowledge base instance. / 知识库实例</param>
+    /// <param name="defaultTopK">Default number of results. / 默认结果数量</param>
     public KnowledgeSearchTool(IKnowledge knowledge, int defaultTopK = 5) 
         : base("knowledge_search", "Search the knowledge base for relevant information")
     {
@@ -36,6 +46,7 @@ public class KnowledgeSearchTool : ToolBase
         _defaultTopK = defaultTopK;
     }
 
+    /// <inheritdoc />
     public override Dictionary<string, object> GetSchema()
     {
         return new Dictionary<string, object>
@@ -53,17 +64,17 @@ public class KnowledgeSearchTool : ToolBase
                         ["query"] = new Dictionary<string, string> 
                         { 
                             ["type"] = "string", 
-                            ["description"] = "The search query" 
+                            ["description"] = "The search query / 搜索查询" 
                         },
                         ["top_k"] = new Dictionary<string, string> 
                         { 
                             ["type"] = "integer", 
-                            ["description"] = "Number of results to return (default: 5)" 
+                            ["description"] = "Number of results to return (default: 5) / 返回结果数量（默认：5）" 
                         },
                         ["filter"] = new Dictionary<string, string> 
                         { 
                             ["type"] = "object", 
-                            ["description"] = "Optional metadata filters" 
+                            ["description"] = "Optional metadata filters / 可选的元数据过滤器" 
                         }
                     },
                     ["required"] = new List<string> { "query" }
@@ -72,10 +83,12 @@ public class KnowledgeSearchTool : ToolBase
         };
     }
 
+    /// <inheritdoc />
     public override async Task<ToolResult> ExecuteAsync(Dictionary<string, object> parameters)
     {
         try
         {
+            // 提取查询文本
             var query = parameters["query"].ToString() ?? "";
             
             var options = new KnowledgeSearchOptions
@@ -83,6 +96,7 @@ public class KnowledgeSearchTool : ToolBase
                 TopK = parameters.TryGetValue("top_k", out var topK) ? Convert.ToInt32(topK) : _defaultTopK
             };
 
+            // 提取可选的元数据过滤器
             if (parameters.TryGetValue("filter", out var filter) && filter is Dictionary<string, object> filters)
             {
                 options.Filters = filters;
@@ -303,10 +317,4 @@ public static class RAGTools
     }
 
     /// <summary>
-    /// Creates only search tool.
-    /// </summary>
-    public static ITool CreateSearchTool(IKnowledge knowledge, int defaultTopK = 5)
-    {
-        return new KnowledgeSearchTool(knowledge, defaultTopK);
-    }
-}
+    ///

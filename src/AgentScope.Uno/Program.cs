@@ -22,6 +22,11 @@ namespace AgentScope.Uno;
 /// </summary>
 public class Program
 {
+    /// <summary>
+    /// GTK 应用程序入口点 - 创建 GTK 宿主并运行 App
+    /// GTK application entry point - creates a GTK host and runs the App
+    /// </summary>
+    /// <param name="args">命令行参数 / Command-line arguments</param>
     public static void Main(string[] args)
     {
         var host = new GtkHost(() => new App());

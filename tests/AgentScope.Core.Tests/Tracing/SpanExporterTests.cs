@@ -6,9 +6,17 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.Tracing;
 
+/// <summary>
+/// Tests for span exporters (InMemorySpanExporter, CompositeSpanExporter) and TraceContext
+/// span 导出器（InMemorySpanExporter、CompositeSpanExporter）和 TraceContext 的测试
+/// </summary>
 public class SpanExporterTests
 {
     [Fact]
+    /// <summary>
+    /// InMemorySpanExporter.Export adds a span to the in-memory store
+    /// 测试 InMemorySpanExporter.Export 向内存存储中添加 span
+    /// </summary>
     public void InMemoryExporter_Export_AddsSpan()
     {
         // Arrange
@@ -23,6 +31,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// InMemorySpanExporter.ExportBatch adds multiple spans at once
+    /// 测试 InMemorySpanExporter.ExportBatch 批量添加多个 span
+    /// </summary>
     public void InMemoryExporter_ExportBatch_AddsSpans()
     {
         // Arrange
@@ -42,6 +54,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// InMemorySpanExporter.Clear removes all stored spans
+    /// 测试 InMemorySpanExporter.Clear 清除所有存储的 span
+    /// </summary>
     public void InMemoryExporter_Clear_RemovesAllSpans()
     {
         // Arrange
@@ -57,6 +73,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// InMemorySpanExporter.GetSpansByName returns spans matching the given operation name
+    /// 测试 InMemorySpanExporter.GetSpansByName 按操作名称返回匹配的 span
+    /// </summary>
     public void InMemoryExporter_GetSpansByName_ReturnsMatchingSpans()
     {
         // Arrange
@@ -73,6 +93,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// InMemorySpanExporter.GetSpansByTraceId returns spans matching the given trace ID
+    /// 测试 InMemorySpanExporter.GetSpansByTraceId 按 trace ID 返回匹配的 span
+    /// </summary>
     public void InMemoryExporter_GetSpansByTraceId_ReturnsMatchingSpans()
     {
         // Arrange
@@ -90,6 +114,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// InMemorySpanExporter does not add spans after being disposed
+    /// 测试 InMemorySpanExporter 在释放后不再添加 span
+    /// </summary>
     public void InMemoryExporter_WhenDisposed_DoesNotAdd()
     {
         // Arrange
@@ -104,6 +132,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// CompositeSpanExporter.Export exports the span to all registered exporters
+    /// 测试 CompositeSpanExporter.Export 将 span 导出到所有注册的导出器
+    /// </summary>
     public void CompositeExporter_Export_ExportsToAll()
     {
         // Arrange
@@ -121,6 +153,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// CompositeSpanExporter.AddExporter dynamically adds a new exporter
+    /// 测试 CompositeSpanExporter.AddExporter 动态添加新的导出器
+    /// </summary>
     public void CompositeExporter_AddExporter_AddsExporter()
     {
         // Arrange
@@ -138,6 +174,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// CompositeSpanExporter.ExportBatch exports batch to all registered exporters
+    /// 测试 CompositeSpanExporter.ExportBatch 将批量 span 导出到所有注册的导出器
+    /// </summary>
     public void CompositeExporter_ExportBatch_ExportsToAll()
     {
         // Arrange
@@ -155,6 +195,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// CompositeSpanExporter.FlushAsync calls flush on all registered exporters
+    /// 测试 CompositeSpanExporter.FlushAsync 对所有注册导出器调用 flush
+    /// </summary>
     public async Task CompositeExporter_FlushAsync_CallsAll()
     {
         // Arrange
@@ -170,6 +214,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// CompositeSpanExporter.ShutdownAsync calls shutdown on all registered exporters
+    /// 测试 CompositeSpanExporter.ShutdownAsync 对所有注册导出器调用 shutdown
+    /// </summary>
     public async Task CompositeExporter_ShutdownAsync_CallsAll()
     {
         // Arrange
@@ -185,6 +233,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// TraceContext.ToTraceParent returns a valid W3C traceparent format string
+    /// 测试 TraceContext.ToTraceParent 返回有效的 W3C traceparent 格式字符串
+    /// </summary>
     public void TraceContext_ToTraceParent_ReturnsValidFormat()
     {
         // Arrange
@@ -203,6 +255,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// TraceContext.FromTraceParent correctly parses a valid traceparent string
+    /// 测试 TraceContext.FromTraceParent 正确解析有效的 traceparent 字符串
+    /// </summary>
     public void TraceContext_FromTraceParent_ParsesCorrectly()
     {
         // Arrange
@@ -219,6 +275,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// TraceContext.FromTraceParent correctly parses a non-sampled traceparent
+    /// 测试 TraceContext.FromTraceParent 正确解析未采样的 traceparent
+    /// </summary>
     public void TraceContext_FromTraceParent_NotSampled()
     {
         // Arrange
@@ -233,6 +293,10 @@ public class SpanExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// TraceContext.FromTraceParent returns null for invalid format strings
+    /// 测试 TraceContext.FromTraceParent 对无效格式字符串返回 null
+    /// </summary>
     public void TraceContext_FromTraceParent_InvalidFormat_ReturnsNull()
     {
         // Arrange
@@ -245,6 +309,10 @@ public class SpanExporterTests
         Assert.Null(context);
     }
 
+    /// <summary>
+    /// Creates a test TraceSpan instance with optional name and trace ID
+    /// 创建测试用的 TraceSpan 实例，可指定名称和 trace ID
+    /// </summary>
     private static TraceSpan CreateTestSpan(string? name = null, string? traceId = null)
     {
         return new TraceSpan(
