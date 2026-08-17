@@ -1,6 +1,7 @@
 // Copyright 2024-2026 the original author or authors.
 // Licensed under the Apache License, Version 2.0
 
+using System.Collections.Generic;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Message;
 using AgentScope.Core.Tool.SubAgent;
@@ -88,11 +89,12 @@ public class SubAgentToolTests
     private sealed class EchoAgent : AgentBase
     {
         public EchoAgent() : base("Echo") { }
-        public override IObservable<Msg> Call(Msg message)
+        protected override Task<Msg> DoCallAsync(IReadOnlyList<Msg> messages)
         {
-            var text = message.GetTextContent() ?? "";
+            var last = messages[^1];
+            var text = last.GetTextContent() ?? "";
             var reply = Msg.Builder().Name("Echo").TextContent(text).Role("assistant").Build();
-            return System.Reactive.Linq.Observable.Return(reply);
+            return Task.FromResult(reply);
         }
     }
 }

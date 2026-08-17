@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 using AgentScope.Core.Agent;
+using AgentScope.Core.Events;
 using AgentScope.Core.Message;
 using AgentScope.Core.MultiAgent;
 using Xunit;
@@ -305,6 +306,18 @@ public class AgentGroupTests
         /// </summary>
         public string Name => _name;
 
+        /// <summary>全局唯一 Agent ID</summary>
+        public string AgentId => $"agent_{_name}";
+
+        /// <summary>Agent 描述</summary>
+        public string Description => $"Test agent: {_name}";
+
+        /// <summary>中断（空实现）</summary>
+        public void Interrupt() { }
+
+        /// <summary>带消息的中断（空实现）</summary>
+        public void Interrupt(Msg message) { }
+
         /// <summary>
         /// Synchronously returns a response via observable.
         /// 通过可观察对象同步返回响应。
@@ -319,10 +332,9 @@ public class AgentGroupTests
         }
 
         /// <summary>
-        /// Asynchronously returns a response.
-        /// 异步返回响应。
+        /// Asynchronously returns a response (单条消息).
         /// </summary>
-        public Task<Msg> CallAsync(Msg message)
+        public Task<Msg> CallAsync(Msg message, RuntimeContext? context = null)
         {
             return Task.FromResult(Msg.Builder()
                 .Role("assistant")
@@ -330,5 +342,35 @@ public class AgentGroupTests
                 .Content($"Response from {_name}: {message.Content}")
                 .Build());
         }
+
+        /// <summary>Asynchronously returns a response (消息列表).</summary>
+        public Task<Msg> CallAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+        {
+            var last = messages[^1];
+            return CallAsync(last, context);
+        }
+
+        /// <summary>Asynchronously returns a response (纯文本).</summary>
+        public Task<Msg> CallAsync(string text, RuntimeContext? context = null)
+        {
+            var msg = Msg.Builder().Role("user").TextContent(text).Build();
+            return CallAsync(msg, context);
+        }
+
+        /// <summary>流式处理（不支持）</summary>
+        public IAsyncEnumerable<AgentScope.Core.Events.Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+            => throw new NotSupportedException();
+
+        /// <summary>流式处理单条消息（不支持）</summary>
+        public IAsyncEnumerable<AgentScope.Core.Events.Event> StreamEventsAsync(Msg message, RuntimeContext? context = null)
+            => throw new NotSupportedException();
+
+        /// <summary>观察单条消息</summary>
+        public async Task ObserveAsync(Msg message, RuntimeContext? context = null)
+            => await CallAsync(message, context);
+
+        /// <summary>观察多条消息</summary>
+        public async Task ObserveAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+            => await CallAsync(messages, context);
     }
 }

@@ -13,8 +13,10 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AgentScope.Core.Agent;
+using AgentScope.Core.Events;
 using AgentScope.Core.Message;
 using AgentScope.Core.Pipeline;
 using Xunit;
@@ -521,17 +523,46 @@ public class PipelineTests
             Name = name;
         }
 
+        public string AgentId => $"agent_{Name}";
+        public string Description => $"Fake agent: {Name}";
+        public void Interrupt() { }
+        public void Interrupt(Msg message) { }
+
         public System.IObservable<Msg> Call(Msg message)
         {
             return System.Reactive.Linq.Observable.Return(
                 Msg.Builder().Role("assistant").TextContent($"Response from {Name}").Build());
         }
 
-        public Task<Msg> CallAsync(Msg message)
+        public Task<Msg> CallAsync(Msg message, RuntimeContext? context = null)
         {
             return Task.FromResult(
                 Msg.Builder().Role("assistant").TextContent($"Response from {Name}").Build());
         }
+
+        public Task<Msg> CallAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+        {
+            var last = messages[^1];
+            return CallAsync(last, context);
+        }
+
+        public Task<Msg> CallAsync(string text, RuntimeContext? context = null)
+        {
+            var msg = Msg.Builder().Role("user").TextContent(text).Build();
+            return CallAsync(msg, context);
+        }
+
+        public IAsyncEnumerable<AgentScope.Core.Events.Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+            => throw new NotSupportedException();
+
+        public IAsyncEnumerable<AgentScope.Core.Events.Event> StreamEventsAsync(Msg message, RuntimeContext? context = null)
+            => throw new NotSupportedException();
+
+        public async Task ObserveAsync(Msg message, RuntimeContext? context = null)
+            => await CallAsync(message, context);
+
+        public async Task ObserveAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+            => await CallAsync(messages, context);
     }
 
     #endregion

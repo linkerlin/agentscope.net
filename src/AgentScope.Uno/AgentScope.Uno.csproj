@@ -11,17 +11,26 @@
 
   <ItemGroup>
     <!-- Uno Platform WinUI Packages -->
-    <PackageReference Include="Uno.WinUI" Version="5.6.4" />
-    <PackageReference Include="Uno.WinUI.RemoteControl" Version="5.6.4" Condition="'$(Configuration)'=='Debug'" />
-    <PackageReference Include="Uno.UI.Adapter.Microsoft.Extensions.Logging" Version="5.6.4" />
+    <PackageReference Include="Uno.WinUI" Version="6.6.184" />
+    <PackageReference Include="Uno.WinUI.RemoteControl" Version="5.6.99" Condition="'$(Configuration)'=='Debug'" />
+    <PackageReference Include="Uno.UI.Adapter.Microsoft.Extensions.Logging" Version="6.6.184" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
     
     <!-- Uno Platform Desktop Support -->
-    <PackageReference Include="Uno.WinUI.Skia.Gtk" Version="5.6.4" />
+    <PackageReference Include="Uno.WinUI.Skia.Gtk" Version="5.6.99" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\AgentScope.Core\AgentScope.Core.csproj" />
+  </ItemGroup>
+
+  <!-- 
+    显式定义 XAML 文件项，确保 Uno 源生成器能正确处理它们。
+    net10.0 下 SDK 不会自动将 .xaml 文件识别为 Page/ApplicationDefinition。
+  -->
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml" SubType="Designer" />
+    <Page Include="MainWindow.xaml" SubType="Designer" />
   </ItemGroup>
 
 </Project>

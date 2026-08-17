@@ -144,7 +144,7 @@ public class ReActAgentTests
         var userMsg = Msg.Builder().TextContent("Test").Build();
 
         // Act
-        var response = await agent.Call(userMsg).FirstOrDefaultAsync();
+        var response = await agent.CallAsync(userMsg);
 
         // Assert
         Assert.NotNull(response);

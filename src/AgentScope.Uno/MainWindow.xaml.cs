@@ -35,7 +35,7 @@ public sealed partial class MainWindow : Window
     /// Agent 实例引用
     /// Agent instance reference
     /// </summary>
-    private ReActAgent? _agent;
+    private EnhancedReActAgent? _agent;
 
     /// <summary>
     /// 记忆存储实例
@@ -81,7 +81,7 @@ public sealed partial class MainWindow : Window
             var model = MockModel.Builder().ModelName("mock-model").Build();
 
             // 创建 Agent Create agent
-            _agent = ReActAgent.Builder()
+            _agent = EnhancedReActAgent.Builder()
                 .Name("Assistant")
                 .Model(model)
                 .Memory(_memory)

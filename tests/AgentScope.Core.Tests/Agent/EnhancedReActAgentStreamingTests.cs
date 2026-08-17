@@ -128,7 +128,7 @@ public class EnhancedReActAgentStreamingTests
             .Build();
 
         var adapter = new AgentStreamAdapter(innerAgent);
-        var events = await CollectEventsAsync(adapter.StreamAsync(Msg.Builder().Role("user").TextContent("hello").Build()));
+        var events = await CollectEventsAsync(adapter.StreamEventsAsync(Msg.Builder().Role("user").TextContent("hello").Build()));
 
         Assert.Contains(events, e => e.Type == AgentEventType.ReasoningChunk);
         Assert.Equal(AgentEventType.SummaryFinish, events[^1].Type);

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 using AgentScope.Core.Agent;
+using AgentScope.Core.Events;
 using AgentScope.Core.Message;
 using AgentScope.Core.MultiAgent;
 using Xunit;
@@ -306,6 +307,18 @@ public class AgentRouterTests
 
         public string Name => _name;
 
+        /// <summary>全局唯一 Agent ID</summary>
+        public string AgentId => $"agent_{_name}";
+
+        /// <summary>Agent 描述</summary>
+        public string Description => $"Test agent: {_name}";
+
+        /// <summary>中断（空实现）</summary>
+        public void Interrupt() { }
+
+        /// <summary>带消息的中断（空实现）</summary>
+        public void Interrupt(Msg message) { }
+
         public System.IObservable<Msg> Call(Msg message)
         {
             return System.Reactive.Linq.Observable.Return(Msg.Builder()
@@ -315,7 +328,7 @@ public class AgentRouterTests
                 .Build());
         }
 
-        public Task<Msg> CallAsync(Msg message)
+        public Task<Msg> CallAsync(Msg message, RuntimeContext? context = null)
         {
             return Task.FromResult(Msg.Builder()
                 .Role("assistant")
@@ -323,5 +336,29 @@ public class AgentRouterTests
                 .Content($"Response from {_name}")
                 .Build());
         }
+
+        public Task<Msg> CallAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+        {
+            var last = messages[^1];
+            return CallAsync(last, context);
+        }
+
+        public Task<Msg> CallAsync(string text, RuntimeContext? context = null)
+        {
+            var msg = Msg.Builder().Role("user").TextContent(text).Build();
+            return CallAsync(msg, context);
+        }
+
+        public IAsyncEnumerable<AgentScope.Core.Events.Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+            => throw new NotSupportedException();
+
+        public IAsyncEnumerable<AgentScope.Core.Events.Event> StreamEventsAsync(Msg message, RuntimeContext? context = null)
+            => throw new NotSupportedException();
+
+        public async Task ObserveAsync(Msg message, RuntimeContext? context = null)
+            => await CallAsync(message, context);
+
+        public async Task ObserveAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+            => await CallAsync(messages, context);
     }
 }
