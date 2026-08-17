@@ -49,6 +49,13 @@ class Program
         var openaiBaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
         var openaiModel = Environment.GetEnvironmentVariable("OPENAI_MODEL");
 
+        Console.WriteLine($" setting : {deepseekApiKey}\n {deepseekModel}\n {openaiApiKey} \n{openaiBaseUrl} \n{openaiModel}\n");
+        deepseekApiKey = "";
+        deepseekModel = "DeepSeek-V4-Flash";
+        openaiApiKey = "sk-589f861fa3994720b704412064899256X";   
+        openaiBaseUrl = "http://10.193.41.51:8198/v1";
+        openaiModel = "DeepSeek-V4-Flash";
+
         if (!string.IsNullOrEmpty(deepseekApiKey) && !string.IsNullOrEmpty(deepseekModel))
         {
             // 使用 DeepSeek

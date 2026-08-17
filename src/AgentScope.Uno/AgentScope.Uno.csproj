@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -14,7 +14,7 @@
     <PackageReference Include="Uno.WinUI" Version="5.6.4" />
     <PackageReference Include="Uno.WinUI.RemoteControl" Version="5.6.4" Condition="'$(Configuration)'=='Debug'" />
     <PackageReference Include="Uno.UI.Adapter.Microsoft.Extensions.Logging" Version="5.6.4" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
     
     <!-- Uno Platform Desktop Support -->
     <PackageReference Include="Uno.WinUI.Skia.Gtk" Version="5.6.4" />
