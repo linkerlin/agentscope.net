@@ -14,17 +14,45 @@
 
 namespace AgentScope.Harness.Skill.Curator;
 
-/// <summary>SkillCurator 配置，对应 Java SkillCuratorConfig</summary>
+/// <summary>
+/// Configuration for <see cref="SkillCurator"/>.
+/// <see cref="SkillCurator"/> 的配置。
+/// </summary>
 public sealed record SkillCuratorConfig
 {
+    /// <summary>
+    /// Umbrella pass mode (bypass for testing).
+    /// 伞形通过模式（用于测试绕过）。
+    /// </summary>
     public UmbrellaPassMode UmbrellaMode { get; init; } = UmbrellaPassMode.Disabled;
+
+    /// <summary>
+    /// Interval between curation runs.
+    /// 整理运行间隔。
+    /// </summary>
     public TimeSpan RunInterval { get; init; } = TimeSpan.FromHours(6);
+
+    /// <summary>
+    /// Time before a Draft skill auto-transitions to Active.
+    /// Draft 技能自动转为 Active 的超时时间。
+    /// </summary>
     public TimeSpan DraftTimeout { get; init; } = TimeSpan.FromDays(7);
+
+    /// <summary>
+    /// Time of inactivity before an Active skill becomes Stale.
+    /// Active 技能转为 Stale 的非活跃超时时间。
+    /// </summary>
     public TimeSpan StaleTimeout { get; init; } = TimeSpan.FromDays(30);
 
+    /// <summary>
+    /// Umbrella pass mode for testing purposes.
+    /// 用于测试目的的伞形通过模式。
+    /// </summary>
     public enum UmbrellaPassMode
     {
+        /// <summary>Disabled / 禁用。</summary>
         Disabled,
+        /// <summary>Dry run only, no actual transitions / 仅试运行，不实际过渡。</summary>
         DryRunOnly
     }
 }

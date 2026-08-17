@@ -317,4 +317,10 @@ public static class RAGTools
     }
 
     /// <summary>
-    ///
+    /// Creates only search tool.
+    /// </summary>
+    public static ITool CreateSearchTool(IKnowledge knowledge, int defaultTopK = 5)
+    {
+        return new KnowledgeSearchTool(knowledge, defaultTopK);
+    }
+}

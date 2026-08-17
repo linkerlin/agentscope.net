@@ -186,6 +186,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// TracerProvider.Initialize sets the global tracer instance
+    /// 测试 TracerProvider.Initialize 设置全局跟踪器实例
+    /// </summary>
     public void TracerProvider_Initialize_SetsGlobalTracer()
     {
         // Arrange

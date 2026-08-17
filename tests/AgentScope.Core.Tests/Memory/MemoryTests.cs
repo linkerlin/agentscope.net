@@ -268,6 +268,10 @@ public class SqliteMemoryTests : IDisposable
         Assert.Equal(0, memory.Count());
     }
 
+    /// <summary>
+    /// Verifies that metadata associated with a message is persisted by <see cref="SqliteMemory"/>.
+    /// 验证与消息关联的元数据被 SqliteMemory 持久化。
+    /// </summary>
     [Fact]
     public void SqliteMemory_WithMetadata_ShouldPersistMetadata()
     {

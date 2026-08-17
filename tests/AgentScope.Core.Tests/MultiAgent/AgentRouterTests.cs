@@ -8,9 +8,17 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.MultiAgent;
 
+/// <summary>
+/// Tests for <see cref="AgentRouter"/> including routing rules, conditions, and patterns.
+/// 对 AgentRouter 的测试，包括路由规则、条件和模式匹配。
+/// </summary>
 public class AgentRouterTests
 {
     [Fact]
+    /// <summary>
+    /// Tests that the constructor creates an empty router with no agents or rules.
+    /// 测试构造函数创建一个没有代理和规则的空路由器。
+    /// </summary>
     public void Constructor_CreatesEmptyRouter()
     {
         // Arrange & Act

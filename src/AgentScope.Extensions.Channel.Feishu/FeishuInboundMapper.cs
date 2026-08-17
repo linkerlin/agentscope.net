@@ -107,7 +107,12 @@ public sealed class FeishuInboundMapper
         return string.IsNullOrWhiteSpace(key) ? null : key;
     }
 
-    /// <summary>映射为入站消息；非 text 或格式非法时返回 null。</summary>
+    /// <summary>
+    /// Maps a Feishu event envelope to an inbound message; returns null for non-text or invalid format.
+    /// 映射为入站消息；非 text 或格式非法时返回 null。
+    /// </summary>
+    /// <param name="envelope">Feishu event envelope JSON / 飞书事件信封 JSON</param>
+    /// <returns>Mapped inbound message, or null if not mappable / 映射后的入站消息，不可映射时返回 null</returns>
     public InboundMessage? Map(JsonNode? envelope)
     {
         if (envelope is null)

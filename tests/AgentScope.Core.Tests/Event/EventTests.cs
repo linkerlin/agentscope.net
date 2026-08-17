@@ -91,6 +91,10 @@ public class EventTests
         Assert.True(new EventItem(EventType.ActingFinish, null).IsActing);
     }
 
+    /// <summary>
+    /// Tests that IsSummary returns true for summary-related EventTypes.
+    /// 测试 IsSummary 对摘要相关的事件类型返回 true。
+    /// </summary>
     [Fact]
     public void Event_IsSummary_ForSummaryTypes()
     {

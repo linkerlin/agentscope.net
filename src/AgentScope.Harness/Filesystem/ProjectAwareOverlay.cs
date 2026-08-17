@@ -26,12 +26,19 @@ public sealed class ProjectAwareOverlay : IFilesystem
     private readonly IFilesystem _inner;
     private readonly string _projectRoot;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProjectAwareOverlay"/> class.
+    /// 初始化项目感知覆层文件系统。
+    /// </summary>
+    /// <param name="inner">底层文件系统 / Underlying filesystem</param>
+    /// <param name="projectRoot">项目根目录 / Project root directory</param>
     public ProjectAwareOverlay(IFilesystem inner, string projectRoot)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _projectRoot = FilesystemUtils.Normalize(projectRoot);
     }
 
+    /// <summary>Gets the normalized project root path. / 获取规范化后的项目根路径。</summary>
     public string ProjectRoot => _projectRoot;
 
     private string Anchor(string path) =>
