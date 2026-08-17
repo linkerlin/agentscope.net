@@ -26,13 +26,29 @@
                     MaxWidth="600"
                     Padding="12,8">
               <StackPanel>
-                <TextBlock Text="{Binding Role, Converter={StaticResource RoleToLabel}}"
-                           FontSize="11"
-                           Foreground="#888"
-                           Margin="0,0,0,4" />
+                <!-- 顶部行：角色标签（左）+ 复制按钮（右） -->
+                <Grid Margin="0,0,0,4">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding Role, Converter={StaticResource RoleToLabel}}"
+                             FontSize="11" Foreground="#888"
+                             Grid.Column="0" />
+                  <Button Content="📋"
+                          FontSize="12"
+                          Height="20" Width="24"
+                          Padding="0"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Cursor="Hand"
+                          Grid.Column="1"
+                          Click="OnCopyClick"
+                          Tag="{Binding Content}" />
+                </Grid>
+                <!-- 消息正文 -->
                 <TextBlock Text="{Binding Content}"
-                           TextWrapping="Wrap"
-                           FontSize="14" />
+                           TextWrapping="Wrap" FontSize="14" />
               </StackPanel>
             </Border>
           </DataTemplate>
