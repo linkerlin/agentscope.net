@@ -39,6 +39,39 @@ dotnet run --project examples/QuickStart/QuickStart.csproj
 dotnet run --project examples/WebSocketEcho/WebSocketEcho.csproj
 ```
 
+## 文档
+
+文档位于 `docs/` 目录，中英文各 82 篇：
+
+```
+docs/
+├── index.html          # 本地文档站入口（浏览器渲染）
+├── en/                 # 英文文档（82 篇）
+│   ├── home.md         # 英文首页
+│   ├── docs/           # quickstart / building-blocks / harness / reference
+│   └── integration/    # model / channel / rag / memory / session / skill / protocol 等
+├── zh/                 # 中文文档（82 篇，结构与 en/ 一致）
+│   ├── home.md         # 中文首页
+│   └── ...
+└── capability-status.md
+```
+
+### 方法一：浏览器查看（推荐）
+
+启动本地文档服务（需 Node.js）：
+
+```bash
+npx -y http-server docs -p 3001 -c-1
+```
+
+打开 http://localhost:3001 即可看到带侧边栏导航、Markdown 渲染和代码高亮的文档站。按 `Ctrl+C` 停止服务。
+
+### 方法二：VS Code 查看
+
+1. VS Code 打开 `docs/` 文件夹
+2. 点击任意 `.md` 文件
+3. 按 `Ctrl+Shift+V` 预览渲染效果（或点右上角"打开预览"按钮）
+
 ## 技术栈
 
 C# (.NET 9.0/10.0) | EF Core | SQLite | System.Reactive | Terminal.Gui | Uno Platform | xUnit | System.Text.Json
