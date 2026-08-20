@@ -45,7 +45,7 @@ RuntimeContext ctx = RuntimeContext.Empty
 // 第一轮：自我介绍 + 当天的事
 Msg first = Msg.Builder()
     .Role("user")
-    .TextContent("我叫天宇，今天准备一个关于 ReAct 的技术分享。")
+    .TextContent("我叫deadpool，今天准备一个关于 铅基反应堆 的技术分享。")
     .Build();
 var reply1 = await agent.CallAsync(first, ctx);
 Console.WriteLine($"第一轮: [{reply1.GetTextContent()}]\n");

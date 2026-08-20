@@ -46,6 +46,14 @@ namespace AgentScope.Core;
 /// </summary>
 public class EnhancedReActAgent : InterruptibleAgentBase, IStreamableAgent, IStateModule, IStructuredOutputCapableAgent
 {
+    /// <summary>
+    /// JSON 序列化选项：不转义非 ASCII 字符，保证中文等原文可见。
+    /// </summary>
+    private static readonly JsonSerializerOptions NonEscapingJsonOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     private const string AgentMetaStateKeyPrefix = "state::enhanced_react::agent_meta::";
     private const string MemoryStateKeyPrefix = "state::enhanced_react::memory::";
     private const string ToolkitStateKeyPrefix = "state::enhanced_react::toolkit::";
@@ -810,7 +818,7 @@ public class EnhancedReActAgent : InterruptibleAgentBase, IStreamableAgent, ISta
                 // Parameters 为 Dictionary（JSON 格式）时序列化为可读文本
                 if (actionIntent.Parameters is Dictionary<string, object> paramsDict)
                 {
-                    finalAnswer = JsonSerializer.Serialize(paramsDict);
+                    finalAnswer = JsonSerializer.Serialize(paramsDict, NonEscapingJsonOptions);
                 }
                 if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
                 {
@@ -925,9 +933,21 @@ public class EnhancedReActAgent : InterruptibleAgentBase, IStreamableAgent, ISta
     private Msg BuildReasoningPrompt(Msg userMessage, List<string> thoughtHistory, int iteration)
     {
         var toolDescriptions = BuildAvailableToolDescriptions();
+
+        // 构建对话历史（排除当前消息，当前消息单独作为"用户问题"传入）
+        var history = _memory.GetAll();
+        var priorMessages = history.Count > 0 && ReferenceEquals(history[^1], userMessage)
+            ? history.Take(history.Count - 1).ToList()
+            : history;
+        var historyText = string.Join("\n",
+            priorMessages.Select(m => $"{m.Role}: {m.GetTextContent()}"));
+
         var promptText = $@"{_systemPrompt}
 
 用户问题: {userMessage.GetTextContent()}
+
+对话历史:
+{historyText}
 
 你可以使用以下工具:
     {toolDescriptions}
@@ -943,7 +963,7 @@ Action: [finish 或 工具名称]
 Action Input: [如果是finish，输出最终答案；如果是工具，输出JSON格式的参数]";
 
         return Msg.Builder()
-            .Role("system")
+            .Role("user")
             .TextContent(promptText)
             .Build();
     }

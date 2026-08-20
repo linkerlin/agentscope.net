@@ -35,6 +35,14 @@ namespace AgentScope.Core;
 [Obsolete("请使用 EnhancedReActAgent 替代")]
 public class ReActAgent : AgentBase
 {
+    /// <summary>
+    /// JSON 序列化选项：不转义非 ASCII 字符，保证中文等原文可见。
+    /// </summary>
+    private static readonly JsonSerializerOptions NonEscapingJsonOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     private readonly IModel _model;
     private readonly IMemory _memory;
     private readonly Dictionary<string, ITool> _tools;
@@ -206,7 +214,7 @@ public class ReActAgent : AgentBase
                 // Parameters 为 Dictionary（JSON 格式）时序列化为可读文本
                 if (intent.Parameters is Dictionary<string, object> paramsDict)
                 {
-                    finalAnswer = JsonSerializer.Serialize(paramsDict);
+                    finalAnswer = JsonSerializer.Serialize(paramsDict, NonEscapingJsonOptions);
                 }
                 if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
                 {
@@ -247,9 +255,20 @@ public class ReActAgent : AgentBase
     {
         var toolDescriptions = BuildAvailableToolDescriptions();
 
+        // 构建对话历史（排除当前消息，当前消息单独作为 User Question 传入）
+        var history = _memory.GetAll();
+        var priorMessages = history.Count > 0 && ReferenceEquals(history[^1], userMessage)
+            ? history.Take(history.Count - 1).ToList()
+            : history;
+        var historyText = string.Join("\n",
+            priorMessages.Select(m => $"{m.Role}: {m.GetTextContent()}"));
+
         var promptText = $@"{_systemPrompt}
 
 User Question: {userMessage.GetTextContent()}
+
+Conversation History:
+{historyText}
 
 Available Tools:
 {toolDescriptions}
