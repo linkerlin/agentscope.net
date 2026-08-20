@@ -13,10 +13,10 @@ namespace AgentScope.Lab;
 public class GetStarted
 {
     private IModel? _model;
-    
+
     public GetStarted()
     {
-// 加载 .env 中的 API Key（优先当前目录，其次仓库根目录）
+        // 加载 .env 中的 API Key（优先当前目录，其次仓库根目录）
         var localEnv = Path.Combine(Directory.GetCurrentDirectory(), ".env");
         var rootEnv = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".env"));
         if (File.Exists(localEnv)) Env.Load(localEnv);
@@ -25,31 +25,18 @@ public class GetStarted
         Console.WriteLine("AgentScope.Lab — 框架用法实验工程");
         Console.WriteLine("====================================");
 
-// 模型：OpenAI 兼容端点（baseUrl / apiKey / model 从 .env 或环境变量读取）
-        var modelBaseUrl = Environment.GetEnvironmentVariable("LLM_BASE_URL") ?? "http://localhost:8000/v1";
-        var modelApiKey = Environment.GetEnvironmentVariable("LLM_API_KEY") ?? "none";
-        var modelName = Environment.GetEnvironmentVariable("LLM_MODEL") ?? "DeepSeek-V4-Flash";
-        this._model = new OpenAIModel(modelName, modelApiKey, modelBaseUrl);
+// 模型：私有化部署的 OpenAI 兼容端点（无需真实 Key，填 "none"）
+        IModel model = new OpenAIModel(
+            "DeepSeek-V4-Flash",
+            "none",
+            "http://10.193.41.51:8198/v1");
+        this._model = model;
+        // Console.WriteLine(model);
     }
 
 
     public async Task Harness_chat()
     {
-// // 加载 .env 中的 API Key（优先当前目录，其次仓库根目录）
-//         var localEnv = Path.Combine(Directory.GetCurrentDirectory(), ".env");
-//         var rootEnv = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".env"));
-//         if (File.Exists(localEnv)) Env.Load(localEnv);
-//         else if (File.Exists(rootEnv)) Env.Load(rootEnv);
-//
-//         Console.WriteLine("AgentScope.Lab — 框架用法实验工程");
-//         Console.WriteLine("====================================");
-//
-// // 模型：私有化部署的 OpenAI 兼容端点（无需真实 Key，填 "none"）
-//         IModel model = new OpenAIModel(
-//             "DeepSeek-V4-Flash",
-//             "none",
-//             "http://10.193.41.51:8198/v1");
-
 // 模型连通性自检
         var pingResp = await this._model!.GenerateAsync(new ModelRequest
         {
@@ -90,8 +77,7 @@ public class GetStarted
 
 
     public async Task Harness_chat_streaming()
-    { 
-
+    {
 // 模型连通性自检
         var pingResp = await _model!.GenerateAsync(new ModelRequest
         {
@@ -121,9 +107,7 @@ public class GetStarted
 
         Console.WriteLine($"第一轮: \n");
         await foreach (var ev in agent.StreamEventsAsync(first, ctx))
-        {  
-
-            Console.WriteLine($"[{ev.Type}] {ev.Message}");
+        { 
             Console.WriteLine($"[{ev.Type}] {ev.Message?.GetTextContent()}");
         }
         // var reply1 = await agent.CallAsync(first, ctx);
