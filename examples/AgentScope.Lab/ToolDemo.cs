@@ -53,12 +53,12 @@ public class ToolDemo
 
     }
     
-    public async void RegisterMcp()
+    public async Task RegisterMcp()
     {
         // Streamable HTTP / SSE（远程服务）
         IMcpClient http = McpClientBuilder.Create()
             .Named("excel-mcp-http")
-            .UseStreamableHttp("https://10.193.41.51:9151/mcp")
+            .UseStreamableHttp("http://10.193.41.51:9151/mcp")
             // .WithApiKey("YOUR_KEY") // Authorization: Bearer
             .WithRequestTimeout(TimeSpan.FromSeconds(60))
             .Build();
@@ -122,7 +122,7 @@ public class ToolDemo
         });
         Console.WriteLine($"模型连通性自检: [{pingResp.Text}]\n");
 
-        RegisterMcp();
+        await RegisterMcp();
         // 构建 HarnessAgent（工作区 + 上下文压缩中间件）
         HarnessAgent agent = new HarnessAgentBuilder()
             .WithName("note-taker")

@@ -14,6 +14,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -46,6 +47,9 @@ public sealed class StreamableHttpMcpClient : McpClientWrapper
 
     /// <summary>Monotonically increasing JSON-RPC request ID / 单调递增的 JSON-RPC 请求 ID</summary>
     private long _requestId;
+
+    /// <summary>MCP session ID returned by the server on first POST / MCP 服务器首次 POST 返回的会话 ID</summary>
+    private string? _sessionId;
 
     /// <summary>
     /// Gets the name of this MCP client instance.
@@ -110,9 +114,10 @@ public sealed class StreamableHttpMcpClient : McpClientWrapper
         if (response == null || !response.TryGetValue("result", out var resultObj))
             return new List<McpToolSchema>();
 
-        if (resultObj is JsonElement resultEl && resultEl.TryGetProperty("tools", out var toolsEl))
-        {
-            var tools = JsonSerializer.Deserialize<List<McpToolSchema>>(toolsEl.GetRawText());
+            if (resultObj is JsonElement resultEl && resultEl.TryGetProperty("tools", out var toolsEl))
+            {
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var tools = JsonSerializer.Deserialize<List<McpToolSchema>>(toolsEl.GetRawText(), opts);
             return (IReadOnlyList<McpToolSchema>)(tools ?? new List<McpToolSchema>());
         }
 
@@ -184,12 +189,9 @@ public sealed class StreamableHttpMcpClient : McpClientWrapper
         {
             ["jsonrpc"] = "2.0",
             ["id"] = id,
-            ["method"] = method
+            ["method"] = method,
+            ["params"] = parameters ?? new Dictionary<string, object>()
         };
-        if (parameters != null)
-        {
-            requestBody["params"] = parameters;
-        }
 
         var json = JsonSerializer.Serialize(requestBody);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -201,15 +203,34 @@ public sealed class StreamableHttpMcpClient : McpClientWrapper
         };
         httpRequest.Headers.Accept.Add(
             new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/event-stream"));
+        httpRequest.Headers.Accept.Add(
+            new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+        if (_sessionId != null)
+        {
+            httpRequest.Headers.TryAddWithoutValidation("mcp-session-id", _sessionId);
+        }
 
         try
         {
             using var httpResponse = await _http.SendAsync(httpRequest, cts.Token).ConfigureAwait(false);
+            // 从响应头中提取 session ID（服务器在首次 initialize 时返回）
+            if (httpResponse.Headers.TryGetValues("mcp-session-id", out var sessionValues))
+            {
+                var sid = sessionValues.FirstOrDefault();
+                if (!string.IsNullOrEmpty(sid)) _sessionId = sid;
+            }
             httpResponse.EnsureSuccessStatusCode();
 
             var body = await httpResponse.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
 
-            // Attempt to parse as JSON-RPC response / 尝试解析为 JSON-RPC 响应
+            // 如果响应体以 SSE event/data 开头，提取 data: 行中的 JSON
+            if (body.Length > 0 && body[0] != '{' && body[0] != '[')
+            {
+                var jsonData = ExtractJsonFromSse(body);
+                if (jsonData != null) body = jsonData;
+            }
+
+            // Parse as JSON-RPC response / 解析为 JSON-RPC 响应
             var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
 
@@ -231,6 +252,26 @@ public sealed class StreamableHttpMcpClient : McpClientWrapper
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Extracts JSON content from SSE-formatted text by finding the first line starting with "data: ".
+    /// 从 SSE 格式文本中提取首个以 "data: " 开头的行中的 JSON 内容。
+    /// </summary>
+    private static string? ExtractJsonFromSse(string sseText)
+    {
+        if (string.IsNullOrWhiteSpace(sseText)) return null;
+        using var reader = new System.IO.StringReader(sseText);
+        string? line;
+        while ((line = reader.ReadLine()) != null)
+        {
+            if (line.StartsWith("data: "))
+            {
+                var json = line.Substring(6).Trim();
+                if (json.Length > 0) return json;
+            }
+        }
+        return null;
     }
 
     /// <summary>
