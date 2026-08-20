@@ -116,12 +116,18 @@ public class Msg
         if (Content is string text)
         {
             return text;
-        }
+        } 
         
         if (Content is Dictionary<string, object> dict && dict.ContainsKey("text"))
         {
             return dict["text"]?.ToString();
         }
+        
+        if (Content is Dictionary<string, object> dict2 && dict2.ContainsKey("content"))
+        {
+            return dict2["content"]?.ToString();
+        }
+        
 
         return Content?.ToString();
     }

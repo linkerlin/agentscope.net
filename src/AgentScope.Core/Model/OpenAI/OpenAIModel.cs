@@ -20,6 +20,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AgentScope.Core.Formatter;
 using AgentScope.Core.Formatter.OpenAI;
+using AgentScope.Core.Formatter.OpenAI.Dto;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model.Transport;
 
@@ -161,14 +162,14 @@ public class OpenAIModel : ModelBase, IStreamingChatModel
 
         // Stream API call - process each SSE chunk as it arrives
         // 流式 API 调用 - 处理每个到达的 SSE 块
+        // 增量工具调用按 index 跨块合并（第一个块带 id/name，后续块只有 arguments 片段）
+        // Incremental tool calls are merged across chunks by index (first chunk carries id/name, later chunks only arguments fragments)
+        var toolCallsByIndex = new Dictionary<int, ToolCallInfo>();
         await foreach (var chunk in _client.StreamAsync(_apiKey, _baseUrl, openaiRequest, cancellationToken))
         {
-            var parsedResponse = _formatter.Parse(chunk);
-            if (parsedResponse != null)
-            {
-                var chatResponse = ConvertToChatResponse(parsedResponse);
+            var chatResponse = ConvertStreamingChunk(chunk, toolCallsByIndex);
+            if (chatResponse != null)
                 yield return chatResponse;
-            }
         }
     }
 
@@ -306,8 +307,101 @@ public class OpenAIModel : ModelBase, IStreamingChatModel
         if (!string.IsNullOrEmpty(parsed.ReasoningContent))
         {
             chatResponse.Metadata ??= new Dictionary<string, object>();
-            chatResponse.Metadata["thinking"] = parsed.ReasoningContent;
+            chatResponse.Metadata["reasoning"] = parsed.ReasoningContent;
         }
+
+        return chatResponse;
+    }
+
+    /// <summary>
+    /// Converts a streaming SSE chunk (delta-based) to ChatResponse.
+    /// SSE 块中的内容位于 choices[].delta，非标准响应的 choices[].message。
+    /// 增量工具调用按 index 合并到 toolCallsByIndex 中。
+    /// </summary>
+    private static ChatResponse? ConvertStreamingChunk(
+        OpenAIResponse chunk,
+        Dictionary<int, ToolCallInfo> toolCallsByIndex)
+    {
+        if (chunk?.Choices == null || chunk.Choices.Count == 0)
+            return null;
+
+        var choice = chunk.Choices[0];
+        var delta = choice.Delta;
+
+        // 部分代理将完整响应放在 message 而非 delta 中（非标准 SSE），
+        // 此时回退到 message 提取内容。
+        var msg = delta ?? choice.Message;
+        if (msg == null)
+            return null;
+
+        // 提取文本内容：优先 content，退化到 reasoning/reasoning_content
+        // 注意：System.Text.Json 将 object? Content 反序列化为 JsonElement 而非 string
+        string? text = null;
+        if (msg.Content != null)
+        {
+            if (msg.Content is string contentStr && !string.IsNullOrEmpty(contentStr))
+                text = contentStr;
+            else if (msg.Content is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.String)
+                text = je.GetString();
+        }
+        if (string.IsNullOrEmpty(text))
+            text = !string.IsNullOrEmpty(msg.Reasoning) ? msg.Reasoning : msg.ReasoningContent;
+
+        // 合并增量工具调用（同一 index 的片段累积参数，id/name 以后到为准）
+        // Merge incremental tool calls: fragments with the same index accumulate arguments
+        List<ToolCallInfo>? toolCalls = null;
+        if (msg.ToolCalls != null)
+        {
+            toolCalls = new List<ToolCallInfo>();
+            foreach (var tc in msg.ToolCalls)
+            {
+                ToolCallInfo merged;
+                if (tc.Index is int idx)
+                {
+                    if (!toolCallsByIndex.TryGetValue(idx, out merged!))
+                    {
+                        merged = new ToolCallInfo
+                        {
+                            Id = string.Empty,
+                            Name = string.Empty,
+                            Type = tc.Type,
+                            Arguments = string.Empty
+                        };
+                        toolCallsByIndex[idx] = merged;
+                    }
+                    if (!string.IsNullOrEmpty(tc.Id)) merged.Id = tc.Id;
+                    if (!string.IsNullOrEmpty(tc.Function?.Name)) merged.Name = tc.Function.Name;
+                    if (!string.IsNullOrEmpty(tc.Function?.Arguments)) merged.Arguments += tc.Function.Arguments;
+                }
+                else
+                {
+                    // 无 index（非标准实现）：按完整条目处理
+                    merged = new ToolCallInfo
+                    {
+                        Id = tc.Id ?? string.Empty,
+                        Name = tc.Function?.Name ?? string.Empty,
+                        Type = tc.Type,
+                        Arguments = tc.Function?.Arguments
+                    };
+                }
+                toolCalls.Add(merged);
+            }
+        }
+
+        // 内容为空且无工具调用则跳过
+        if (text == null && toolCalls == null)
+            return null;
+
+        var chatResponse = new ChatResponse
+        {
+            Id = chunk.Id,
+            Model = chunk.Model,
+            Text = text,
+            Content = text,
+            StopReason = choice.FinishReason,
+            Success = true,
+            ToolCalls = toolCalls
+        };
 
         return chatResponse;
     }

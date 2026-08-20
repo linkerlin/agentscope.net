@@ -37,7 +37,7 @@ dotnet build src/AgentScope.Core/AgentScope.Core.csproj
 dotnet run --project examples/QuickStart/QuickStart.csproj
 ```
 
-Minimal runnable example (same as `examples/AgentScope.Lab/Program.cs`):
+Minimal runnable example (using the same building APIs as `examples/AgentScope.Lab`):
 
 ```csharp
 using AgentScope.Core.Message;

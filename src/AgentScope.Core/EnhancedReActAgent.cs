@@ -614,6 +614,13 @@ public class EnhancedReActAgent : InterruptibleAgentBase, IStreamableAgent, ISta
                     finalAnswer = ExtractFinalAnswerForFinish(responseText, actionIntent.HasActionLine);
                 }
 
+                // 与非流式 ActingPhaseAsync 一致：仍为空时回退到原始响应文本
+                // Consistent with non-streaming ActingPhaseAsync: fall back to the raw response text when still empty
+                if (string.IsNullOrWhiteSpace(finalAnswer))
+                {
+                    finalAnswer = responseText;
+                }
+
                 var actionResult = ActionResult.Finish(finalAnswer ?? string.Empty);
                 var postActingEvent = new PostActingEvent
                 {
@@ -626,7 +633,7 @@ public class EnhancedReActAgent : InterruptibleAgentBase, IStreamableAgent, ISta
 
                 events.Add(new AgentEvent(
                     AgentEventType.ActingFinish,
-                    null,
+                    BuildAssistantChunkMessage(finalAnswer ?? string.Empty),
                     false,
                     CreatePhaseMetadata(iteration, "acting_finish")));
 
@@ -1199,7 +1206,7 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
         {
             new(
                 AgentEventType.SummaryStart,
-                null,
+                currentMessage,
                 false,
                 CreatePhaseMetadata(iteration, "summary_start"))
         };

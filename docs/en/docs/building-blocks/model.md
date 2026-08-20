@@ -79,6 +79,10 @@ await foreach (ChatResponse chunk in ((IStreamingChatModel)model).GenerateStream
 }
 ```
 
+:::{note}
+**Reasoning content of reasoning models**: the OpenAI-compatible family (`OpenAIModel` / `DashScopeModel` / `DeepSeekModel` / `OllamaModel`) falls back to the `reasoning` / `reasoning_content` field as text when `content` is empty (common with reasoning models deployed via vLLM); in non-streaming responses the reasoning content is also stored in `Metadata["reasoning"]`. Streaming tool calls are merged across chunks by `index`, so the final `ToolCalls` entries contain complete arguments.
+:::
+
 ## ModelFactory
 
 `AgentScope.Core.ModelFactory` is a static utility class that creates models by provider string:

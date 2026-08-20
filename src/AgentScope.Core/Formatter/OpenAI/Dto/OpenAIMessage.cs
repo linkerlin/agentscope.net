@@ -31,7 +31,8 @@ public record OpenAIMessage
     /// Message role: system, user, assistant, tool
     /// </summary>
     [JsonPropertyName("role")]
-    public required string Role { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Role { get; init; }
 
     /// <summary>
     /// 消息内容，可以是字符串或内容对象数组<br />

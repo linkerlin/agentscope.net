@@ -31,7 +31,7 @@ Unlike many frameworks, **all model providers (OpenAI / DashScope / Anthropic / 
 
 ## First Agent
 
-The following example is consistent with `examples/AgentScope.Lab/Program.cs` in the repository. It uses `HarnessAgent` to accomplish three things: **build a HarnessAgent**, **identify sessions via RuntimeContext**, and **multi-turn conversation**.
+The following example uses exactly the same building APIs as `examples/AgentScope.Lab` (`HarnessAgentBuilder` + `RuntimeContext`) to accomplish three things: **build a HarnessAgent**, **identify sessions via RuntimeContext**, and **multi-turn conversation**.
 
 ```csharp
 using AgentScope.Core.Agent;

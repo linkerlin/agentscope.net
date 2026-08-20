@@ -37,7 +37,7 @@ dotnet build src/AgentScope.Core/AgentScope.Core.csproj
 dotnet run --project examples/QuickStart/QuickStart.csproj
 ```
 
-最小可运行示例（与 `examples/AgentScope.Lab/Program.cs` 一致）：
+最小可运行示例（与 `examples/AgentScope.Lab` 使用相同的构建 API）：
 
 ```csharp
 using AgentScope.Core.Message;

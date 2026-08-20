@@ -79,6 +79,10 @@ await foreach (ChatResponse chunk in ((IStreamingChatModel)model).GenerateStream
 }
 ```
 
+:::{note}
+**推理模型的思考内容**：OpenAI 兼容系列（OpenAIModel / DashScopeModel / DeepSeekModel / OllamaModel）在 `content` 为空时会把响应中的 `reasoning` / `reasoning_content` 字段作为文本回退（vllm 部署的推理模型常见）；非流式响应中推理内容同时放入 `Metadata["reasoning"]`。流式工具调用按 `index` 跨块合并，最终 `ToolCalls` 中的条目是完整参数。
+:::
+
 ## ModelFactory
 
 `AgentScope.Core.ModelFactory` 是静态工具类，按 provider 字符串创建模型：

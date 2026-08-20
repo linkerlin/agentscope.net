@@ -262,6 +262,7 @@ public static class OpenAIResponseParser
     /// </summary>
     /// <param name="chunk">响应块 / Response chunk</param>
     /// <returns>解析后的块信息 / Parsed chunk information</returns>
+    [Obsolete("流式解析已改由 OpenAIModel.ConvertStreamingChunk 直接处理 SSE 块，此方法不再被框架内部调用，保留仅用于外部兼容")]
     public static StreamChunkInfo? ParseStreamChunk(string chunk)
     {
         if (string.IsNullOrWhiteSpace(chunk))
@@ -310,6 +311,19 @@ public static class OpenAIResponseParser
             if (delta.Content is string deltaText && !string.IsNullOrEmpty(deltaText))
             {
                 chunkInfo.Content = deltaText;
+            }
+
+            // 提取增量推理内容（vllm 推理模型在 SSE 流中把推理放在 reasoning 字段）
+            // Extract delta reasoning content (vllm reasoning models put thinking in reasoning field)
+            if (string.IsNullOrEmpty(chunkInfo.Content))
+            {
+                var reasoning = !string.IsNullOrEmpty(delta.Reasoning)
+                    ? delta.Reasoning
+                    : delta.ReasoningContent;
+                if (!string.IsNullOrEmpty(reasoning))
+                {
+                    chunkInfo.Content = reasoning;
+                }
             }
 
             // 提取增量工具调用

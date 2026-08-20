@@ -31,7 +31,7 @@ AgentScope .NET 基于 **.NET 10.0**（`net10.0`），推荐使用 dotnet CLI。
 
 ## 第一个智能体
 
-下面的例子与仓库 `examples/AgentScope.Lab/Program.cs` 一致，用 `HarnessAgent` 跑通三件事：**构建 HarnessAgent**、**通过 RuntimeContext 标识会话**、**多轮对话**。
+下面的例子使用与 `examples/AgentScope.Lab` 完全相同的构建 API（`HarnessAgentBuilder` + `RuntimeContext`），跑通三件事：**构建 HarnessAgent**、**通过 RuntimeContext 标识会话**、**多轮对话**。
 
 ```csharp
 using AgentScope.Core.Agent;

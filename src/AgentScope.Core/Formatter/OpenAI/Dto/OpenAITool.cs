@@ -95,11 +95,20 @@ public record OpenAIToolFunction
 public record OpenAIToolCall
 {
     /// <summary>
+    /// 流式增量中的工具调用序号（用于跨块合并同一工具调用）
+    /// Tool call index for merging incremental deltas across stream chunks
+    /// </summary>
+    [JsonPropertyName("index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Index { get; init; }
+
+    /// <summary>
     /// 工具调用ID
     /// Tool call ID
     /// </summary>
     [JsonPropertyName("id")]
-    public required string Id { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Id { get; init; }
 
     /// <summary>
     /// 工具类型
@@ -113,7 +122,8 @@ public record OpenAIToolCall
     /// Function call information
     /// </summary>
     [JsonPropertyName("function")]
-    public required OpenAIFunctionCall Function { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OpenAIFunctionCall? Function { get; init; }
 }
 
 /// <summary>
@@ -127,14 +137,16 @@ public record OpenAIFunctionCall
     /// Function name
     /// </summary>
     [JsonPropertyName("name")]
-    public required string Name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Name { get; init; }
 
     /// <summary>
     /// 函数参数（JSON字符串）
     /// Function arguments (JSON string)
     /// </summary>
     [JsonPropertyName("arguments")]
-    public required string Arguments { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Arguments { get; init; }
 }
 
 /// <summary>
