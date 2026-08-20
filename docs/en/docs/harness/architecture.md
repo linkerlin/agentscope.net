@@ -1,81 +1,106 @@
 ---
-title: "Harness Architecture"
-description: "What HarnessAgent is, how its capabilities cooperate, and how state flows during a call()"
+title: "Architecture"
+description: "HarnessAgent composition, HarnessAgentBuilder full configuration, and middleware assembly"
 ---
 
-`HarnessAgent` is a thin wrapper around `ReActAgent` that packages the engineering capabilities long-running agents need — workspace-driven persona, long-term memory, subagent orchestration, sandbox isolation, skill composition, plan mode, channel routing — into a single builder.
+## HarnessAgent Composition
 
-A bare `ReActAgent` only handles "one request → reason → tool → reply". Harness answers a different set of questions: how does the next turn pick up where the last left off, how does context stay bounded, how do users stay isolated, how do dangerous actions get reviewed, how do reusable capabilities accumulate.
+`HarnessAgent` (`AgentScope.Harness`) composes the inner `EnhancedReActAgent` with various subsystems to provide a complete agent runtime:
 
-> Installation, dependency, and an end-to-end "first `HarnessAgent`" walkthrough live in [Quickstart](../quickstart.md). This page is architecture only.
+```
+HarnessAgent
+├── EnhancedReActAgent        ← Reasoning-acting loop (AgentScope.Core)
+├── IMessageBus               ← Message bus (default WorkspaceMessageBus)
+├── IFilesystem               ← Filesystem abstraction (default local sandbox)
+├── IGateway                  ← Gateway (HarnessGateway, delegates to inner Agent)
+└── List<IHarnessMiddleware>  ← Middleware pipeline (onion model)
+```
 
-## Core working principle
+`HarnessAgent` implements `IAgent`:
 
-Three things to keep in mind:
+- `CallAsync(IReadOnlyList<Msg>, RuntimeContext?)` / `CallAsync(Msg, ...)` / `CallAsync(string, ...)`: calls the inner Agent after passing through the middleware pipeline;
+- `StreamEventsAsync(...)`: directly forwards the inner Agent's `IAsyncEnumerable<Event>`;
+- `ObserveAsync`, `Interrupt()` / `Interrupt(Msg)`.
 
-**1. Capabilities layer onto the reasoning loop, not into it.**
-Workspace injection, compaction, subagents, sandbox, Plan Mode — each hooks into key moments of the ReAct loop. The core algorithm is untouched; Harness only adds.
+`HarnessAgent`'s constructor is internal and can **only be created via `HarnessAgentBuilder`**.
 
-**2. Capabilities don't depend on each other; they share three objects.**
-Each capability does one job and is unaware of the others. They cooperate through:
+## HarnessAgentBuilder
 
-- **`RuntimeContext`** — who is speaking in this call: `sessionId`, `userId`, plus arbitrary extras. Not persisted.
-- **The workspace** — who reads and writes which files. Where they physically land (local disk, sandbox, KV store) is a configuration choice.
-- **`AgentStateStore`** — how runtime state is restored across calls.
+| Method | Signature | Default | Description |
+|------|------|--------|------|
+| `WithName` | `(string name)` | `"harness-agent"` | Agent name |
+| `WithSystemPrompt` | `(string prompt)` | Built-in English prompt | System prompt |
+| `WithModel` | `(IModel model)` | **Required** | Throws if not set on Build |
+| `WithToolkit` | `(Toolkit toolkit)` | null | Inject all tools at once |
+| `WithPermission` | `(IPermissionEngine)` | null | Permission engine |
+| `WithMessageBus` | `(IMessageBus bus)` | `new WorkspaceMessageBus()` | Message bus |
+| `WithFilesystem` | `(IFilesystem fs)` | Local current directory filesystem | See [filesystem](./filesystem.md) |
+| `WithDefaultFilesystem` | `(string? workspaceRoot = null)` | Current directory | Convenience: local sandbox mode |
+| `WithTeamClient` | `(ITeamClient team)` | `new LocalTeamClient()` | Team collaboration client |
+| `WithSubagentManager` | `(ISubagentManager mgr)` | `new DefaultAgentManager()` | Subagent manager |
+| `WithMiddleware` | `(IHarnessMiddleware mw)` | — | Append custom middleware, can be called multiple times |
+| `WithMaxIterations` | `(int n)` | `10` | Max ReAct iterations |
+| `WithWorkspace` | `(WorkspaceManager mgr)` | null | Enable workspace triple middleware |
+| `WithWorkspaceRoot` | `(string root, bool sandboxed = true)` | — | Convenience overload: `new WorkspaceManager(root, sandboxed)` |
+| `WithToolResultEviction` | `(ToolResultEvictionConfig cfg)` | null | Enable large tool result eviction |
+| `WithMemoryConsolidator` | `(MemoryConsolidator c)` | null | Memory consolidator (consumed by maintenance middleware) |
+| `WithSkillUsageStore` | `(SkillUsageStore store)` | null | Enable skill usage statistics middleware |
+| `WithSkillCurator` | `(SkillCurator curator)` | null | Enable skill curation middleware |
+| `Build` | `()` | — | Assemble and return `HarnessAgent` |
 
-**3. Built-ins run in a fixed order; your middleware runs first.**
-Harness wires its built-in middleware in a fixed order at build time. Anything you add via `.middleware(...)` runs **before** Harness's built-ins.
+### Typical Assembly
 
-## Core components
+```csharp
+using AgentScope.Harness;
+using AgentScope.Harness.Middleware;
 
-Each capability answers one problem; opt in on the builder.
+HarnessAgent agent = new HarnessAgentBuilder()
+    .WithName("coder")
+    .WithSystemPrompt("You are a coding assistant.")
+    .WithModel(model)
+    .WithWorkspaceRoot(Path.GetFullPath(".agentscope/workspace"))
+    .WithMaxIterations(20)
+    .WithMiddleware(new CompactionMiddleware(maxContextLength: 8192))
+    .Build();
+```
 
-| Capability | What it solves | Builder hook | Detail |
-|---|---|---|---|
-| Workspace-driven persona | Persona, knowledge, subagent specs, skills, MCP allowlist all live as files | `.workspace(path)` | [Workspace](./workspace.md) |
-| State persistence | Same `(userId, sessionId)` resumes across requests, processes, replicas | on by default; override with `.stateStore(...)` | [Context & AgentState](../building-blocks/context.md) |
-| Two-layer long-term memory | Facts in long conversations sediment into `MEMORY.md` | on by default; `.memory(...)` customizes prompts / trigger policy | [Memory](./memory.md) |
-| Conversation compaction | History bounded; force-retry on real overflow | `.compaction(...)` | [Compaction](./compaction.md) |
-| Large tool-result offloading | >80K-char results moved to disk + placeholder | `.toolResultEviction(...)` | [Compaction](./compaction.md) |
-| Subagent orchestration | Delegate to children, sync or background, with auto push-back | `.subagent(...)` or drop spec in `workspace/subagents/` | [Subagent](./subagent.md) |
-| Pluggable filesystem | Local + shell / shared store / sandbox without code changes | `.filesystem(...)` | [Filesystem](./filesystem.md) |
-| Sandbox isolation | Files and commands isolated; cross-call recovery; multi-replica | `.filesystem(new DockerFilesystemSpec()...)` | [Sandbox](./sandbox.md) |
-| Plan Mode | Read-only think-first phase with HITL exit | `.enablePlanMode()` | [Plan Mode](./plan-mode.md) |
-| Skill composition | Skills from Git / Nacos / MySQL / classpath / workspace | `.skillRepository(...)` | [Skill](./skill.md) |
-| MCP integration & tool allowlist | Declarative MCP servers + allow/deny per tool | `workspace/tools.json` | [Workspace](./workspace.md) |
-| Channel routing | Session management, per-session concurrency, multi-agent routing, streaming events | `agent.channel(...)` / `GatewayBootstrap` | [Channel](./channel.md) |
+## Build() Assembly Details
 
-## How state flows
+`Build()` does four things:
 
-Three layers exist; the framework moves data between them automatically.
+1. **Build the inner `EnhancedReActAgent`**: applies `Name` / `SysPrompt` / `Model` / tools / permission / `MaxIterations`;
+2. **Create `HarnessGateway`** wrapping the inner Agent;
+3. **Assemble the middleware pipeline**: first add user-provided middlewares via `WithMiddleware`, then automatically append `SandboxLifecycle` → `Subagents` → `Teams` → `Inbox` → `PlanMode` → `Compaction` → `MemoryFlush` → `AgentTrace` → `Transcript`; when workspace is configured, append `WorkspaceContext` / `AtPathExpansion` / `MemoryMaintenance`; when eviction / skill stats / skill curation are explicitly configured, append corresponding middlewares;
+4. **Construct `HarnessAgent`**.
 
-- **In-call state** — `AgentState` (conversation context, permission rules, Plan Mode state, tool state) plus `RuntimeContext` (`sessionId`, `userId`, sandbox handle, extras).
-- **Cross-call state** — auto-saved at the end of every `call()` and auto-loaded on the next: the `AgentState` runtime snapshot in the configured `AgentStateStore` (default `~/.agentscope/state/<agentId>/`, addressed by `(userId, sessionId)`), the never-compacted full conversation log under `sessions/<sessionId>.log.jsonl`, subtask records, and sandbox metadata.
-- **Long-term memory** — accumulated across sessions: `memory/YYYY-MM-DD.md` is append-only, periodically merged into `MEMORY.md` by a throttled background job; `MEMORY.md` is injected into the system prompt every reasoning step.
+At runtime, middlewares form an onion chain sorted by `Order` in ascending order (see [Middleware](../building-blocks/middleware.md)). The system prompt is first rewritten by each layer's `OnSystemPromptAsync` in sequence, then written back to the inner Agent.
 
-Three invariants worth remembering:
+## Gateway
 
-- The system prompt is rebuilt every reasoning step, so edits to `AGENTS.md` or `MEMORY.md` take effect immediately — no restart.
-- Compaction, memory distillation, and background maintenance are throttled; they don't run every turn.
-- `AgentState` is persisted by core's `ReActAgent` + `AgentStateStore`. Harness no longer adds its own persistence hook.
+`IGateway` exposes the Agent as a unified entry point:
 
-## Adding your own middleware
+```csharp
+public interface IGateway
+{
+    Task<Msg> RunAsync(Msg input, RuntimeContext? context = null, CancellationToken ct = default);
+    IAsyncEnumerable<Event> RunStreamAsync(Msg input, RuntimeContext? context = null, CancellationToken ct = default);
+}
+```
 
-To insert custom behaviour without bypassing Harness's plumbing:
+`HarnessGateway(IAgent agent)` is the default implementation, directly delegating to the inner Agent's `CallAsync` / `StreamEventsAsync`. Channel (see [Channel](./channel.md)) interacts with the Agent through the gateway.
 
-- Use `.middleware(...)` — your middleware runs before all Harness built-ins.
-- Read `RuntimeContext` from the agent for the current call's identity (`userId` / `sessionId`).
-- For workspace I/O, go through `harnessAgent.getWorkspaceManager()` — it routes correctly under sandbox or remote-store modes. `java.nio.Files` writes to the host disk and will land in the wrong place outside local mode.
+## Message Bus (IMessageBus)
 
-## Related pages
+`WorkspaceMessageBus` (default) is based on `System.Threading.Channels` and supports four modes:
 
-- [Workspace](./workspace.md) — directory layout, what gets injected into the system prompt, `tools.json`
-- [Context & AgentState](../building-blocks/context.md) — `AgentState`, `RuntimeContext`, `AgentStateStore` persistence, multi-user isolation
-- [Memory](./memory.md) — two-layer memory
-- [Compaction](./compaction.md) — summary compaction, large-result offloading, overflow recovery
-- [Filesystem](./filesystem.md) — local + shell / shared store / sandbox
-- [Sandbox](./sandbox.md) — isolated execution, cross-call recovery, distributed
-- [Subagent](./subagent.md) — declarations, sync/background, streaming forwarding
-- [Skill](./skill.md) — four-layer composition, self-learning loop
-- [Plan Mode](./plan-mode.md) — read-only phase + HITL exit
-- [Channel](./channel.md) — session management, multi-agent routing, streaming SSE
+- **Drain queue**: `QueuePushAsync(queue, entry)` / `QueueDrainAsync(queue)` / `QueueDeleteAsync`;
+- **Replay log**: `LogAppendAsync(log, entry)` / `LogReadAsync(log, startSeq)` / `LogTrimAsync`;
+- **Publish-Subscribe**: `PublishAsync(topic, entry)` / `Subscribe(topic, handler)`;
+- **Inbox domain helper**: `InboxPushAsync(agentId, entry)` / `InboxDrainAsync(agentId)` (consumed by `InboxMiddleware` at the start of each turn).
+
+Entry type `BusEntry(Id, Key, Payload)`, with monotonic `Sequence`.
+
+## Related Documentation
+
+- [Middleware](../building-blocks/middleware.md) —— Middleware interface and Order table
+- [Filesystem](./filesystem.md) · [Workspace](./workspace.md) · [Subagent](./subagent.md) · [Channel](./channel.md)

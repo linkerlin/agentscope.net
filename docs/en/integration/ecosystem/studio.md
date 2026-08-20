@@ -1,72 +1,47 @@
 # AgentScope Studio
 
-`AgentScope.Extensions.Studio` integrates Agents with [AgentScope Studio](https://github.com/agentscope-ai/agentscope-studio): every Agent invocation is pushed to Studio for visual debugging, trace replay, and human-in-the-loop input.
+`AgentScope.Extensions.Studio` provides `AgentScopeStudioClient` for pushing Agent run records to [AgentScope Studio](https://github.com/agentscope-ai/agentscope-studio) for visual debugging and trace replay.
 
 ## When to use
 
-- You want to inspect event streams, reasoning, and tool calls in Studio during development.
-- You need to issue `RequestUserInput` from Studio and let a real user respond.
+- Inspect Agent conversations in Studio during development.
+- Record production traces for retrospective analysis.
 
 ## Add the dependency
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Studio" Version="$(AgentScopeVersion)" />
+<PackageReference Include="AgentScope.Extensions.Studio" Version="2.0.1" />
 ```
 
-## Quickstart
+## AgentScopeStudioClient
 
 ```csharp
-using AgentScope.Core.Studio;
+using AgentScope.Extensions.Studio;
 
-// 1) Initialize Studio connection (HTTP + WebSocket)
-StudioManager.Init()
-    .StudioUrl("http://localhost:8000")
-    .Project("MyProject")
-    .RunName("experiment_001")
-    .Initialize()
-    .Wait();
+var client = new AgentScopeStudioClient(
+    http: httpClient,
+    baseUrl: "http://localhost:8000");
 
-// 2) Attach StudioMessageHook so messages are pushed to Studio
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(model)
-    .Hook(new StudioMessageHook(StudioManager.GetClient()))
-    .Build();
+// Create a session
+var sessionId = await client.CreateSessionAsync("agent-1");
 
-// 3) Use the Agent normally; Studio mirrors the conversation
-agent.Call(msg).Wait();
+// Log an event
+await client.LogEventAsync(sessionId, "user_input", "Hello");
+
+// Query the session
+var session = await client.GetSessionAsync(sessionId);
 ```
 
-## What Studio gives you
+### API
 
-- **Message push**: every user / assistant / tool message is mirrored to Studio.
-- **Traces**: Studio organizes events into a trace tree per `RunName`.
-- **Human-in-the-loop**: via `StudioUserAgent` or `RequestUserInput`, Studio's UI prompts a real user to fill in input before execution continues.
-
-## API overview
-
-| Class | Purpose |
+| Constructor | Description |
 | --- | --- |
-| `StudioManager` | Singleton entry point — initialize and access clients |
-| `StudioConfig` | URL / project / runName configuration |
-| `StudioClient` | HTTP client for events, messages, and run registration |
-| `StudioWebSocketClient` | WebSocket client for inbound commands (e.g. user input) |
-| `StudioMessageHook` | A `Hook` for `ReActAgent` that auto-pushes `Msg` |
-| `StudioUserAgent` | "Human-played" Agent that blocks on Studio user input |
+| `AgentScopeStudioClient(HttpClient http, string baseUrl)` | Connect to the Studio server |
 
-## When to disable
+| Method | Description |
+| --- | --- |
+| `CreateSessionAsync(string agentId, CancellationToken ct)` | Create a new session; returns `session_id` |
+| `LogEventAsync(string sessionId, string type, string data, CancellationToken ct)` | Log an event to a session |
+| `GetSessionAsync(string sessionId, CancellationToken ct)` | Get full session info (JSON format) |
 
-In production, you usually don't want this hook attached (every call writes to Studio). Gate it via configuration:
-
-```csharp
-// Only enable when configuration is present
-if (configuration.GetSection("AgentScope:Studio").Exists())
-{
-    StudioManager.Init()
-        .StudioUrl(url)
-        .Project(project)
-        .Initialize()
-        .Wait();
-    services.AddSingleton(new StudioMessageHook(StudioManager.GetClient()));
-}
-```
+> In production, consider gating Studio logging behind a configuration toggle to avoid unnecessary network overhead.

@@ -34,15 +34,14 @@ hide-toc: true
           <div class="hs-tab active" data-panel="en-harness">HarnessAgent</div>
         </div>
       </div>
-      <div class="hs-code-panel" id="en-harness"><pre><span class="kw">var</span> agent = <span class="ty">HarnessAgent</span>.CreateBuilder()
-    .Name(<span class="str">"coder"</span>)
-    .Model(<span class="str">"dashscope:qwen-max"</span>)                                <span class="cm">// resolved via ModelRegistry; reads DASHSCOPE_API_KEY</span>
-    .Workspace(<span class="ty">Path</span>.GetFullPath(<span class="str">".agentscope/workspace"</span>))   <span class="cm">// AGENTS.md · MEMORY.md · skills · subagents</span>
-    .Filesystem(<span class="kw">new</span> <span class="ty">DockerFilesystemSpec</span>()           <span class="cm">// sandboxed exec: local · Docker · remote KV swap in one line</span>
-        .IsolationScope(<span class="ty">IsolationScope</span>.User))           <span class="cm">// shared across sessions of the same user</span>
+      <div class="hs-code-panel" id="en-harness"><pre><span class="kw">var</span> agent = <span class="kw">new</span> <span class="ty">HarnessAgentBuilder</span>()
+    .WithName(<span class="str">"coder"</span>)
+    .WithSystemPrompt(<span class="str">"You are a coding assistant."</span>)
+    .WithModel(<span class="kw">new</span> <span class="ty">DashScopeModel</span>(<span class="str">"qwen-max"</span>, apiKey))      <span class="cm">// models are built into Core, construct directly</span>
+    .WithWorkspaceRoot(<span class="ty">Path</span>.GetFullPath(<span class="str">".agentscope/workspace"</span>))   <span class="cm">// AGENTS.md · MEMORY.md · skills · subagents</span>
     .Build();
-agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.CreateBuilder()
-    .SessionId(<span class="str">"demo"</span>).UserId(<span class="str">"alice"</span>).Build()).GetAwaiter().GetResult();</pre></div>
+agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.Empty
+    .WithSessionId(<span class="str">"demo"</span>).WithUserId(<span class="str">"alice"</span>)).GetAwaiter().GetResult();</pre></div>
       <div class="hs-install">
         <code>AgentScope.Harness</code>
         <button class="hs-copy-btn"
@@ -167,7 +166,7 @@ agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.CreateBuilder()
     <a class="hs-card" href="docs/building-blocks/model.html">
       <svg class="hs-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
       <h3>Model fault-tolerance</h3>
-      <p>Unified Credential + ChatModel abstraction across Qwen / OpenAI / Anthropic / Gemini / DeepSeek / Ollama through model extension packages. Configure max retries and a fallback model — the framework auto-switches when the primary is unavailable.</p>
+      <p>Unified <code>IModel</code> abstraction across OpenAI / Anthropic / Gemini / DashScope / DeepSeek / Ollama / Mock — all built into <code>AgentScope.Core</code>.</p>
       <span class="hs-card__link">Learn about models →</span>
     </a>
     <a class="hs-card" href="docs/harness/memory.html">
@@ -218,11 +217,11 @@ agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.CreateBuilder()
   </div>
   <details class="hs-faq-item">
     <summary>Which .NET version is required?</summary>
-    <p><code>.NET 8.0 SDK</code> or later. The framework relies on modern .NET features and runs on a Task-based asynchronous execution model.</p>
+    <p><code>.NET 10.0 SDK</code> or later. The framework relies on modern .NET features and runs on a Task-based asynchronous execution model.</p>
   </details>
   <details class="hs-faq-item">
     <summary>Which LLM providers are supported?</summary>
-    <p>Supported through model extension packages: OpenAI (and OpenAI-compatible endpoints including vLLM, DeepSeek, Kimi, Moonshot), Anthropic Claude, Alibaba Qwen via DashScope, Google Gemini, xAI Grok, and local Ollama. Each is a dedicated <code>ChatModel</code> implementation behind a unified builder. Retry and a fallback model can be configured at the model layer for graceful failover.</p>
+    <p>All models are built into <code>AgentScope.Core</code>: OpenAI (and OpenAI-compatible endpoints), Anthropic Claude, Alibaba Qwen via DashScope, Google Gemini, DeepSeek, local Ollama, and Mock. A unified <code>IModel</code> interface plus <code>IStreamingChatModel</code> for streaming — plug in and go.</p>
   </details>
   <details class="hs-faq-item">
     <summary>How does Harness differ from a plain ReActAgent?</summary>
@@ -238,7 +237,7 @@ agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.CreateBuilder()
   </details>
   <details class="hs-faq-item">
     <summary>How does it scale horizontally in production?</summary>
-    <p>AgentScope .NET is built for stateless horizontal scaling. Agent state is persisted by an <code>IAgentStateStore</code> (defaulting to a local <code>JsonFileAgentStateStore</code>; swap in <code>RedisAgentStateStore</code> for multi-replica), addressed by <code>(userId, sessionId)</code>; workspaces can be mounted on a remote KV / object store; in sandbox mode even the execution environment itself resumes across calls. Combined with Kubernetes + HPA, any replica can pick up the full context of any user.</p>
+    <p>AgentScope .NET is built for stateless horizontal scaling. Conversation state is managed by <code>IMemory</code> implementations (local <code>SqliteMemory</code> / <code>StateBackedMemory</code> backed by <code>IAgentStateStore</code>; use <code>RedisAgentStateStore</code> from <code>AgentScope.Extensions.Store.Redis</code> for multi-replica), addressed by <code>(userId, sessionId)</code>. Combined with Kubernetes + HPA, any replica can pick up the full context of any user.</p>
   </details>
 </div>
 

@@ -20,14 +20,15 @@ using AgentScope.Core.Model.DashScope;
 string key = System.Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
 var model = new DashScopeModel("qwen-plus", key);
 
-string response = await model.GenerateAsync(
+ModelResponse response = await model.GenerateAsync(
     new ModelRequest
     {
         Messages = new List<Msg>
         {
             Msg.Builder().Role("user").TextContent("Explain AgentScope").Build()
         }
-    }).Result.Text;
+    });
+Console.WriteLine(response.Text);
 ```
 
 ## Agent 集成

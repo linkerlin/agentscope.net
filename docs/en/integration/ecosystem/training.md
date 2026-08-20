@@ -1,83 +1,68 @@
 # Online Training
 
-`AgentScope.Extensions.Training` plugs a Trinity-style training backend into AgentScope: it samples production traffic, collects traces, computes rewards, and periodically commits training jobs — closing the loop.
+`AgentScope.Extensions.Training` provides `TrainingManager` for managing model fine-tuning tasks via HTTP API.
 
 ## When to use
 
-- You run Trinity (or a compatible service) as the training store.
-- You want to use live traffic for reinforcement learning or online fine-tuning.
-- You want the training pipeline to be transparent to the Agent's callers.
+- You have a compatible training backend and want to submit training jobs over REST.
+- You need to control training lifecycle (start, query, cancel) from code.
 
 ## Add the dependency
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Training" Version="$(AgentScopeVersion)" />
+<PackageReference Include="AgentScope.Extensions.Training" Version="2.0.1" />
 ```
 
-## Quickstart
+## TrainingManager
 
 ```csharp
-using AgentScope.Core.Training.Runner;
-using AgentScope.Core.Training.Strategy;
+using AgentScope.Extensions.Training;
 
-TrainingRunner runner = TrainingRunner.Builder()
-    .TrinityEndpoint("http://localhost:8080")
-    .ModelName("/path/to/model")
-    .SelectionStrategy(SamplingRateStrategy.Of(0.1))   // 10% sampling
-    .RewardCalculator(agent => 0.0)                    // custom reward
-    .CommitIntervalSeconds(300)                        // commit every 5 minutes
-    .Build();
+var manager = new TrainingManager(
+    http: httpClient,
+    baseUrl: "http://localhost:8080");
 
-runner.Start();          // intercept Agent calls and start sampling
+// Start training
+var jobId = await manager.StartTrainingAsync(
+    modelName: "my-model",
+    dataset: "production-traces",
+    config: new TrainingConfig(
+        Epochs: 3,
+        LearningRate: 1e-5,
+        BatchSize: 32));
 
-// Business code keeps using the Agent unmodified
-agent.Call(msg).Wait();
+// Query status
+var status = await manager.GetStatusAsync(jobId);
+Console.WriteLine($"Status: {status.Status}, Progress: {status.Progress}, Loss: {status.CurrentLoss}");
 
-runner.Stop();           // stop the training pipeline
+// Cancel
+await manager.CancelTrainingAsync(jobId);
 ```
 
-## Selection strategies
+### API
 
-- `SamplingRateStrategy.Of(0.1)`: random sampling at the given rate.
-- `ExplicitMarkingStrategy.Create()`: only marked requests are sampled.
-- Or implement `TrainingSelectionStrategy` for custom behavior.
-
-## Reward calculation
-
-`RewardCalculator` is a `Func<AgentBase, double>`, invoked once per sampled trajectory:
-
-- A lambda — heuristics like answer length, tool-call count, etc.
-- A custom class implementing `IRewardCalculator` for richer metrics.
-
-```csharp
-TrainingRunner runner = TrainingRunner.Builder()
-    .TrinityEndpoint(endpoint)
-    .ModelName(model)
-    .SelectionStrategy(SamplingRateStrategy.Of(0.1))
-    .RewardCalculator(new MyMetricRewardCalculator())
-    .Build();
-```
-
-## How it works
-
-1. After `runner.Start()`, requests go through `TrainingRouter`:
-   - sampled → routed to the Trinity store, traces collected;
-   - not sampled → original model is used, no side effects.
-2. Sampled trajectories invoke the reward calculator and feedback through `TrinityClient.Feedback(...)`.
-3. Every `commitIntervalSeconds`, `Commit(...)` triggers a training job.
-
-`runner.Stop()` shuts down timers and connection pools cleanly.
-
-## Key configuration
-
-| Field | Notes |
+| Constructor | Description |
 | --- | --- |
-| `TrinityEndpoint` | Trinity service URL |
-| `ModelName` | Target model path or alias |
-| `SelectionStrategy` | Sampling strategy |
-| `RewardCalculator` | Reward function |
-| `CommitIntervalSeconds` | Commit interval, default 300 |
+| `TrainingManager(HttpClient http, string baseUrl)` | Connect to the training backend |
 
-## Pairs well with Studio
+| Method | Description |
+| --- | --- |
+| `StartTrainingAsync(string modelName, string dataset, TrainingConfig? config, CancellationToken ct)` | Submit a training job; returns `job_id` |
+| `GetStatusAsync(string jobId, CancellationToken ct)` | Query training progress |
+| `CancelTrainingAsync(string jobId, CancellationToken ct)` | Cancel a training job |
 
-Attach `StudioMessageHook` simultaneously and you can see in Studio which sessions get sampled and how rewards were computed.
+### Data Models
+
+```csharp
+public sealed record TrainingConfig(
+    int Epochs = 3,
+    double LearningRate = 1e-5,
+    int? BatchSize = null);
+
+public sealed record TrainingStatus(
+    string Status,
+    double Progress,
+    double CurrentLoss);
+```
+
+`TrainingManager` is a pure HTTP client — it does not intercept Agent execution. You decide when and how to send production traffic to the training backend.

@@ -1,163 +1,157 @@
 ---
 title: "Quickstart"
-description: "Get started with AgentScope .NET 2.0 — bring up your first long-running agent with HarnessAgent"
+description: "Get started quickly with AgentScope .NET 2.0 — Run your first agent with HarnessAgent"
 ---
 
 ## Installation
 
-AgentScope .NET requires .NET 8.0 SDK or newer. The dotnet CLI is recommended.
+AgentScope .NET is built on **.NET 10.0** (`net10.0`). The dotnet CLI is recommended.
 
-### NuGet package
+### NuGet Packages
 
-`HarnessAgent` is the recommended entry point — it packages workspace, long-term memory, session persistence, subagents, sandboxes, and other engineering capabilities into one builder. Depending on `AgentScope.Harness` pulls `AgentScope.Core` in transitively:
+`AgentScope.Harness` is the recommended entry package. It internally references the core package `AgentScope.Core` and bundles workspace management, message bus, filesystem abstraction, sub-agents, middleware pipeline, and other engineering capabilities into a single Builder:
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Harness" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Harness" Version="2.0.1" />
+</ItemGroup>
+```
+
+If you only need the bare `ReActAgent` / `EnhancedReActAgent` framework API (without workspace / middleware pipeline / sub-agents), reference `AgentScope.Core` directly:
+
+```xml
+<ItemGroup>
+    <PackageReference Include="AgentScope.Core" Version="2.0.1" />
 </ItemGroup>
 ```
 
 :::{note}
-Substitute `$(AgentScopeVersion)` with the latest version. See [Release Notes](others/release-notes.md) for the latest version and full release details.
+Unlike many frameworks, **all model providers (OpenAI / DashScope / Anthropic / Gemini / DeepSeek / Ollama / Mock) are built into `AgentScope.Core`**; there are no `AgentScope.Extensions.Model.*` model extension packages. No additional packages are needed to integrate a model.
 :::
 
-If you only need the bare `ReActAgent` APIs (no workspace / persistence / subagents / sandbox), `AgentScope.Core` is enough for the agent framework itself. Concrete model providers are separate: provider-specific chat models and formatters live in independent `AgentScope.Extensions.Model.*` packages. The difference between `ReActAgent` and `HarnessAgent` is covered in [Harness Architecture](./harness/architecture.md).
+## First Agent
 
-The quickstart below uses DashScope through `.Model("dashscope:qwen-plus")`, so add the matching model extension as well:
-
-```xml
-<ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Model.DashScope" Version="$(AgentScopeVersion)" />
-</ItemGroup>
-```
-
-MCP integration requires the official MCP SDK — see `AgentScope.Examples/AgentScope.Examples.csproj` for a working example.
-
-## Your first agent
-
-The example below uses `HarnessAgent` to demonstrate three things at once: **workspace-driven persona** (`AGENTS.md`), **automatic session persistence** (the second turn with the same `sessionId` remembers the first), and **conversation compaction** (over-threshold compaction + long-term facts distilled into `MEMORY.md`). The model id is passed as a string to `.Model(...)` — `ModelRegistry` resolves it and reads the matching API-key env var automatically.
+The following example is consistent with `examples/AgentScope.Lab/Program.cs` in the repository. It uses `HarnessAgent` to accomplish three things: **build a HarnessAgent**, **identify sessions via RuntimeContext**, and **multi-turn conversation**.
 
 ```csharp
 using AgentScope.Core.Agent;
 using AgentScope.Core.Message;
-using AgentScope.Harness.Agent;
-using AgentScope.Harness.Agent.Memory.Compaction;
+using AgentScope.Core.Model;
+using AgentScope.Harness;
+using AgentScope.Harness.Middleware;
 
 class FirstAgent
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
-        HarnessAgent agent = HarnessAgent.CreateBuilder()
-                .Name("note-taker")
-                .SysPrompt("You are a note-taking assistant.")
-                // String form resolved via ModelRegistry — picks up DASHSCOPE_API_KEY
-                // from the environment. Use "openai:gpt-5.5", "anthropic:claude-sonnet-4-5",
-                // "gemini:gemini-2.0-flash", or "ollama:llama3" to switch providers.
-                .Model("dashscope:qwen-plus")
-                .Workspace(Path.GetFullPath(".agentscope/workspace"))
-                .Compaction(CompactionConfig.CreateBuilder()
-                        .TriggerMessages(30)
-                        .KeepMessages(10)
-                        .Build())
-                .Build();
+        // Model: construct directly, ApiKey usually from environment variables
+        IModel model = new DashScopeModel(
+            "qwen-plus",
+            Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY"));
 
-        RuntimeContext ctx = RuntimeContext.CreateBuilder()
-                .SessionId("demo-session")
-                .UserId("alice")
-                .Build();
+        HarnessAgent agent = new HarnessAgentBuilder()
+            .WithName("note-taker")
+            .WithSystemPrompt("You are an assistant that helps users take notes.")
+            .WithModel(model)
+            .WithWorkspaceRoot(Path.GetFullPath(".agentscope/workspace"))
+            .WithMiddleware(new CompactionMiddleware(maxContextLength: 4096))
+            .Build();
 
-        // Turn 1: introduce yourself + state today's task
-        agent.CallAsync(new UserMessage("My name is Alice, and I'm preparing a tech talk on ReAct today."), ctx).GetAwaiter().GetResult();
+        // Runtime context: record type, derive new instances with With* methods
+        RuntimeContext ctx = RuntimeContext.Empty
+            .WithUserId("alice")
+            .WithSessionId("demo-session");
 
-        // Turn 2: same sessionId — state from turn 1 is restored automatically
-        agent.CallAsync(new UserMessage("What is my name? What am I doing today?"), ctx).GetAwaiter().GetResult();
+        Msg first = Msg.Builder()
+            .Role("user")
+            .TextContent("My name is Tianyu. I'm preparing a tech talk about ReAct today.")
+            .Build();
+        Msg reply1 = await agent.CallAsync(first, ctx);
+        Console.WriteLine($"Assistant: {reply1.GetTextContent()}");
+
+        Msg second = Msg.Builder()
+            .Role("user")
+            .TextContent("What is my name? What am I doing today?")
+            .Build();
+        Msg reply2 = await agent.CallAsync(second, ctx);
+        Console.WriteLine($"Assistant: {reply2.GetTextContent()}");
     }
 }
 ```
 
-After this run you get two directory trees — the **workspace** and the **state store**:
-
-```
-.agentscope/workspace/                          ← workspace (agent content)
-├── AGENTS.md                                   ← write one to give the agent its persona (optional)
-└── agents/note-taker/
-    └── sessions/                               ← never-compacted raw conversation log
-
-~/.agentscope/state/note-taker/                 ← state store (outside workspace)
-└── alice/demo-session/                         ← AgentState auto-saved / auto-loaded
-    └── agent_state.json
-```
-
-`AgentState` lives **outside the workspace** at `~/.agentscope/state/<agentId>/` by default — because state is a prerequisite for restoring the workspace itself (e.g. after a sandbox wipe), so it must not be entangled with workspace data. Restart the process with the same `sessionId` and the second turn still remembers the first.
-
-:::{warning}
-The default `JsonFileAgentStateStore` is a local-file backend suitable for development and single-node deployment. For production clusters, use a distributed implementation such as `RedisAgentStateStore` (provided by `AgentScope.Extensions.Redis`) or implement your own `IAgentStateStore`. See [Going to Production](./others/going-to-production.md).
-:::
-
-After enough turns trip compaction, distilled facts first land in `workspace/memory/YYYY-MM-DD.md`, then a throttled background job merges them into `MEMORY.md`, which is injected into the system prompt on the next reasoning step.
-
-### Streaming reasoning and tool calls
-
-Swap `CallAsync(...)` for `StreamEventsAsync(...)` to receive incremental events — text deltas, tool calls, etc. — suitable for Web / TUI rendering:
+When no API Key is available, use `MockModel` to walk through the flow (echoes input without making network requests):
 
 ```csharp
-using AgentScope.Core.Event;
-
-agent.StreamEventsAsync(new UserMessage("Summarize today in three bullets."))
-        .Subscribe(event =>
-        {
-            if (event.Type == AgentEventType.TextBlockDelta)
-            {
-                // Streaming text fragment — append to UI or stdout
-                Console.Write(((TextBlockDeltaEvent)event).Delta);
-            }
-            else if (event.Type == AgentEventType.ToolCallStart)
-            {
-                // The agent is about to call a tool — surface the call info
-                Console.WriteLine("\n[tool] " + ((ToolCallStartEvent)event).ToolCallName);
-            }
-            // Other events: thinking blocks, tool results, reply end, etc.
-        });
+IModel model = MockModel.Builder().ModelName("mock-model").Build();
 ```
 
-:::{tip}
-Set `DASHSCOPE_API_KEY` in the environment before running. To switch providers, add the matching `AgentScope.Extensions.Model.*` package, change the string passed to `.Model(...)`, and export the matching API key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`). When you need explicit control over timeouts or custom endpoints, build the model with the provider builder such as `DashScopeChatModel.CreateBuilder()...Build()` and pass it to `.Model(Model)` instead.
-:::
+### Key API Reference
 
-### Multi-user concurrency
+| API | Description |
+|-----|-------------|
+| `new HarnessAgentBuilder()...Build()` | `HarnessAgent` can only be created via `HarnessAgentBuilder` (constructor is internal) |
+| `.WithModel(IModel)` | Required; accepts any `IModel` implementation, **no string model ID overload** |
+| `.WithWorkspaceRoot(path)` | Convenience overload, equivalent to `WithWorkspace(new WorkspaceManager(root, sandboxed: true))`; when set, automatically enables workspace context injection, `@path` expansion, and memory maintenance middlewares |
+| `.WithMiddleware(IHarnessMiddleware)` | Appends custom middleware to the pipeline (can be called multiple times); a set of built-in middlewares are auto-configured |
+| `RuntimeContext.Empty.WithUserId(...).WithSessionId(...)` | `RuntimeContext` is an immutable record, no Builder class |
+| `agent.CallAsync(Msg, RuntimeContext)` | Drives one reasoning-action loop, returns the final `Msg`; `reply.GetTextContent()` extracts text |
 
-The agent is **stateless between calls** — a single instance can handle requests from different users and sessions. Pass `userId` / `sessionId` via `RuntimeContext` and the agent automatically loads and isolates the corresponding conversation state:
+See [Harness Architecture](./harness/architecture.md) for all available Builder methods.
+
+### Streaming Reasoning and Tool Calls
+
+Replace `CallAsync(...)` with `StreamEventsAsync(...)` to get real-time intermediate events such as reasoning fragments and tool calls, suitable for Web / TUI rendering. It returns an `IAsyncEnumerable<Event>`, consumed with `await foreach`:
 
 ```csharp
-using AgentScope.Core.Agent;
-using AgentScope.Core.Message;
-using AgentScope.Harness.Agent;
-using AgentScope.Harness.Agent.Memory.Compaction;
+using AgentScope.Core.Events;
 
-// Create one agent instance at startup (singleton is fine)
-HarnessAgent agent = HarnessAgent.CreateBuilder()
-        .Name("note-taker")
-        .SysPrompt("You are a note-taking assistant.")
-        .Model("dashscope:qwen-plus")
-        .Workspace(Path.GetFullPath(".agentscope/workspace"))
-        .Compaction(CompactionConfig.CreateBuilder()
-                .TriggerMessages(30)
-                .KeepMessages(10)
-                .Build())
-        .Build();
-
-// In your HTTP handler — different requests pass different RuntimeContexts
-agent.CallAsync(new UserMessage(userInput), RuntimeContext.CreateBuilder()
-        .SessionId(sessionId)
-        .UserId(userId)
-        .Build()).GetAwaiter().GetResult();
+await foreach (Event evt in agent.StreamEventsAsync(
+    Msg.Builder().Role("user").TextContent("List three key points for today.").Build(), ctx))
+{
+    if (evt.Type == EventType.ReasoningChunk && evt.Message != null)
+    {
+        // Streaming text fragments from the model output
+        Console.Write(evt.Message.GetTextContent());
+    }
+    else if (evt.Type == EventType.ToolCallStart)
+    {
+        Console.WriteLine("\n[tool] Model requested a tool call");
+    }
+    else if (evt.IsLast)
+    {
+        Console.WriteLine("\n[done]");
+    }
+}
 ```
 
-Calls targeting the same `(userId, sessionId)` are automatically serialized (no concurrent writes to one session); calls to different sessions run in parallel. For full production patterns (Redis session, sandbox, skill repositories), see [Going to Production](./others/going-to-production.md).
+Event types are defined by the `AgentScope.Core.Events.EventType` enum: `ReasoningStart/Chunk/Finish`, `ToolCallStart/Chunk/Finish`, `ActingStart/Chunk/Finish`, `SummaryStart/Chunk/Finish`, `Error`. See [Message and Event](./building-blocks/message-and-event.md) for the full description.
 
-## Next steps
+### Multi-User Concurrency
 
-- [Agent](./building-blocks/agent.md) — full `ReActAgent` API, builder fields, `CallAsync` / `StreamEventsAsync` / `Observe`, human-in-the-loop, `IAgentStateStore` configuration
-- [Harness Architecture](./harness/architecture.md) — how `HarnessAgent`'s capabilities cooperate, how state flows
-- [Workspace](./harness/workspace.md) — `AGENTS.md` / `MEMORY.md` / `skills/` / `subagents/` / `tools.json` directory layout and loading model
-- [Filesystem](./harness/filesystem.md) — local + shell / shared store / sandbox deployment modes
+A `HarnessAgent` instance can be reused. Pass different `UserId` / `SessionId` values via `RuntimeContext` — each call operates independently:
+
+```csharp
+// Create a single agent instance at application startup (singleton)
+HarnessAgent agent = new HarnessAgentBuilder()
+    .WithName("note-taker")
+    .WithSystemPrompt("You are an assistant that helps users take notes.")
+    .WithModel(model)
+    .Build();
+
+// In an HTTP handler — different requests pass different RuntimeContext
+await agent.CallAsync(userInput, RuntimeContext.Empty
+    .WithUserId(userId)
+    .WithSessionId(sessionId));
+```
+
+`HarnessAgent` also provides a plain-text convenience overload: `agent.CallAsync("hello", ctx)` internally wraps the string into a `Msg`.
+
+To restore sessions across processes, use `EnhancedReActAgent`'s `SaveTo` / `LoadFrom` with `SessionManager`, or configure `StateBackedMemory` + `IAgentStateStore` for memory. See [Context and AgentState](./building-blocks/context.md).
+
+## Next Steps
+
+- [Agent](./building-blocks/agent.md) — Full Builder, invocation, streaming, and structured output for `EnhancedReActAgent`
+- [Model](./building-blocks/model.md) — Constructor signatures and streaming interfaces for each provider's model class
+- [Tool](./building-blocks/tool.md) — `[Tool]` attribute registration, `Toolkit`, MCP client
+- [Harness Architecture](./harness/architecture.md) — Complete `HarnessAgentBuilder` methods and middleware pipeline
+- [Workspace](./harness/workspace.md) — Directory layout and loading mechanism for `AGENTS.md` / `MEMORY.md` / `skills/`

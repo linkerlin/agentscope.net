@@ -1,114 +1,92 @@
 ---
 title: "Context Compaction"
-description: "Keep the conversation within the model's token budget without losing critical information"
+description: "CompactionMiddleware, ConversationCompactor, and tool result eviction"
 ---
 
-:::{note}
-This page covers **context compaction** — the strategies `HarnessAgent` uses to keep the conversation within the model's token budget. It builds on the stateless-engine design and `AgentState` persistence described in [Context & AgentState](../building-blocks/context.md). Read that page first if you haven't — compaction operates on the same `AgentState` that the persistence layer saves and restores.
+## Overview
 
-**How they work together**: compaction mutates `AgentState.ContextMutable()` in memory; the state store writes the updated `AgentState` at end of call. The two paths are independent but always run in that order — the state store sees the post-compaction state.
-:::
+`AgentScope.Harness.Memory.Compaction` provides two levels of context management:
 
-The model's token budget is finite. A long-running conversation either compacts proactively or eventually crashes into the model's hard limit. `HarnessAgent` ships a full compaction stack — opt-in via `.compaction(...)` / `.toolResultEviction(...)`.
+1. **Turn-level marking**: `CompactionMiddleware` checks context length each turn and marks whether compaction is needed;
+2. **Message list compaction**: `ConversationCompactor` performs truncation / pruning / summarization on the message list according to `CompactionConfig`;
+3. **Tool result eviction**: `ToolResultEvictionConfig` + `ToolResultEvictionMiddleware` offloads oversized tool results to disk, leaving only placeholders.
 
-## What `HarnessAgent` ships
-
-| Strategy | What it solves | When it fires | Middleware |
-|------|----------|----------|--------|
-| **Conversation summarization** | Context too *deep* — message count / token total piles up | Before each model reasoning call | `CompactionMiddleware` |
-| **Large tool-result eviction** | Context too *wide* — a single tool result is huge | After tool execution | `ToolResultEvictionMiddleware` |
-| **Overflow safety net** | Model actually returned `context_length_exceeded` | When `call()` throws | `HarnessAgent.RecoverFromOverflow` |
-| **Pre-summary argument truncation** | Tool-call args (e.g. `write_file` body) are big but nobody reads them later | Lightweight pre-pass before summarization | `CompactionConfig.TruncateArgsConfig` |
-
-The four are **orthogonal — combine them freely**. All four are off by default.
-
-### 1. Conversation summarization (`CompactionMiddleware`)
-
-Triggers on message count or estimated token count. Distills the conversation **prefix** into a structured summary via one LLM call, **keeps the last N messages verbatim**, and writes `[summary] + [recent tail]` back into `AgentState.ContextMutable()`.
+## CompactionMiddleware
 
 ```csharp
-HarnessAgent.Builder()
-    .Compaction(CompactionConfig.Builder()
-        .TriggerMessages(30)     // fire at 30 messages
-        .KeepMessages(10)        // keep last 10 verbatim
-        .Build())
+using AgentScope.Harness.Middleware;
+
+HarnessAgent agent = new HarnessAgentBuilder()
+    .WithModel(model)
+    .WithMiddleware(new CompactionMiddleware(maxContextLength: 4096))   // default 4096
     .Build();
 ```
 
-The default summary prompt organizes content into `SESSION INTENT / SUMMARY / ARTIFACTS / NEXT STEPS` — works well for engineering/orchestration agents. `CompactionConfig` also supports `.Model(...)` to specify a dedicated model for the summarization LLM call (falls back to the agent's primary model when not set). The full configuration surface (`TriggerTokens`, `KeepTokens`, `FlushBeforeCompact`, `OffloadBeforeCompact`, `Model`, `TruncateArgsConfig`) and the summary prompt template are in [Memory — Enable compaction](./memory.md#enable-compaction); not duplicated here.
+`HarnessAgentBuilder.Build()` also automatically assembles a default `CompactionMiddleware` (Order 700). It reads `ctx.Items["context_length"]` and sets `ctx.Items["needs_compaction"]` to `true` when the threshold is exceeded, for downstream components to consume.
 
-### 2. Large tool-result eviction (`ToolResultEvictionMiddleware`)
+## ConversationCompactor
 
-Independent of summarization. When a tool result exceeds the threshold (default 80K chars ≈ 20K tokens), the full output is written to a workspace directory and **the in-context message is replaced with a head + tail preview (~2K chars each) plus a `read_file` pointer**. The agent reads the full version on demand.
+Performs compaction judgment and compaction on any message list:
 
 ```csharp
-HarnessAgent.Builder()
-    .ToolResultEviction(ToolResultEvictionConfig.Defaults())
+using AgentScope.Harness.Memory.Compaction;
+
+var compactor = new ConversationCompactor(new CompactionConfig
+{
+    TriggerMessageCount = 30,     // message count threshold (default 50)
+    TriggerTokenCount = 8000,     // token count threshold (default 8000, estimated by len/4)
+    TargetMessageCount = 15,      // max messages retained after compaction (default 20)
+    TargetTokenCount = 3000,      // max tokens retained after compaction (default 3000)
+    Mode = CompactionMode.Adaptive
+});
+
+if (compactor.ShouldCompact(messages))
+{
+    IReadOnlyList<Msg> compacted = compactor.Compact(messages);
+}
+```
+
+### CompactionMode
+
+| Mode | Behavior |
+|------|------|
+| `TruncateOnly` | Only truncate tool call parameters (`TruncateArgsConfig`: enabled by default, 500 chars per param, max 20 per call) |
+| `PruneOnly` | Only prune tool results (`PruneConfig`: enabled by default, 1000 chars per result, max 10 per message, preserve error results) |
+| `SummarizeOnly` | Only generate summaries (`SummarizeConfig`: **disabled** by default, configurable with `ModelName` / `MaxSummaryTokens=500` / `SummaryPrompt`) |
+| `Adaptive` | (default) Applies the above three sub-strategies in sequence |
+
+## Tool Result Eviction
+
+`ToolResultEvictionConfig` defines the eviction strategy:
+
+```csharp
+using AgentScope.Harness.Memory.Compaction;
+
+HarnessAgent agent = new HarnessAgentBuilder()
+    .WithModel(model)
+    .WithFilesystem(fs)
+    .WithToolResultEviction(new ToolResultEvictionConfig
+    {
+        Enabled = true,
+        MaxResultBytes = 4096,        // trigger threshold
+        HeadBytes = 256,              // head bytes to retain
+        TailBytes = 256,              // tail bytes to retain
+        Placeholder = "... [Result truncated] ...",
+        MaxResultChars = 4000,        // character threshold for eviction
+        PreviewChars = 500,           // preview length retained in placeholder
+        EvictionPath = ".evicted",    // directory for evicted content
+        ExcludedToolNames = new HashSet<string> { "read_file", "readFile" }
+    })
     .Build();
 ```
 
-`read_file` / `write_file` / `edit_file` / `grep_files` / `glob_files` / `list_files` / `memory_*` / `session_search` are excluded by default — they either self-paginate or return tiny payloads. **Shell `execute` is deliberately NOT excluded** because command output can be arbitrarily large.
+Setting `WithToolResultEviction(...)` automatically enables `ToolResultEvictionMiddleware` (Order 30): oversized tool results are written to the filesystem (deduplicated by content hash), leaving only `head + preview + tail` placeholders in the message, with metadata marking `agentscope.tool_result_evicted`. `config.Evict(result)` can also be called independently for in-memory truncation.
 
-Details in [Memory — Large tool-result offloading](./memory.md#large-tool-result-offloading).
+## Interaction with Memory Maintenance
 
-### 3. Overflow safety net
+`MemoryConsolidator` (see [Memory](./memory.md)) internally calls `ConversationCompactor` during consolidation; the compaction action itself is written to the session transcript log as a `CompactionEntry` (`Summary` / `OriginalMessageCount` / `CompressedMessageCount`), ensuring that already compacted content can be skipped during replay.
 
-If the model returns `context_length_exceeded` / `maximum context` / `token limit` errors, `HarnessAgent.RecoverFromOverflow()` runs a forced `triggerMessages=1` extreme compaction and **automatically retries once**. Requires `.compaction(...)` to be configured at build time — otherwise the error propagates.
+## Related Documentation
 
-No extra configuration: turn on compaction, and overflow recovery comes along.
-
-### 4. Pre-summary argument truncation (optional)
-
-Before the LLM summary pass, a **non-LLM** string-truncation pass clips oversized tool-call args (`write_file`, `edit_file` bodies):
-
-```csharp
-CompactionConfig.Builder()
-    .TriggerMessages(80)
-    .TruncateArgs(CompactionConfig.TruncateArgsConfig.Builder()
-        .MaxArgLength(2000)
-        .TruncationText("... [truncated] ...")
-        .Build())
-    .Build();
-```
-
-In many workloads this single step delays the summarization trigger considerably at near-zero cost.
-
-## Coordination with Memory
-
-`CompactionConfig.FlushBeforeCompact` (default `true`) decides **whether to extract facts from the conversation prefix into long-term memory before summarizing** — handled by `MemoryFlushMiddleware` + `MemoryFlushManager`, which read `<workspace>/MEMORY.md` and `memory/*.md` and incrementally append new facts. Once summarization drops the prefix messages, the information persists: the agent can pull it back via `memory_search` / `memory_get`.
-
-Similarly, `OffloadBeforeCompact` (default `true`) writes the **raw messages** to the uncompressed `*.log.jsonl` before summarization, so `session_search` can still reach them.
-
-> The full Memory subsystem — two-tier structure, background maintenance (archive, merge), memory tools — is in [Memory](./memory.md). Compaction and memory are commonly used together but have independent switches.
-
-## What compaction does *not* touch
-
-`ConversationCompactor` only operates on the **conversation message list** in `AgentState.ContextMutable()`. The following live in other `AgentState` fields and **stay untouched by summarization**:
-
-- **Plan Mode state** (`AgentState.PlanModeContext()`): whether plan mode is active, current plan file path. The plan file itself lives under `plans/` in the workspace and is managed by Plan Mode's own lifecycle. See [Plan Mode](./plan-mode.md).
-- **Subagent background tasks** (`task_id`, status, result): stored at `<workspace>/agents/<parentAgentId>/tasks/<sessionId>.json`, managed by `TaskRepository`; completed results are injected back into the parent via a system reminder on the next reasoning turn — they **do not enter the conversation message stream**, so summarization can't touch them. See [Subagent — Background task storage](./subagent.md#background-task-storage).
-- **`todo_write` task list** (`AgentState.TasksContext()`): independent field, persisted with `AgentState` but not in the compaction path. See [Plan Mode — Interaction with `todo_write`](./plan-mode.md#interaction-with-todo_write).
-- **Permission rules** (`PermissionContext()`): independent field, self-persisting.
-
-Each of these owns its own state machine and recovery path; the compaction track is transparent to them — you can enable `.compaction(...)` without worrying about losing a plan or an in-flight background task.
-
-## Letting the agent inspect its own history
-
-When session capability is on (the default), three query tools are registered automatically:
-
-- `session_list agentId="..."` — list an agent's historical sessions.
-- `session_history agentId="..." sessionId="..." lastN=20` — recent N messages of a session.
-- `session_search query="..." agentId="..."` — keyword search across history.
-
-These tools read the **uncompressed conversation log** (`<workspace>/agents/<agentId>/sessions/<sessionId>.log.jsonl`), so even when the in-context conversation has been summarized, the agent can still pull up the original messages.
-
----
-
-## Related pages
-
-- [Context & AgentState](../building-blocks/context.md) — stateless engine design, `AgentState` structure, state persistence, `RuntimeContext`
-- [Architecture](./architecture.md) — how context, state persistence, and workspace cooperate inside one call
-- [Memory](./memory.md) — long-term memory, full compaction configuration, large tool-result offloading, background maintenance
-- [Plan Mode](./plan-mode.md) — independent persistence and recovery of plan state
-- [Subagent](./subagent.md) — where background tasks live and how they survive node migration
-- [Filesystem](./filesystem.md) — `userId`-based multi-tenant path isolation
+- [Memory](./memory.md) —— Transcript, flush, and consolidation
+- [Context and AgentState](../building-blocks/context.md)
