@@ -15,6 +15,6 @@ using DotNetEnv;
 
 async Task Executor()
 {
-    var getStart = new GetStarted();
-    await  getStart.Harness_chat_streaming();  
+    var demo = new ToolDemo();
+    await  demo.Tool_chat_streaming();  
 }
