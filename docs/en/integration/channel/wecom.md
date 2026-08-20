@@ -1,68 +1,53 @@
 # WeCom Channel
 
-`AgentScope.Extensions.Channel.WeCom` connects your Agent to WeCom (企业微信 / WeChat Work) via the **encrypted callback** mechanism. A controller receives message callbacks, decrypts them, and dispatches through the Gateway.
+`AgentScope.Extensions.Channel.WeCom` connects your Agent to WeCom (企业微信 / WeChat Work) through encrypted webhook callbacks.
 
-## When to use
-
-- Your Agent needs to respond to WeCom bot messages in 1:1 chats or group chats.
-- Your application already runs ASP.NET Core.
+Package version: **2.0.1** | Target framework: **net10.0**
 
 ## Add the dependency
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Channel.WeCom" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Channel.WeCom" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## Prerequisites
-
-1. Create an **Application** in the [WeCom Admin Console](https://work.weixin.qq.com/).
-2. Enable the **Receive Messages** API and configure the callback URL:
-   `https://your-host/api/channels/wecom/{channelId}/callback`
-3. Note down the **Corp ID**, **Agent ID**, **Secret**, **Token**, and **EncodingAESKey**.
-
-## Quickstart
+## Constructor
 
 ```csharp
-var channel = WeComChannel.FromProperties(
-    "my-wecom",
-    ChannelConfig.Of("my-wecom", "main"),
-    new Dictionary<string, string>
-    {
-        ["corpId"] = "your-corp-id",
-        ["agentId"] = "1000002",
-        ["secret"] = "your-secret",
-        ["token"] = "your-callback-token",
-        ["encodingAesKey"] = "your-encoding-aes-key"
-    });
-
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", agent)
-    .Channel(channel)
-    .Build();
-
-gw.Start();
+public WeComChannel(
+    HttpClient http,
+    string webhookUrl,
+    string? corpId = null,
+    string? corpSecret = null,
+    string? token = null,
+    string? encodingAesKey = null,
+    string? receiveId = null,
+    string? apiBase = null)
 ```
 
-## Configuration properties
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `http` | `HttpClient` | Yes | HTTP client for calling WeCom APIs |
+| `webhookUrl` | `string` | Yes | Webhook URL for outgoing messages |
+| `corpId` | `string?` | No | Enterprise Corp ID |
+| `corpSecret` | `string?` | No | Application secret |
+| `token` | `string?` | No | Callback token (for signature verification) |
+| `encodingAesKey` | `string?` | No | AES key (for message encryption/decryption) |
+| `receiveId` | `string?` | No | Receiver ID (corpId) |
+| `apiBase` | `string?` | No | API base URL, default `https://qyapi.weixin.qq.com` |
 
-| Property | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `corpId` | Yes | — | Enterprise Corp ID |
-| `agentId` | Yes | — | Application Agent ID |
-| `secret` | Yes | — | Application secret for access token |
-| `token` | Yes | — | Callback token for signature verification |
-| `encodingAesKey` | Yes | — | AES key for message encryption/decryption |
-| `callbackPath` | No | `/api/channels/wecom/{channelId}/callback` | Override the callback URL path |
-| `apiBase` | No | `https://qyapi.weixin.qq.com` | WeCom API base URL |
+When `corpId` and `corpSecret` are provided, `TokenProvider` exposes a `WeComAccessTokenProvider`. When `token`, `encodingAesKey`, and `receiveId` are all provided, `WeComCrypto` is enabled.
 
-## Encryption
+## Interface members
 
-All WeCom callbacks are encrypted. The adapter handles decryption and signature verification automatically using `WeComCrypto`, which implements the [WeCom callback encryption spec](https://developer.work.weixin.qq.com/document/path/90238).
+| Member | Description |
+|--------|-------------|
+| `Name` | Returns `"wecom"` |
+| `StartAsync` | No-op (stateless channel) |
+| `StopAsync` | No-op |
+| `SendAsync` | Sends text via webhook (`POST` to `webhookUrl`) |
+| `ProcessInboundAsync` | Processes callback: `msg_signature` verify → decrypt → URL verification (echostr) → MsgId dedup → mapping → BotLoopGuard → fires `OnMessageReceived` |
+| `OnMessageReceived` | Inbound message event |
 
-## Message flow
-
-**Inbound:** `WeComCallbackController` → URL verification (echostr) → decrypt → MsgId dedup → `WeComInboundMapper` (text messages) → bot-loop guard → Gateway.
-
-**Outbound:** `WeComOutboundClient` sends replies via `/cgi-bin/message/send` (DMs) or `/cgi-bin/appchat/send` (groups), authenticating with an `access_token` from `WeComAccessTokenProvider`.
+All WeCom callbacks are encrypted. Without `token`/`encodingAesKey`/`receiveId`, `ProcessInboundAsync` returns `FailedVerification`.

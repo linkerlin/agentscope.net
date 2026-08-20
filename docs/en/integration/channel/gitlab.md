@@ -1,61 +1,45 @@
 # GitLab Channel
 
-`AgentScope.Extensions.Channel.GitLab` connects your Agent to GitLab note (comment) hooks. When someone comments on an issue or merge request, the Agent replies as a new note.
+`AgentScope.Extensions.Channel.GitLab` connects your Agent to GitLab note (comment) hooks. It receives callbacks via webhook and replies via the REST API.
 
-## When to use
-
-- You want an AI-powered bot that responds to GitLab issue or merge request comments.
-- You run GitLab SaaS or a self-managed GitLab instance.
+Package version: **2.0.1** | Target framework: **net10.0**
 
 ## Add the dependency
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Channel.GitLab" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Channel.GitLab" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## Prerequisites
-
-1. Create a **Personal Access Token** (or Project/Group Access Token) with `api` scope.
-2. Configure a **webhook** on your project or group:
-   - URL: `https://your-host/api/channels/gitlab/{channelId}/webhook`
-   - Secret token: (optional, for signature verification)
-   - Trigger: **Note events**
-
-## Quickstart
+## Constructor
 
 ```csharp
-var channel = GitLabChannel.FromProperties(
-    "my-gitlab",
-    ChannelConfig.Of("my-gitlab", "main"),
-    new Dictionary<string, string>
-    {
-        ["token"] = "glpat-xxxxxxxxxxxx"
-    });
-
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", agent)
-    .Channel(channel)
-    .Build();
-
-gw.Start();
+public GitLabChannel(
+    HttpClient http,
+    string gitlabUrl,
+    string accessToken,
+    string projectId,
+    string? webhookToken = null)
 ```
 
-## Configuration properties
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `http` | `HttpClient` | Yes | HTTP client for calling GitLab API |
+| `gitlabUrl` | `string` | Yes | GitLab instance URL (e.g. `https://gitlab.com`) |
+| `accessToken` | `string` | Yes | GitLab API access token |
+| `projectId` | `string` | Yes | Project ID |
+| `webhookToken` | `string?` | No | Webhook secret token (for `X-Gitlab-Token` verification) |
 
-| Property | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `token` | Yes | — | Access token for the GitLab API |
-| `apiBase` | No | `https://gitlab.com` | API base URL (set for self-managed instances) |
-| `webhookPath` | No | `/api/channels/gitlab/{channelId}/webhook` | Override the webhook URL path |
+Constant-time token comparison is used when `webhookToken` is provided.
 
-## Bot-loop protection
+## Interface members
 
-At startup, the channel resolves the bot's GitLab user id by calling `GET /api/v4/user`. Incoming notes authored by the bot are dropped to prevent infinite loops.
-
-## Message flow
-
-**Inbound:** `GitLabWebhookController` → note.id dedup → bot self-note filter → `GitLabInboundMapper` → bot-loop guard → Gateway.
-
-**Outbound:** `GitLabOutboundClient` posts replies as notes via the GitLab Notes API.
+| Member | Description |
+|--------|-------------|
+| `Name` | Returns `"gitlab"` |
+| `StartAsync` | No-op (stateless channel) |
+| `StopAsync` | No-op |
+| `SendAsync` | Creates a new Issue (`POST /api/v4/projects/{projectId}/issues`) with `PRIVATE-TOKEN` auth |
+| `ProcessInboundAsync` | Processes webhook: `X-Gitlab-Token` constant-time verify → event filter (only `Note Hook`) → note.id dedup → mapping → BotLoopGuard → fires `OnMessageReceived` |
+| `OnMessageReceived` | Inbound message event |

@@ -1,4 +1,4 @@
-using AgentScope.Core;
+﻿using AgentScope.Core;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
@@ -21,7 +21,14 @@ IModel model = new AgentScope.Core.Model.OpenAI.OpenAIModel(
     "none",
     "http://10.193.41.51:8198/v1");
 
-// 构建 HarnessAgent
+// 模型连通性自检
+var pingResp = await model.GenerateAsync(new ModelRequest
+{
+    Messages = new List<Msg> { Msg.Builder().Role("user").TextContent("ping").Build() }
+});
+Console.WriteLine($"模型连通性自检: [{pingResp.Text}]\n");
+
+// 构建 HarnessAgent（工作区 + 上下文压缩中间件）
 HarnessAgent agent = new HarnessAgentBuilder()
     .WithName("note-taker")
     .WithSystemPrompt("你是一个帮助用户做笔记的助手。")
@@ -35,39 +42,13 @@ RuntimeContext ctx = RuntimeContext.Empty
     .WithUserId("alice")
     .WithSessionId("demo-session");
 
-// 第一轮消息
+// 第一轮：自我介绍 + 当天的事
 Msg first = Msg.Builder()
     .Role("user")
     .TextContent("我叫天宇，今天准备一个关于 ReAct 的技术分享。")
     .Build();
-
-// ── 诊断：复刻推理提示词直调模型 ──
-Console.WriteLine("── 诊断：复刻推理提示词直调 ──");
-var reasonPrompt = @"你是一个帮助用户做笔记的助手。
-
-用户问题: 我叫天宇，今天准备一个关于 ReAct 的技术分享。
-
-你可以使用以下工具:
-    
-
-之前的思考:
-
-
-当前迭代: 1/10
-
-请以以下格式回答:
-Thought: [你的思考过程]
-Action: [finish 或 工具名称]
-Action Input: [如果是finish，输出最终答案；如果是工具，输出JSON格式的参数]";
-var reasonMsg = Msg.Builder().Role("system").TextContent(reasonPrompt).Build();
-var reasonResp = await model.GenerateAsync(new ModelRequest { Messages = new List<Msg> { reasonMsg } });
-Console.WriteLine($"RawResponse: [{reasonResp.Text}]");
-Console.WriteLine($"Reasoning:   [{reasonResp.ReasoningContent}]\n");
-
-
-// 第一轮：自我介绍 + 当天的事
 var reply1 = await agent.CallAsync(first, ctx);
-Console.WriteLine($"Assistant: [{reply1.GetTextContent()}]\n");
+Console.WriteLine($"第一轮: [{reply1.GetTextContent()}]\n");
 
 // 第二轮：同 sessionId，自动恢复上一轮状态后回答
 Msg second = Msg.Builder()
@@ -75,4 +56,4 @@ Msg second = Msg.Builder()
     .TextContent("我叫什么？我今天要干什么？")
     .Build();
 var reply2 = await agent.CallAsync(second, ctx);
-Console.WriteLine($"Assistant: {reply2.GetTextContent()}");
+Console.WriteLine($"第二轮: [{reply2.GetTextContent()}]");

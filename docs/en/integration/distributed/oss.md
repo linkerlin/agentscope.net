@@ -1,67 +1,80 @@
-# Alibaba Cloud OSS
+# OSS Distributed Storage
 
-`AgentScope.Extensions.Oss` provides distributed storage backed by Alibaba Cloud Object Storage Service (OSS), ideal for large-capacity data and Alibaba Cloud ecosystems.
+`AgentScope.Extensions.Store.Oss` provides object-storage-based distributed state storage backed by Alibaba Cloud OSS SDK.
 
 ## Dependency
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Oss" Version="$(AgentScopeVersion)" />
+<ItemGroup>
+  <PackageReference Include="AgentScope.Extensions.Store.Oss" Version="2.0.1" />
+</ItemGroup>
 ```
 
-## One-Line Setup
+Target framework: net10.0.
+
+## OssDistributedStore
 
 ```csharp
-using AgentScope.Extensions.Oss;
+using AgentScope.Extensions.Store.Oss;
 
-OssClient ossClient = new OssClient(endpoint, accessKeyId, accessKeySecret);
-DistributedStore store = OssDistributedStore.Create(ossClient, "my-bucket", "agentscope/");
-
-HarnessAgent agent = HarnessAgent.Builder()
-    .DistributedStore(store)
-    .Filesystem(new RemoteFilesystemSpec()
-            .IsolationScope(IsolationScope.USER))
-    .Build();
+var ossStore = new OssDistributedStore(
+    httpClient,
+    endpoint: "oss-cn-hangzhou.aliyuncs.com",
+    bucket: "my-bucket",
+    accessKeyId: "your-access-key",
+    accessKeySecret: "your-access-secret");
 ```
 
-## Components Provided
+Parameter reference:
 
-### 1. OssAgentStateStore
+| Parameter | Description |
+|-----------|-------------|
+| `httpClient` | `HttpClient` instance |
+| `endpoint` | OSS region endpoint, e.g. `oss-cn-hangzhou.aliyuncs.com` |
+| `bucket` | OSS bucket name |
+| `accessKeyId` | RAM user AccessKey ID |
+| `accessKeySecret` | RAM user AccessKey Secret |
 
-Agent state persisted to OSS objects.
-
-### 2. OssBaseStore
-
-Workspace filesystem KV storage to OSS objects.
-
-### 3. OssSnapshotSpec
-
-Sandbox snapshots to OSS — the best choice for large workspace archives.
-
-### Not Provided: SandboxExecutionGuard
-
-Object storage is unsuitable for distributed locking. Mix in a Redis guard:
+## OssAgentStateStore
 
 ```csharp
-DistributedStore ossStore = OssDistributedStore.Create(ossClient, "my-bucket", "agentscope/");
+using AgentScope.Extensions.Store.Oss;
 
-DistributedStore mixed = DistributedStore.Builder()
-    .AgentStateStore(ossStore.AgentStateStore())
-    .BaseStore(ossStore.BaseStore())
-    .SandboxSnapshotSpec(ossStore.SandboxSnapshotSpec())
-    .SandboxExecutionGuard(RedisDistributedStore.FromJedis(jedis).SandboxExecutionGuard())
-    .Build();
+var ossStore = new OssDistributedStore(httpClient, endpoint, bucket, ak, sk);
+var stateStore = new OssAgentStateStore(ossStore);
+
+// Custom key prefix
+var stateStore = new OssAgentStateStore(ossStore, keyPrefix: "prod/state");
 ```
 
-## When to Use
+The default `keyPrefix` is `"agentstate"`.
 
-| Scenario | Recommendation |
-|----------|---------------|
-| Large snapshots (>100MB workspaces) | **First choice**: OSS |
-| Alibaba Cloud ecosystem | OSS |
-| Need sandbox concurrency lock | Mix OSS + Redis |
-| Lowest latency | Redis |
+## Integration with StateBackedMemory
 
-## Security
+```csharp
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.Oss;
 
-- Use RAM Role + STS temporary credentials in production — avoid hardcoded AK/SK
-- Configure bucket lifecycle rules (e.g. 7-day auto-expiry) to control storage costs
+var stateStore = new OssAgentStateStore(
+    new OssDistributedStore(httpClient, endpoint, bucket, ak, sk));
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
+```
+
+## Versioning Notes
+
+`OssAgentStateStore.SupportsVersioning = false`. OSS uses last-writer-wins semantics and does not support CAS. For multi-replica deployments, consider combining with Redis or MySQL.
+
+## Production Considerations
+
+- Use RAM Role + STS temporary credentials instead of hardcoded AK/SK.
+- Configure bucket lifecycle rules (e.g. 7-day auto-expiry) to control storage costs.
+- OSS latency is higher than Redis for frequent small-object reads/writes — evaluate your use case.
+- OSS is ideal for large-capacity snapshot archiving scenarios.
+
+## Related Documentation
+
+- [Session State — OSS](../session/oss.md) — OssAgentStateStore + Session usage examples
+- [Distributed Storage Overview](index.md) — Backend comparison and selection guide

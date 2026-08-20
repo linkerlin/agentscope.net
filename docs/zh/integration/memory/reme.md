@@ -1,56 +1,58 @@
 ﻿# ReMe
 
-`agentscope-extensions-reme` 接入自托管的 ReMe 记忆服务，特点是基于 **trajectory（对话轨迹）** 抽取长期记忆，并按 **workspace** 隔离。
-
-## 何时使用
-
-- 想要一个轻量的本地记忆服务，启动门槛低。
-- 关注整段对话轨迹的摘要，而不是单条消息级的存储。
-- 用 `userId` 表达逻辑工作区，每个用户一份独立记忆。
+`AgentScope.Extensions.Mem.ReMe.ReMeLongTermMemory` 接入自托管 ReMe 记忆服务。
 
 ## 添加依赖
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.ReMe" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Mem.ReMe" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## 快速上手
+## 构造
 
 ```csharp
-using AgentScope.core.memory.reme.ReMeLongTermMemory;
-ReMeLongTermMemory memory = ReMeLongTermMemory.Builder()
-    .UserId("task_workspace")            // 映射到 ReMe 的 workspace_id
-    .ApiBaseUrl("http://localhost:8002") // 你的 ReMe Server 地址
-    .Build();
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(model)
-    .LongTermMemory(memory)
-    .LongTermMemoryMode(LongTermMemoryMode.BOTH)
-    .Build();
+using AgentScope.Extensions.Mem.ReMe;
+
+var client = new ReMeLongTermMemory(
+    new HttpClient(),
+    baseUrl: "http://localhost:8002" // 默认 https://api.reme.ai/v1
+);
 ```
 
-`userId` 在 ReMe 里实际作为 `workspace_id`，这是 ReMe 用来切分记忆的最小单位。
+构造函数：`(HttpClient http, string? baseUrl = null)`
 
-## 工作机制
+## 方法
 
-- **写入（record）**：把过滤后的对话拼成一个 `ReMeTrajectory`，作为整体送给 ReMe 的 `add` 接口；服务端再用 LLM 把轨迹抽取成可检索的记忆片段。
-- **检索（retrieve）**：以当前消息为 query 调用 ReMe 的 `search`，优先返回服务端聚合的 `answer`，没有时退化为多个 memory 片段拼接。
+```csharp
+// 保存记忆
+string memoryId = await client.SaveAsync(userId: "workspace_001", memoryText: "用户偏好安静的工作环境");
 
-写入时遵循与 Bailian 相同的过滤策略：
+// 查询记忆
+List<string> memories = await client.QueryAsync(userId: "workspace_001", query: "工作环境偏好");
+```
 
-- 只保留 `USER` 与 `ASSISTANT` 消息。
-- 跳过含 `ToolUseBlock` 的助手消息（工具调用请求不入记忆）。
-- 跳过含 `<compressed_history>` 标记的压缩历史。
+## 适配示例
 
-## Builder 配置参数
+```csharp
+public class ReMeAdapter : AgentScope.Core.Memory.ILongTermMemory
+{
+    private readonly ReMeLongTermMemory _client;
+    private readonly string _userId;
 
-| 方法 | 是否必填 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `userId(String)` | ✅ | - | 工作区 ID（写入和检索都基于它） |
-| `apiBaseUrl(String)` | ✅ | - | ReMe 服务地址，例如 `http://localhost:8002` |
-| `timeout(Duration)` | ❌ | `60s` | HTTP 请求超时 |
+    public ReMeAdapter(ReMeLongTermMemory client, string userId)
+    {
+        _client = client;
+        _userId = userId;
+    }
 
-> ReMe 暂未提供更细粒度的 metadata 过滤；如果需要按业务标签切分，建议在 `userId` 里编码命名空间（例如 `tenant-a:project-1`）。
+    public async Task AddAsync(string text, Dictionary<string, object>? metadata = null)
+        => await _client.SaveAsync(_userId, text);
+
+    public async Task<List<string>> SearchAsync(string query, int topK = 5)
+        => await _client.QueryAsync(_userId, query);
+
+    public Task<string> SummarizeAsync() => Task.FromResult("");
+}
+```

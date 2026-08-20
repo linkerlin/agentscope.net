@@ -1,111 +1,52 @@
 # PostgreSQL Skill Repository
 
-`agentscope-extensions-skill-postgresql-repository` stores skills in PostgreSQL with full CRUD: edit and save in your admin console / business system, and the Agent picks up changes immediately on the next read.
+`AgentScope.Extensions.Skill.PostgreSql` uses **Npgsql** to load skill definitions from a PostgreSQL database.
+
+Package version: **2.0.1** | Target framework: **net10.0**
 
 ## When to use
 
-- You operate skills via an admin console and want changes to take effect right away.
-- You already have PostgreSQL infrastructure and don't want a Git dependency.
-- You want skill storage to share the transactional boundary with your business data.
+- You operate skills via an admin console and want changes to take effect immediately
+- You already have PostgreSQL infrastructure
 
 ## Add the dependency
 
 ```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-skill-postgresql-repository</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
+<ItemGroup>
+    <PackageReference Include="AgentScope.Extensions.Skill.PostgreSql" Version="2.0.1" />
+</ItemGroup>
 ```
 
-## Quickstart
+## Constructor
 
 ```csharp
-using javax.sql.DataSource;
-using AgentScope.core.skill.repository.postgresql.PostgresSkillRepository;
-
-DataSource ds = ...;  // HikariCP, PgBouncer, etc.
-
-// createIfNotExist=true: auto-create schema and tables; writeable=true: allow writes
-PostgresSkillRepository repo = new PostgresSkillRepository(ds, true, true);
-
-Toolkit toolkit = new Toolkit();
-repo.GetAllSkills().ForEach(toolkit.RegisterSkill);
+public PostgreSqlSkillRepository(string connectionString)
 ```
 
-## Using the Builder
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `connectionString` | `string` | Yes | PostgreSQL connection string |
 
-```csharp
-PostgresSkillRepository repo = PostgresSkillRepository.builder(ds)
-    .WithSchemaName("my_schema")
-    .WithSkillsTableName("my_skills")
-    .WithResourcesTableName("my_resources")
-    .WithCreateIfNotExist(true)
-    .WithWriteable(true)
-    .Build();
-```
+On construction, the repository connects and runs `CREATE TABLE IF NOT EXISTS` to ensure the `skills` table exists.
 
 ## Schema
 
-When `createIfNotExist=true`, the following tables are created (under the configured schema):
-
 ```sql
-CREATE TABLE IF NOT EXISTS "agentscope"."agentscope_skills" (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT NOT NULL,
-    skill_content TEXT NOT NULL,
-    source VARCHAR(255) NOT NULL,
-    metadata_json TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS "agentscope"."agentscope_skill_resources" (
-    id BIGINT NOT NULL,
-    resource_path VARCHAR(500) NOT NULL,
-    resource_content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id, resource_path),
-    FOREIGN KEY (id) REFERENCES "agentscope"."agentscope_skills"(id) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS skills (
+    name TEXT PRIMARY KEY,
+    description TEXT,
+    content TEXT NOT NULL,
+    source TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-- `agentscope_skills`: the skills themselves; `name` is unique; `skill_content` stores the full `SKILL.md`.
-- `agentscope_skill_resources`: attached resource files (screenshots, templates, ...) cascaded by `id`.
+## Public methods
 
-Unlike the MySQL variant, PostgreSQL uses **schemas** (not databases) as the namespace isolation boundary — the database is selected via the JDBC URL.
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `GetSkillAsync(string, CancellationToken)` | `Task<Skill?>` | Queries a skill by name from `skills` table |
+| `GetAllSkillNamesAsync(CancellationToken)` | `Task<IReadOnlyList<string>>` | Lists all skill names from `skills` table |
+| `SkillExistsAsync(string, CancellationToken)` | `Task<bool>` | Checks if a skill name exists |
 
-## Compatibility with legacy tables
-
-- If an existing table lacks `metadata_json`, the repository falls back to round-tripping `name` + `description` only. It does not auto-`ALTER TABLE`.
-- To upgrade: run `ALTER TABLE "agentscope"."agentscope_skills" ADD COLUMN metadata_json TEXT NULL;` yourself.
-
-## CRUD
-
-```csharp
-// Write (Save is upsert: existing name => update)
-AgentSkill skill = ...;
-repo.Save(new List<skill), /* overwrite */ true);
-
-// Read
-AgentSkill loaded = repo.GetSkill("calculator");
-List<string> names = repo.GetAllSkillNames();
-boolean exists = repo.SkillExists("calculator");
-
-// Delete
-repo.Delete("calculator");
-```
-
-Writes and deletes run in transactions; the resource table's `ON DELETE CASCADE` ensures no orphaned resources.
-
-## Builder reference
-
-| Method | Notes |
-| --- | --- |
-| `schemaName(string)` | Default `agentscope` |
-| `skillsTableName(string)` | Default `agentscope_skills` |
-| `resourcesTableName(string)` | Default `agentscope_skill_resources` |
-| `createIfNotExist(boolean)` | `true` to auto-`CREATE SCHEMA` + `CREATE TABLE`, default `true` |
-| `writeable(boolean)` | Whether write operations are allowed, default `true` |
+Each method creates and closes its own database connection — no connection pool management required.

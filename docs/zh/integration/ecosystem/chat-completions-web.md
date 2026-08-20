@@ -1,76 +1,100 @@
-# Chat Completions Web
+# Chat Completions Web — 实践指南
 
-`AgentScope.Extensions.ChatCompletionsWeb` 把 AgentScope Agent 包装成 [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat) 兼容接口，让 OpenAI SDK、LangChain、LlamaIndex、ChatBox 等客户端"以为自己在调 OpenAI"。
+> 本文档是实践指南，不属于某个独立 NuGet 包的官方功能。`AgentScope` 本身不提供 `ChatCompletionsWeb` 扩展包；以下思路基于 `AgentScope.Core` 的 `IOpenAIModel` 和 ASP.NET Core 基础设施。
 
-## 何时使用
+## 目标
 
-- 想把 Agent 变成"标准 LLM"暴露给已有客户端，无需改对端代码。
-- 希望保留流式输出、工具调用过程，符合 OpenAI 的 SSE 协议格式。
+将 AgentScope Agent 包装为 OpenAI Chat Completions 兼容 HTTP 接口，让 OpenAI SDK、LangChain、ChatBox 等客户端可以直接调用。
 
-## 添加依赖
+## 思路
 
-```xml
-<PackageReference Include="AgentScope.Extensions.ChatCompletionsWeb" Version="$(AgentScopeVersion)" />
-```
+AgentScope 的 `OpenAIModel` 本身就是 OpenAI Chat Completions API 的客户端。若要让 AgentScope Agent **对外暴露**与 OpenAI 兼容的端点，只需在 ASP.NET Core Controller 中手动转换请求并流式输出 SSE。
 
-注意：本扩展**只**提供框架无关的核心适配器，真正的 HTTP/SSE 路由请自行写 Controller。
-
-## 核心适配器
+## 示例：ASp.NET Core 控制器
 
 ```csharp
-using AgentScope.Core.ChatCompletions.Streaming;
-using AgentScope.Core.ChatCompletions.Model;
+using System.Text.Json;
+using AgentScope.Core.Agent;
+using AgentScope.Core.Message;
 
-ChatCompletionsStreamingAdapter adapter = new();
-
-// 把 OpenAI 风格 Request 转成 Agent 调用 + 反向把事件流转回 OpenAI chunks
-IAsyncEnumerable<ChatCompletionsChunk> stream = adapter.Stream(agent, request);
-```
-
-适配器把 AgentScope 的 `Event` 流（含 `REASONING`、`TOOL_RESULT` 等）转成 OpenAI 兼容的 `ChatCompletionsChunk`，包括：
-
-- 文本增量 → `delta.Content`
-- 工具调用 → `delta.ToolCalls[]`
-- 流结束 → 带 `FinishReason` 的 chunk
-
-## 在 ASP.NET Core 里暴露 SSE
-
-```csharp
 [ApiController]
 public class ChatController : ControllerBase
 {
-    private readonly ChatCompletionsStreamingAdapter _adapter = new();
-    private readonly Agent _agent;
+    private readonly IAgent _agent;
 
-    public ChatController(Agent agent)
+    public ChatController(IAgent agent)
     {
         _agent = agent;
     }
 
     [HttpPost("/v1/chat/completions")]
-    public async Task Chat([FromBody] ChatCompletionsRequest req)
+    public async Task ChatCompletions([FromBody] JsonElement body)
     {
         Response.ContentType = "text/event-stream";
-        await foreach (var chunk in _adapter.Stream(_agent, req))
+
+        // 提取用户消息
+        var messages = body.GetProperty("messages");
+        var last = messages.EnumerateArray().Last();
+        var text = last.GetProperty("content").GetString() ?? "";
+
+        var msg = Msg.Builder().Role("user").TextContent(text).Build();
+
+        // 调用 Agent
+        var result = await _agent.CallAsync(new[] { msg });
+
+        // 输出 OpenAI 格式
+        var response = new
         {
-            await Response.WriteAsync(ToSseLine(chunk));
-            await Response.Body.FlushAsync();
-        }
+            id = $"chatcmpl-{Guid.NewGuid():N}",
+            @object = "chat.completion.chunk",
+            choices = new[]
+            {
+                new
+                {
+                    delta = new { content = result.GetTextContent() },
+                    index = 0,
+                    finish_reason = "stop"
+                }
+            }
+        };
+
+        await Response.WriteAsync($"data: {JsonSerializer.Serialize(response)}\n\n");
+        await Response.WriteAsync("data: [DONE]\n\n");
     }
 }
 ```
 
-## 模型对照表
+## 流式输出
 
-OpenAI 客户端发起调用时通常会带 `model` 字段，可在控制器层做映射：
+如需完整的 SSE 流式输出（逐 token 推送），可以遍历 Agent 的流事件：
 
 ```csharp
-string model = req.Model;   // 例如 "gpt-4o"，路由到不同 Agent
-Agent target = agentRegistry.Lookup(model);
-IAsyncEnumerable<ChatCompletionsChunk> stream = _adapter.Stream(target, req);
+await foreach (var evt in _agent.StreamEventsAsync(new[] { msg }))
+{
+    // 将 evt 转换为 OpenAI delta chunk
+    // 参考 AG-UI 的事件映射逻辑
+}
 ```
 
-## 适合搭配
+## 模型路由
 
-- **AG-UI**：偏 Web 前端可视化，关注事件粒度的 UI 渲染。
-- **Chat Completions Web**：偏标准 LLM 接入，只关心 OpenAI 兼容。
+OpenAI 客户端通常携带 `model` 字段，可在 Controller 层做路由：
+
+```csharp
+var modelName = body.GetProperty("model").GetString();
+var targetAgent = modelName switch
+{
+    "gpt-4o" => myAgent,
+    "translator" => translatorAgent,
+    _ => defaultAgent
+};
+```
+
+## 对比 AG-UI
+
+| 特性 | AG-UI | Chat Completions Web |
+| --- | --- | --- |
+| 面向 | 前端 UI 可视化 | 标准 LLM 接入 |
+| 事件粒度 | 细粒度（推理、工具调用、状态） | 仅文本/token |
+| 协议 | AG-UI Protocol | OpenAI Chat Completions |
+| 实现位置 | `AgentScope.Core.AgUI` | 实践指南，手工实现 |

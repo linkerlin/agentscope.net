@@ -1,135 +1,89 @@
-﻿```{note}
-This page has been superseded by [Distributed Storage — Redis](../distributed/redis.md). Content below is kept for reference.
-```
+﻿# Redis Session State
 
-# Redis State Store
+Persist agent session state in Redis using the `AgentScope.Extensions.Store.Redis` package (powered by StackExchange.Redis 3.x).
 
-`agentscope-extensions-redis` persists AgentScope agent state in Redis. The unified `RedisClientAdapter` abstracts over **Jedis, Lettuce, and Redisson**, covering Standalone, Cluster, and Sentinel deployment modes.
-
-## Add the dependency
+## Dependency
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Redis" Version="$(AgentScopeVersion)" />
+  <PackageReference Include="AgentScope.Extensions.Store.Redis" Version="2.0.1" />
 </ItemGroup>
 ```
 
-The module does not pin a Redis client — bring whatever you already use (Jedis / Lettuce / Redisson).
+Target framework: net10.0.
 
-## Quickstart (Lettuce, standalone)
+## Quick Start
 
-```csharp
-using io.lettuce.core.RedisClient;
-using AgentScope.core.state.AgentStateStore;
-using AgentScope.extensions.redis.state.RedisAgentStateStore;
-RedisClient redisClient = RedisClient.create("redis://localhost:6379");
-AgentStateStore stateStore = RedisAgentStateStore.Builder()
-    .LettuceClient(redisClient)
-    .Build();
-```
-
-## Wiring each client
-
-### Jedis
+### Direct Construction
 
 ```csharp
-using redis.clients.jedis.UnifiedJedis;
-UnifiedJedis jedis = new redis.clients.jedis.JedisPooled("localhost", 6379);
-AgentStateStore stateStore = RedisAgentStateStore.Builder()
-    .JedisClient(jedis)   // UnifiedJedis, JedisCluster, JedisSentineled all work
-    .Build();
-```
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.Model;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.Redis;
 
-### Lettuce cluster
+// Convenience constructor: creates the underlying RedisDistributedStore automatically
+var stateStore = new RedisAgentStateStore("redis://localhost:6379");
 
-```csharp
-using io.lettuce.core.cluster.RedisClusterClient;
-using io.lettuce.core.RedisURI;
-RedisClusterClient clusterClient = RedisClusterClient.create(
-    RedisURI.create("redis://localhost:7000"));
-AgentStateStore stateStore = RedisAgentStateStore.Builder()
-    .LettuceClusterClient(clusterClient)
-    .Build();
-```
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
 
-### Redisson
-
-```csharp
-using org.redisson.Redisson;
-using org.redisson.config.Config;
-Config config = new Config();
-config.UseSingleServer().SetAddress("redis://localhost:6379");
-RedissonClient redisson = Redisson.create(config);
-AgentStateStore stateStore = RedisAgentStateStore.Builder()
-    .RedissonClient(redisson)
-    .Build();
-```
-
-> Redisson also supports `useClusterServers()` / `useSentinelServers()` / `useMasterSlaveServers()`; pass the resulting `RedissonClient` to `redissonClient(...)`.
-
-## Custom key prefix
-
-By default, all keys look like `agentscope:session:{userSegment}/{sessionId}:...` (where `userSegment` is the `userId`, or `__anon__` for anonymous sessions). When several projects share the same Redis, override it:
-
-```csharp
-AgentStateStore stateStore = RedisAgentStateStore.Builder()
-    .LettuceClient(redisClient)
-    .KeyPrefix("myapp:session:")
-    .Build();
-```
-
-## Key layout
-
-The `(userId, sessionId)` pair is packed into a single slot id `{userSegment}/{sessionId}` (`userSegment` = `userId`, or `__anon__` when `userId` is null).
-
-| Type | Key pattern |
-| --- | --- |
-| Single value | `{prefix}{userSegment}/{sessionId}:{stateKey}` (Redis String, JSON value) |
-| List | `{prefix}{userSegment}/{sessionId}:{stateKey}:list` (Redis List, one JSON item per element) |
-| List hash | `{prefix}{userSegment}/{sessionId}:{stateKey}:list:_hash` (change detection) |
-| Session index | `{prefix}{userSegment}/{sessionId}:_keys` (Redis Set tracking all stateKeys) |
-
-The `_keys` index makes `delete(userId, sessionId)` and `exists(userId, sessionId)` O(1) without needing `KEYS *`.
-
-## Wire into an agent
-
-```csharp
-ReActAgent agent = ReActAgent.Builder()
+EnhancedReActAgent agent = new EnhancedReActAgentBuilder()
     .Name("assistant")
-    .Model(model)
-    .StateStore(stateStore)
+    .Model(new DashScopeModel("qwen-plus", apiKey))
+    .Memory(memory)
     .Build();
+
+await agent.CallAsync(Msg.Builder().Role("user").TextContent("Hello").Build());
 ```
 
-After this, your Memory, Workspace, Plan, etc. are persisted through Redis automatically. The slot each call reads / writes is chosen per-call from the `RuntimeContext`:
+### Explicit DistributedStore
 
 ```csharp
-RuntimeContext rc = RuntimeContext.Builder()
-    .UserId("alice")
-    .SessionId("session-1")
-    .Build();
-agent.Call(msg, rc).GetAwaiter().GetResult();
+using AgentScope.Extensions.Store.Redis;
+
+var redisStore = new RedisDistributedStore("redis://localhost:6379");
+var stateStore = new RedisAgentStateStore(redisStore, keyPrefix: "agentstate");
 ```
 
-## Custom adapter
+## Custom Key Prefix
 
-If you target a Redis-compatible store (KeyDB, Tair, ...), implement `RedisClientAdapter` and inject it via `clientAdapter(...)`:
+Use a key prefix to isolate data when multiple environments share a Redis instance:
 
 ```csharp
-AgentStateStore stateStore = RedisAgentStateStore.Builder()
-    .ClientAdapter(new MyCustomAdapter(...))
-    .Build();
+var stateStore = new RedisAgentStateStore(
+    new RedisDistributedStore("redis://localhost:6379"),
+    keyPrefix: "myapp:state");
 ```
 
-## Builder reference
+The default `keyPrefix` is `"agentstate"`.
 
-| Method | Notes |
-| --- | --- |
-| `jedisClient(UnifiedJedis)` | Jedis standalone / cluster / sentinel |
-| `lettuceClient(RedisClient)` | Lettuce standalone / sentinel |
-| `lettuceClusterClient(RedisClusterClient)` | Lettuce cluster |
-| `redissonClient(RedissonClient)` | Redisson, any deployment mode |
-| `clientAdapter(RedisClientAdapter)` | Custom adapter |
-| `keyPrefix(String)` | Default `agentscope:session:` |
+## Save and Restore Session
 
-> The client setters are mutually exclusive — set exactly one.
+```csharp
+using AgentScope.Core.Session;
+
+var sessionManager = new SessionManager();
+Session session = sessionManager.CreateSession(name: "redis-demo");
+
+// Save
+agent.SaveTo(session, "main");
+
+// Restore
+agent.LoadIfExists(session, "main");
+```
+
+## Versioning and Optimistic Concurrency
+
+`RedisAgentStateStore` supports `SupportsVersioning`:
+- `GetVersionedAsync` — Retrieves state together with its current version number
+- `SaveIfVersionAsync` — Writes only when the version matches; no-op otherwise
+
+This is critical for conflict detection in multi-replica deployments.
+
+## Failover
+
+- StackExchange.Redis has built-in connection multiplexing and auto-reconnect.
+- Use Redis Sentinel or Redis Cluster for high availability in production.
+- Connection string example: `redis://password@host:6379?ssl=true`.

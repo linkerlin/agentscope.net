@@ -1,91 +1,74 @@
-# MySQL / JDBC
+# MySQL 分布式存储
 
-`AgentScope.Extensions.MySql` 提供基于 JDBC 的全链路分布式存储实现，适合已有关系型数据库基础设施的场景。
+`AgentScope.Extensions.Store.MySql` 基于 MySqlConnector 2.x 提供 MySQL 分布式状态存储实现。
 
-## 添加依赖
+## 安装
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.MySql" Version="$(AgentScopeVersion)" />
+<ItemGroup>
+  <PackageReference Include="AgentScope.Extensions.Store.MySql" Version="2.0.1" />
+</ItemGroup>
 ```
 
-数据库驱动按实际使用的版本自行引入（如 `MySqlConnector`、`Npgsql`）。
+目标框架：net10.0。
 
-## 一键配置
+## MySqlDistributedStore
+
+底层分布式存储，实现 `IDistributedStore` 接口：
 
 ```csharp
-using AgentScope.Extensions.MySql;
+using AgentScope.Extensions.Store.MySql;
 
-DataSource dataSource = ...;  // HikariCP, Druid, etc.
-DistributedStore store = MysqlDistributedStore.Create(dataSource);
-
-HarnessAgent agent = HarnessAgent.Builder()
-    .DistributedStore(store)
-    .Filesystem(new RemoteFilesystemSpec()
-            .IsolationScope(IsolationScope.USER))
-    .Build();
+var store = new MySqlDistributedStore(
+    "Server=localhost;Database=agentscope;User=root;Password=***;");
 ```
 
-## 提供的组件
+连接串为标准 MySQL 连接串格式，支持 MySqlConnector 所有选项：
 
-### 1. MysqlAgentStateStore
+```
+Server=host;Port=3306;Database=agentscope;User=root;Password=***;SslMode=Preferred;
+```
 
-Agent 状态持久化到 MySQL 表。
+## MySqlAgentStateStore
 
 ```csharp
-using AgentScope.Extensions.MySql.State;
+using AgentScope.Extensions.Store.MySql;
 
-// 自动建库建表
-AgentStateStore store = new MysqlAgentStateStore(dataSource, true);
+var mysqlStore = new MySqlDistributedStore(connectionString);
+var stateStore = new MySqlAgentStateStore(mysqlStore);
 
-// 自定义库名 / 表名
-AgentStateStore store = new MysqlAgentStateStore(
-    dataSource, "agentscope_prod", "session_state", true);
+// 自定义 key 前缀
+var stateStore = new MySqlAgentStateStore(mysqlStore, keyPrefix: "prod:state");
 ```
 
-### 2. JdbcStore（BaseStore）
+默认 `keyPrefix` 为 `"agentstate"`。
 
-工作区文件系统 KV 存储，支持多种数据库方言。
+## 与 StateBackedMemory 集成
 
 ```csharp
-using AgentScope.Extensions.MySql.Store;
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.MySql;
 
-BaseStore store = JdbcStore.Builder(dataSource)
-    .InitializeSchema(true)
-    .Build();
+var stateStore = new MySqlAgentStateStore(
+    new MySqlDistributedStore(connectionString));
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
 ```
 
-**支持的方言**（自动检测）：MySQL, PostgreSQL, H2, SQLite。
+## 版本化支持
 
-### 3. JdbcSnapshotSpec
+`MySqlAgentStateStore.SupportsVersioning = true`。基于 MySQL 行级锁或乐观锁实现 CAS。
 
-沙箱快照以 LONGBLOB 存储到数据库表。
+## 生产建议
 
-```csharp
-using AgentScope.Extensions.MySql.Snapshot;
+- 使用连接池管理 MySQL 连接。
+- 为 `agentscope` 数据库配置定期备份。
+- 监控慢查询，确保状态读写性能。
+- 多副本部署时启用版本化 CAS 防止状态冲突。
 
-SandboxSnapshotSpec spec = new JdbcSnapshotSpec(dataSource);
-```
+## 相关文档
 
-### 4. JdbcSandboxExecutionGuard
-
-基于 MySQL `GET_LOCK()` / `RELEASE_LOCK()` 的分布式锁。
-
-```csharp
-using AgentScope.Extensions.MySql.Sandbox;
-
-SandboxExecutionGuard guard = JdbcSandboxExecutionGuard.Builder(dataSource)
-    .KeyPrefix("myapp:lock:")
-    .LockTimeout(TimeSpan.FromMinutes(30))
-    .Build();
-```
-
-锁绑定 JDBC 连接——连接关闭时自动释放。
-
-## 选型建议
-
-| 场景 | 建议 |
-|------|------|
-| 已有 MySQL，不想引入 Redis | **首选** MySQL |
-| 需要 SQL 审计 / 报表 / 联表查询 | MySQL |
-| 快照数据量大（>100MB） | MySQL BLOB 可行但推荐 OSS |
-| 追求最低延迟 | Redis |
+- [会话状态 — MySQL](../session/mysql.md) — MySqlAgentStateStore + Session 使用示例
+- [分布式存储总览](index.md) — 后端对比与选型指南

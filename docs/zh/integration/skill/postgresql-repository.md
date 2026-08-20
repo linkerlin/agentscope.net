@@ -1,111 +1,52 @@
 # PostgreSQL 技能仓库
 
-`agentscope-extensions-skill-postgresql-repository` 把技能存到 PostgreSQL，提供完整的 CRUD：在控制台/业务系统里编辑保存，Agent 这边立即可读。
+`AgentScope.Extensions.Skill.PostgreSql` 使用 **Npgsql** 从 PostgreSQL 数据库加载技能定义。
+
+包版本：**2.0.1** | 目标框架：**net10.0**
 
 ## 何时使用
 
-- 通过管理后台在线运营技能，希望"改完即生效"。
-- 已经有 PostgreSQL 基础设施，不想再引入 Git 依赖。
-- 需要把技能存储和业务数据放在同一事务边界。
+- 通过管理后台在线运营技能，希望"改完即生效"
+- 已经有 PostgreSQL 基础设施
 
 ## 添加依赖
 
 ```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-skill-postgresql-repository</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
+<ItemGroup>
+    <PackageReference Include="AgentScope.Extensions.Skill.PostgreSql" Version="2.0.1" />
+</ItemGroup>
 ```
 
-## 快速上手
+## 构造函数
 
 ```csharp
-using javax.sql.DataSource;
-using AgentScope.core.skill.repository.postgresql.PostgresSkillRepository;
-
-DataSource ds = ...;  // HikariCP、PgBouncer 等连接池
-
-// createIfNotExist=true：自动建 schema 和表；writeable=true：允许写入
-PostgresSkillRepository repo = new PostgresSkillRepository(ds, true, true);
-
-Toolkit toolkit = new Toolkit();
-repo.GetAllSkills().ForEach(toolkit.RegisterSkill);
+public PostgreSqlSkillRepository(string connectionString)
 ```
 
-## 使用 Builder
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `connectionString` | `string` | 是 | PostgreSQL 连接字符串 |
 
-```csharp
-PostgresSkillRepository repo = PostgresSkillRepository.builder(ds)
-    .WithSchemaName("my_schema")
-    .WithSkillsTableName("my_skills")
-    .WithResourcesTableName("my_resources")
-    .WithCreateIfNotExist(true)
-    .WithWriteable(true)
-    .Build();
-```
+构造时自动连接数据库并执行 `CREATE TABLE IF NOT EXISTS` 确保 `skills` 表存在。
 
 ## 表结构
 
-`createIfNotExist=true` 时自动创建以下两张表（在指定 schema 下）：
-
 ```sql
-CREATE TABLE IF NOT EXISTS "agentscope"."agentscope_skills" (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT NOT NULL,
-    skill_content TEXT NOT NULL,
-    source VARCHAR(255) NOT NULL,
-    metadata_json TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS "agentscope"."agentscope_skill_resources" (
-    id BIGINT NOT NULL,
-    resource_path VARCHAR(500) NOT NULL,
-    resource_content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id, resource_path),
-    FOREIGN KEY (id) REFERENCES "agentscope"."agentscope_skills"(id) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS skills (
+    name TEXT PRIMARY KEY,
+    description TEXT,
+    content TEXT NOT NULL,
+    source TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-- `agentscope_skills`：技能本身，`name` 唯一，`skill_content` 存 `SKILL.md` 全文。
-- `agentscope_skill_resources`：技能附带的资源文件（截图、模板等），与 `id` 级联。
+## 公开方法
 
-与 MySQL 版不同，PostgreSQL 使用 **schema**（而非 database）作为命名空间隔离边界，数据库由 JDBC URL 决定。
+| 方法 | 返回 | 说明 |
+|------|------|------|
+| `GetSkillAsync(string, CancellationToken)` | `Task<Skill?>` | 按名称从 `skills` 表查询技能 |
+| `GetAllSkillNamesAsync(CancellationToken)` | `Task<IReadOnlyList<string>>` | 查询 `skills` 表全部 `name` |
+| `SkillExistsAsync(string, CancellationToken)` | `Task<bool>` | 检查技能名称是否存在 |
 
-## 与已有表兼容
-
-- 旧表如果没有 `metadata_json` 列，仓库会自动降级到"只往返 name + description"的兼容模式，不会主动 `ALTER TABLE`。
-- 想升级到完整模式，自行执行 `ALTER TABLE "agentscope"."agentscope_skills" ADD COLUMN metadata_json TEXT NULL;` 即可。
-
-## CRUD 操作
-
-```csharp
-// 写入（Save 是 upsert：name 已存在则更新）
-AgentSkill skill = ...;
-repo.Save(new List<skill), /* overwrite */ true);
-
-// 读取
-AgentSkill loaded = repo.GetSkill("calculator");
-List<string> names = repo.GetAllSkillNames();
-boolean exists = repo.SkillExists("calculator");
-
-// 删除
-repo.Delete("calculator");
-```
-
-写入与删除都在事务里执行，资源表的 `ON DELETE CASCADE` 保证不会出现孤儿资源。
-
-## Builder 配置参数
-
-| 方法 | 说明 |
-| --- | --- |
-| `schemaName(string)` | 默认 `agentscope` |
-| `skillsTableName(string)` | 默认 `agentscope_skills` |
-| `resourcesTableName(string)` | 默认 `agentscope_skill_resources` |
-| `createIfNotExist(boolean)` | `true` 时自动 `CREATE SCHEMA` + `CREATE TABLE`，默认 `true` |
-| `writeable(boolean)` | 是否允许写操作，默认 `true` |
+每个方法独立创建和关闭数据库连接，无连接池管理要求。

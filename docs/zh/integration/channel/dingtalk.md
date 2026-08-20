@@ -1,63 +1,47 @@
 # 钉钉 Channel
 
-`AgentScope.Extensions.Channel.DingTalk` 通过 **Stream 协议**（持久 WebSocket）将你的 Agent 接入钉钉，无需暴露公网 webhook 端点即可实时接收机器人消息。
+`AgentScope.Extensions.Channel.DingTalk` 通过钉钉 Webhook 和回调机制将你的 Agent 接入钉钉。
 
-## 适用场景
-
-- Agent 需要响应钉钉机器人消息（单聊和群 @提醒）。
-- 你更倾向于 WebSocket 推送模型而非轮询或 webhook 回调。
+包版本：**2.0.1** | 目标框架：**net10.0**
 
 ## 添加依赖
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Channel.DingTalk" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Channel.DingTalk" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## 前置准备
-
-1. 在[钉钉开发者后台](https://open-dev.dingtalk.com/)创建一个**企业内部应用**。
-2. 启用**机器人**能力并订阅机器人消息 topic。
-3. 记下 **App Key**、**App Secret** 和 **Robot Code**。
-
-## 快速开始
+## 构造函数
 
 ```csharp
-var channel = DingTalkChannel.FromProperties(
-    "my-dingtalk",
-    ChannelConfig.Of("my-dingtalk", "main"),
-    new Dictionary<string, string>
-    {
-        ["appKey"] = "your-app-key",
-        ["appSecret"] = "your-app-secret",
-        ["robotCode"] = "your-robot-code"
-    });
-
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", agent)
-    .Channel(channel)
-    .Build();
-
-gw.Start();   // 打开 Stream WebSocket，开始接收消息
+public DingTalkChannel(
+    HttpClient http,
+    string webhookUrl,
+    string? appSecret = null,
+    string? appKey = null,
+    string? apiBase = null)
 ```
 
-## 配置属性
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `http` | `HttpClient` | 是 | 用于调用钉钉 API 的 HTTP 客户端 |
+| `webhookUrl` | `string` | 是 | 出站消息的 Webhook 地址 |
+| `appSecret` | `string?` | 否 | 钉钉应用密钥（用于 token 型 API 调用） |
+| `appKey` | `string?` | 否 | 钉钉应用 Key |
+| `apiBase` | `string?` | 否 | 自定义 API 基地址，默认 `https://api.dingtalk.com` |
 
-| 属性 | 必填 | 默认值 | 说明 |
-|------|------|--------|------|
-| `appKey` | 是 | — | 企业内部应用 App Key |
-| `appSecret` | 是 | — | 企业内部应用 App Secret |
-| `robotCode` | 是 | — | 机器人编码，用于出站消息发送 |
-| `apiBase` | 否 | `https://api.dingtalk.com` | OpenAPI 基地址 |
-| `streamRegisterUrl` | 否 | `https://api.dingtalk.com/v1.0/gateway/connections/open` | Stream 网关注册地址 |
+当 `appKey` 和 `appSecret` 均提供时，可通过 `TokenProvider` 属性获取 `DingTalkAccessTokenProvider`。
 
-## 消息流转
+## 接口实现
 
-**入站：** `DingTalkStreamClient` 通过 WebSocket 连接钉钉网关，接收机器人消息回调，ACK 每个帧后进入 `DingTalkInboundMapper` → 幂等去重 → 防循环 → Gateway。
+| 成员 | 说明 |
+|------|------|
+| `Name` | 返回 `"dingtalk"` |
+| `StartAsync` | 无操作（无状态渠道） |
+| `StopAsync` | 无操作 |
+| `SendAsync` | 通过 Webhook 发送文本消息（`POST` 到 `webhookUrl`） |
+| `ProcessInboundAsync` | 处理回调：JSON 解析 → msgId 去重 → mapping → BotLoopGuard → 触发 `OnMessageReceived` 事件 |
+| `OnMessageReceived` | 入站消息事件 |
 
-**出站：** 通过 `DingTalkOutboundClient` 使用 OpenAPI 的 `batchSend` 接口发送回复——`oToMessages/batchSend` 用于单聊，`groupMessages/send` 用于群聊。文本和 Markdown 格式自动识别。
-
-## 断线重连
-
-Stream 客户端在 WebSocket 断开时自动以指数退避（1s → 60s 上限）重连。
+入站回调无签名校验（钉钉 Webhook 回调格式）。`ProcessInboundAsync` 返回 `InboundProcessResult` 指示验证和派发结果。

@@ -1,104 +1,66 @@
-# 分布式存储（Distributed Store）
+# 分布式存储总览
 
-AgentScope 将所有需要分布式持久化的组件统一到 `DistributedStore` 接口下。一行配置即可让 Agent 的状态、工作区文件系统、沙箱快照和并发锁全部切到同一个分布式后端。
+AgentScope 通过 `IAgentStateStore` 接口抽象分布式状态存储，提供统一的 Get/Set/Delete 语义，并支持可选的版本化乐观并发。
 
-## 快速上手
+## IAgentStateStore 接口
 
-```csharp
-// Redis 一键配置
-DistributedStore store = RedisDistributedStore.FromConnectionMultiplexer(
-        ConnectionMultiplexer.Connect("redis://localhost:6379"));
-
-HarnessAgent agent = HarnessAgent.Builder()
-    .Name("my-agent")
-    .Model("dashscope:qwen-plus")
-    .DistributedStore(store)
-    .Filesystem(new RemoteFilesystemSpec()            // baseStore 自动注入
-            .IsolationScope(IsolationScope.USER))
-    .Build();
-```
-
-## 能力矩阵
-
-| 功能组件 | 接口 | Redis | OSS | MySQL |
-|---------|------|:-----:|:---:|:-----:|
-| Agent 状态持久化 | `AgentStateStore` | `RedisAgentStateStore` | `OssAgentStateStore` | `MysqlAgentStateStore` |
-| 工作区文件系统 KV | `BaseStore` | `RedisStore` | `OssBaseStore` | `JdbcStore` |
-| 沙箱快照 | `SandboxSnapshotSpec` | `RedisSnapshotSpec` | `OssSnapshotSpec` | `JdbcSnapshotSpec` |
-| 沙箱并发锁 | `SandboxExecutionGuard` | `RedisSandboxExecutionGuard` | — | `JdbcSandboxExecutionGuard` |
-
-> OSS 不提供 `SandboxExecutionGuard`——对象存储不适合做分布式锁。需要 sandbox 并发控制的 OSS 用户，用 `DistributedStore.Builder()` 混入 Redis 的 guard。
-
-## 混合后端
-
-不同组件可以来自不同的存储后端：
+定义于 `AgentScope.Core.State`：
 
 ```csharp
-DistributedStore mysql = MysqlDistributedStore.Create(dataSource);
-DistributedStore redis = RedisDistributedStore.FromConnectionMultiplexer(redisConn);
+public interface IAgentStateStore
+{
+    bool SupportsVersioning { get; }
 
-// MySQL 管状态和文件，Redis 管沙箱锁和快照
-DistributedStore mixed = DistributedStore.Builder()
-    .AgentStateStore(mysql.AgentStateStore())
-    .BaseStore(mysql.BaseStore())
-    .SandboxSnapshotSpec(redis.SandboxSnapshotSpec())
-    .SandboxExecutionGuard(redis.SandboxExecutionGuard())
-    .Build();
-
-HarnessAgent.Builder()
-    .DistributedStore(mixed)
-    .Filesystem(new DockerFilesystemSpec()
-            .Image("ubuntu:24.04"))
-    .Build();
+    Task<AgentState?> GetAsync(string userId, string sessionId, string key);
+    Task<VersionedState<AgentState>?> GetVersionedAsync(string userId, string sessionId, string key);
+    Task SaveAsync(string userId, string sessionId, string key, AgentState state);
+    Task<long> SaveIfVersionAsync(string userId, string sessionId, string key, AgentState state, long expectedVersion);
+}
 ```
 
-## 各组件说明
+- `SupportsVersioning` — 指示后端是否支持版本化
+- `GetVersionedAsync` — 获取状态及其当前版本号
+- `SaveIfVersionAsync` — CAS（Compare-And-Swap）写入，仅在 `expectedVersion` 匹配时成功，返回新版本号
 
-### AgentStateStore — Agent 状态持久化
+## 后端矩阵
 
-Agent 的对话上下文、压缩摘要、权限规则、Plan Mode 状态等，通过 `(userId, sessionId)` 寻址。`DistributedStore` 自动注入，也可通过 `.StateStore(...)` 单独覆盖。
+| 后端 | 包名 | 构造方式 | 版本化支持 | 适用场景 |
+|------|------|----------|:---------:|---------|
+| **Redis** | `AgentScope.Extensions.Store.Redis` | `RedisAgentStateStore(RedisDistributedStore)` / `RedisAgentStateStore(connectionString)` | ✅ | 多副本生产，低延迟 |
+| **MySQL** | `AgentScope.Extensions.Store.MySql` | `MySqlAgentStateStore(MySqlDistributedStore)` | ✅ | 已有 MySQL 基础设施 |
+| **PostgreSQL** | `AgentScope.Extensions.Store.PostgreSql` | `PostgreSqlAgentStateStore(PostgreSqlDistributedStore)` | ✅ | 需 PostgreSQL 特性 |
+| **OSS** | `AgentScope.Extensions.Store.Oss` | `OssAgentStateStore(OssDistributedStore)` | ❌ | 阿里云生态，大容量 |
+| **COS** | `AgentScope.Extensions.Store.Cos` | `CosAgentStateStore(CosStore)` | ❌ | 腾讯云生态 |
 
-### BaseStore — 工作区文件系统 KV
+## IDistributedStore 底层接口
 
-`RemoteFilesystemSpec` 的存储后端，将 `MEMORY.md`、`memory/`、`skills/`、`sessions/` 等路径路由到共享 KV 存储。`DistributedStore` 自动注入到 `RemoteFilesystemSpec`（如果用的是无参构造器）。
+所有 `*DistributedStore` 实现 `IDistributedStore`：
 
-### SandboxSnapshotSpec — 沙箱快照
+- `Get(string key)` — 获取原始数据
+- `Set(string key, byte[] value)` — 设置原始数据
+- `Delete(string key)` — 删除
+- `ListKeys(string prefix)` — 按前缀列举
 
-将 Docker/K8s 等沙箱的工作区打成 tar 包持久化，下次 `Call()` 自动恢复。`DistributedStore` 自动注入到 `SandboxFilesystemSpec`。
+## 如何选型
 
-### SandboxExecutionGuard — 沙箱并发锁
+1. **低延迟、多副本** → **Redis**（版本化支持，生产首选）
+2. **已有 MySQL/PostgreSQL** → **MySQL/PostgreSQL**（版本化支持，可共用数据库）
+3. **阿里云/腾讯云生态、大容量归档** → **OSS/COS**（不支持版本化，last-writer-wins）
+4. **本地开发调试** → `InMemoryAgentStateStore` 或 `JsonFileAgentStateStore`
 
-`AGENT` / `GLOBAL` 隔离范围在多副本下需要分布式锁防止并发冲突。`DistributedStore` 自动注入到 `SandboxFilesystemSpec`。
+## 结合 StateBackedMemory
 
-## 优先级
-
-```
-显式 builder 方法 (.StateStore(), .Filesystem() 上的 .SnapshotSpec() 等)
-    > DistributedStore 自动注入
-        > 本地默认 (JsonFileAgentStateStore, NoopSnapshotSpec 等)
-```
-
-## 后端详细文档
-
-- [Redis](redis.md) — 最全功能覆盖，多副本生产首选
-- [MySQL / JDBC](mysql.md) — 已有关系型数据库的场景
-- [阿里云 OSS](oss.md) — 对象存储，大容量快照首选
-
-## aistio 托管 Store
-
-若已部署 aistio 控制面，可由控制面托管 `DistributedStore` 的协调类能力（BaseStore、沙箱锁/快照、MessageBus、AsyncToolRegistry、**TaskRepository**、可选 **SessionTurnGate**）。**`AgentStateStore` 仍需自备一个后端**（Redis / MySQL / Postgres / OSS）；core 已提供 `GetVersioned` / `SaveIfVersion` 乐观并发，但存储不在控制面。
+任何 `IAgentStateStore` 都可与 `StateBackedMemory` 配合使用：
 
 ```csharp
-ControlPlaneStores cp = ControlPlaneStores.FromEnv();
-HarnessAgent.Builder()
-    .DistributedStore(cp.WithAgentStateStore(redis.AgentStateStore()))
-    .Filesystem(new RemoteFilesystemSpec().IsolationScope(IsolationScope.USER))
-    .Build();
+var stateStore = new RedisAgentStateStore("redis://localhost:6379");
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
 ```
 
-- 控制面开启：`--enable-hosted-store`（生产建议 Postgres）。
-- **`WithAgentStateStore` 已包含**托管 `TaskRepository` 与 `SessionTurnGate`。使用 **`SandboxFilesystemSpec` 且需要子 agent 后台任务**时，应走此路径（workspace 版 `TaskRepository` 无法跨副本持久化任务）。
-- **AgentStateStore versioning**：Redis、Postgres、MySQL、InMemory 支持 CAS；JsonFile / OSS / COS / JPA 仍为 last-writer-wins。多副本建议选支持 versioning 的后端。
-- **Turn gate + `ConflictPolicy.FAIL`** 为可选：多副本下减少重复 LLM turn；正确性仍靠 CAS（当后端支持 versioning 时）。
-- 当前鉴权为集群内共享 internal token；租户（`agentName` / `namespace`）取自请求体——**不适用于**同一控制面上互不信任的多租户。
-- `MessageBus.QueueDrain` 为 **destructive**（读即 ack）；租户/key 弄错会丢消息。
+## 详细文档
+
+- [Redis 后端](redis.md) — 连接串格式、构造方式、生产建议
+- [MySQL 后端](mysql.md) — 连接串格式、构造方式
+- [OSS 后端](oss.md) — 阿里云 OSS 接入
+- [会话状态集成](../session/index.md) — SessionManager 与状态持久化用法

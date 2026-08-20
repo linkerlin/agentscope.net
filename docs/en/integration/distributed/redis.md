@@ -1,93 +1,76 @@
-# Redis
+# Redis Distributed Storage
 
-`AgentScope.Extensions.Redis` provides full-stack Redis distributed storage — the recommended store for multi-replica production deployments.
+`AgentScope.Extensions.Store.Redis` provides Redis-based distributed state storage powered by StackExchange.Redis 3.x.
 
 ## Dependency
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Redis" Version="$(AgentScopeVersion)" />
+<ItemGroup>
+  <PackageReference Include="AgentScope.Extensions.Store.Redis" Version="2.0.1" />
+</ItemGroup>
 ```
 
-The module does not force a specific Redis client — import whichever you use (StackExchange.Redis / Microsoft.Extensions.Caching.StackExchangeRedis).
+Target framework: net10.0.
 
-## One-Line Setup
+## RedisDistributedStore
+
+Low-level distributed store implementing `IDistributedStore`:
 
 ```csharp
-using AgentScope.Extensions.Redis;
+using AgentScope.Extensions.Store.Redis;
 
-ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("redis://localhost:6379");
-DistributedStore store = RedisDistributedStore.FromConnectionMultiplexer(redis);
-
-HarnessAgent agent = HarnessAgent.Builder()
-    .DistributedStore(store)
-    .Filesystem(new RemoteFilesystemSpec()
-            .IsolationScope(IsolationScope.USER))
-    .Build();
+var store = new RedisDistributedStore("redis://localhost:6379");
 ```
 
-Custom key prefix for multi-environment isolation:
+The connection string supports all StackExchange.Redis configuration options, including password, SSL, and timeouts:
+
+```
+redis://password@host:6379?ssl=true&connectTimeout=5000
+```
+
+## RedisAgentStateStore
 
 ```csharp
-DistributedStore store = RedisDistributedStore.FromConnectionMultiplexer(redis, "prod:");
+using AgentScope.Extensions.Store.Redis;
+
+// Option 1: Direct construction from connection string
+var stateStore = new RedisAgentStateStore("redis://localhost:6379");
+
+// Option 2: Via RedisDistributedStore
+var redisStore = new RedisDistributedStore("redis://localhost:6379");
+var stateStore = new RedisAgentStateStore(redisStore);
+
+// Option 3: Custom key prefix
+var stateStore = new RedisAgentStateStore(redisStore, keyPrefix: "prod:state");
 ```
 
-## Components Provided
+The default `keyPrefix` is `"agentstate"`.
 
-### 1. RedisAgentStateStore
-
-Agent state persisted to Redis.
+## Integration with StateBackedMemory
 
 ```csharp
-using AgentScope.Extensions.Redis.State;
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.Redis;
 
-AgentStateStore store = RedisAgentStateStore.Builder()
-    .ConnectionMultiplexer(redis)
-    .KeyPrefix("myapp:session:")
-    .Build();
+var stateStore = new RedisAgentStateStore("redis://localhost:6379");
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
 ```
 
-### 2. RedisStore (BaseStore)
+## Versioning Support
 
-Workspace filesystem KV storage for `RemoteFilesystemSpec`.
+`RedisAgentStateStore.SupportsVersioning = true`. Atomic CAS is implemented using Redis transactions or Lua scripts, suitable for multi-replica conflict detection.
 
-```csharp
-using AgentScope.Extensions.Redis.Store;
+## Production Considerations
 
-BaseStore store = new RedisStore(redis);
-BaseStore store = new RedisStore(redis, "myapp:store:");
-```
+- Use Redis Sentinel or Redis Cluster for high availability.
+- Isolate environments and applications via `keyPrefix`.
+- Monitor Redis memory usage; configure `maxmemory` and an eviction policy.
+- StackExchange.Redis handles connection multiplexing and auto-reconnect automatically.
 
-Concurrency-safe: `Put` / `PutIfVersion` use Lua scripts for atomicity.
+## Related Documentation
 
-### 3. RedisSnapshotSpec
-
-Sandbox snapshots stored as Redis binary keys. Best for small workspaces + short TTL.
-
-```csharp
-using AgentScope.Extensions.Redis.Snapshot;
-
-SandboxSnapshotSpec spec = new RedisSnapshotSpec(redis, "myapp:snapshot:", 3600);
-```
-
-### 4. RedisSandboxExecutionGuard
-
-Redis `SET NX PX` lease-based distributed lock for multi-replica sandbox concurrency control.
-
-```csharp
-using AgentScope.Extensions.Redis.Sandbox;
-
-SandboxExecutionGuard guard = RedisSandboxExecutionGuard.Builder(redis)
-    .KeyPrefix("myapp:guard:")
-    .LeaseTtl(TimeSpan.FromMinutes(30))
-    .RetryInterval(TimeSpan.FromMilliseconds(500))
-    .Build();
-```
-
-## When to Use
-
-| Scenario | Recommendation |
-|----------|---------------|
-| Multi-replica production, low latency | **First choice**: Redis |
-| Existing Redis cluster | StackExchange.Redis |
-| Small workspace + short TTL snapshots | Redis snapshots work, watch memory |
-| Large workspace snapshots | Mixed store: Redis for state/lock, OSS for snapshots |
+- [Session State — Redis](../session/redis.md) — RedisAgentStateStore + Session usage examples
+- [Distributed Storage Overview](index.md) — Backend comparison and selection guide

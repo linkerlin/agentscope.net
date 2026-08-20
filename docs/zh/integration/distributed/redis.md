@@ -1,93 +1,76 @@
-# Redis
+# Redis 分布式存储
 
-`AgentScope.Extensions.Redis` 提供全链路的 Redis 分布式存储实现，是多副本生产部署的首选后端。
+`AgentScope.Extensions.Store.Redis` 基于 StackExchange.Redis 3.x 提供 Redis 分布式状态存储实现。
 
-## 添加依赖
+## 安装
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Redis" Version="$(AgentScopeVersion)" />
+<ItemGroup>
+  <PackageReference Include="AgentScope.Extensions.Store.Redis" Version="2.0.1" />
+</ItemGroup>
 ```
 
-模块本身不强制依赖某一 Redis 客户端，按项目实际使用引入（如 StackExchange.Redis）。
+目标框架：net10.0。
 
-## 一键配置
+## RedisDistributedStore
+
+底层分布式存储，实现 `IDistributedStore` 接口：
 
 ```csharp
-using AgentScope.Extensions.Redis;
+using AgentScope.Extensions.Store.Redis;
 
-ConnectionMultiplexer redis = ConnectionMultiplexer.Connect("redis://localhost:6379");
-DistributedStore store = RedisDistributedStore.FromConnectionMultiplexer(redis);
-
-HarnessAgent agent = HarnessAgent.Builder()
-    .DistributedStore(store)
-    .Filesystem(new RemoteFilesystemSpec()
-            .IsolationScope(IsolationScope.USER))
-    .Build();
+var store = new RedisDistributedStore("redis://localhost:6379");
 ```
 
-自定义 key 前缀（多环境隔离）：
+连接串支持 StackExchange.Redis 全部配置选项，包括密码、SSL、超时等：
+
+```
+redis://password@host:6379?ssl=true&connectTimeout=5000
+```
+
+## RedisAgentStateStore
 
 ```csharp
-DistributedStore store = RedisDistributedStore.FromConnectionMultiplexer(redis, "prod:");
+using AgentScope.Extensions.Store.Redis;
+
+// 方式一：通过连接串直接构造
+var stateStore = new RedisAgentStateStore("redis://localhost:6379");
+
+// 方式二：通过 RedisDistributedStore 构造
+var redisStore = new RedisDistributedStore("redis://localhost:6379");
+var stateStore = new RedisAgentStateStore(redisStore);
+
+// 方式三：自定义 key 前缀
+var stateStore = new RedisAgentStateStore(redisStore, keyPrefix: "prod:state");
 ```
 
-## 提供的组件
+默认 `keyPrefix` 为 `"agentstate"`。
 
-### 1. RedisAgentStateStore
-
-Agent 状态持久化到 Redis。
+## 与 StateBackedMemory 集成
 
 ```csharp
-using AgentScope.Extensions.Redis.State;
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.Redis;
 
-AgentStateStore store = RedisAgentStateStore.Builder()
-    .ConnectionMultiplexer(redis)
-    .KeyPrefix("myapp:session:")
-    .Build();
+var stateStore = new RedisAgentStateStore("redis://localhost:6379");
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
 ```
 
-### 2. RedisStore（BaseStore）
+## 版本化支持
 
-工作区文件系统 KV 存储，供 `RemoteFilesystemSpec` 使用。
+`RedisAgentStateStore.SupportsVersioning = true`。使用 Redis 事务或 Lua 脚本实现原子 CAS，适用于多副本冲突检测。
 
-```csharp
-using AgentScope.Extensions.Redis.Store;
+## 生产建议
 
-BaseStore store = new RedisStore(redis);
-BaseStore store = new RedisStore(redis, "myapp:store:");
-```
+- 生产环境使用 Redis Sentinel 或 Redis Cluster 实现高可用。
+- 通过 `keyPrefix` 隔离多环境/多应用的数据。
+- 监控 Redis 内存用量，设置合理的 maxmemory 和淘汰策略。
+- StackExchange.Redis 自动处理连接复用和重连，无需手动管理连接生命周期。
 
-**并发安全**：`Put` / `PutIfVersion` 使用 Lua 脚本保证原子性。
+## 相关文档
 
-### 3. RedisSnapshotSpec
-
-沙箱快照存储到 Redis 二进制 key。适合小工作区 + 短 TTL 场景。
-
-```csharp
-using AgentScope.Extensions.Redis.Snapshot;
-
-SandboxSnapshotSpec spec = new RedisSnapshotSpec(redis, "myapp:snapshot:", 3600);
-```
-
-### 4. RedisSandboxExecutionGuard
-
-基于 Redis `SET NX PX` 租约的分布式锁，用于 `AGENT` / `GLOBAL` 隔离范围下的多副本并发控制。
-
-```csharp
-using AgentScope.Extensions.Redis.Sandbox;
-
-SandboxExecutionGuard guard = RedisSandboxExecutionGuard.Builder(redis)
-    .KeyPrefix("myapp:guard:")
-    .LeaseTtl(TimeSpan.FromMinutes(30))
-    .RetryInterval(TimeSpan.FromMilliseconds(500))
-    .Build();
-```
-
-## 选型建议
-
-| 场景 | 建议 |
-|------|------|
-| 多副本生产，追求低延迟 | **首选** Redis |
-| 已有 Redis 集群 | StackExchange.Redis |
-| 小工作区 + 短 TTL 快照 | Redis 快照可以，但注意内存 |
-| 大工作区快照 | 混合后端：Redis 管状态和锁，OSS 管快照 |
+- [会话状态 — Redis](../session/redis.md) — RedisAgentStateStore + Session 使用示例
+- [分布式存储总览](index.md) — 后端对比与选型指南

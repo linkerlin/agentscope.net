@@ -1,58 +1,61 @@
 # Kimi Model
 
-`AgentScope.Extensions.Model.OpenAI` provides first-class Kimi (Moonshot AI) support through the OpenAI-compatible model stack. Add the OpenAI model extension module, then use `kimi:<model>` with `ModelRegistry`.
+Kimi (Moonshot AI) uses an OpenAI-compatible endpoint accessed through `OpenAIModel`. There is no dedicated model class.
 
-## Add the dependency
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.OpenAI" Version="$(AgentScopeVersion)" />
-```
-
-## ModelRegistry
-
-Set `MOONSHOT_API_KEY` or `KIMI_API_KEY`, then use the `kimi:<model>` id:
+## Constructor Example
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("kimi:kimi-k3") // Resolved internally by ModelRegistry.Resolve(modelId)
-    .Build();
+new OpenAIModel("moonshot-v1-8k", apiKey, "https://api.moonshot.cn/v1")
 ```
 
-The provider defaults to `https://api.moonshot.cn/v1`, strips the `kimi:` prefix before sending the model name, and uses the Kimi formatter from `AgentScope.Extensions.Model.OpenAI.Compat.Kimi`.
-
-## Thinking mode
-
-Pass Kimi thinking options through `GenerateOptions` when resolving the model:
+## Minimal Example
 
 ```csharp
 using AgentScope.Core.Model;
-using System.Collections.Generic;
+using AgentScope.Core.Model.OpenAI;
 
-Model model = ModelRegistry.Resolve(
-    "kimi:kimi-k2.6",
-    ModelCreationContext.Builder()
-        .Component(
-            typeof(GenerateOptions),
-            GenerateOptions.Builder()
-                .AdditionalBodyParam("thinking", new Dictionary<string, string> { { "type", "disabled" } })
-                .MaxCompletionTokens(16000)
-                .Build())
-        .Build());
+string key = System.Environment.GetEnvironmentVariable("MOONSHOT_API_KEY");
+var model = new OpenAIModel("moonshot-v1-8k", key,
+    "https://api.moonshot.cn/v1");
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Hello").Build()
+        }
+    }).Result.Text;
 ```
 
-`kimi-k3` uses the top-level `reasoning_effort` option (`low`, `high`, or `max`). `kimi-k3` and `kimi-k2.7-code` always run with thinking enabled. `kimi-k2.6` and `kimi-k2.5` enable thinking by default, but can disable it with `additionalBodyParam("thinking", Map.of("type", "disabled"))`.
+## Agent Integration
 
-## Compatibility notes
+```csharp
+using AgentScope.Core.Model.OpenAI;
+using AgentScope.Core.Agent;
 
-The Kimi formatter adapts OpenAI-style requests to the Kimi chat-completions API. It omits tool schema `strict`, preserves assistant `reasoning_content` in message history, and strips unsupported request fields such as `thinking_budget`.
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new OpenAIModel("moonshot-v1-8k", key,
+        "https://api.moonshot.cn/v1"))
+    .Build();
+```
 
-On `kimi-*` models, sampling parameters such as `temperature`, `top_p`, `n`, `frequency_penalty`, and `presence_penalty` are fixed by the platform and are removed from requests. The `moonshot-v1` series keeps those parameters. Kimi documents `max_completion_tokens`, so `max_tokens` is mapped to `max_completion_tokens` when `max_completion_tokens` is not already set.
+## Streaming
 
-`reasoning_effort` is kept only for `kimi-k3`. For K2.x thinking controls, pass the `thinking` body parameter through `GenerateOptions.AdditionalBodyParam`.
+`OpenAIModel` implements `IStreamingChatModel`, and the Kimi endpoint supports it:
 
-`tool_choice=auto` and `tool_choice=none` are supported broadly. `tool_choice=required` is degraded to `auto` on K2.x models. Forcing a specific function is incompatible with thinking enabled, so it is degraded to `auto` on `kimi-k3`, on `kimi-k2.7-code`, and on `kimi-k2.6` / `kimi-k2.5` unless `thinking.type` is explicitly set to `disabled`.
+```csharp
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
+```
 
-Structured output uses the normal AgentScope fallback behavior by default.
+## Differences from Dedicated Models
 
-For compatible or self-hosted endpoints, pass `baseUrl`, `endpointPath`, generation options, or formatter overrides through `ModelCreationContext`.
+- AgentScope has no `KimiModel` class; all functionality comes from `OpenAIModel`.
+- Suggested environment variable: `MOONSHOT_API_KEY` or `KIMI_API_KEY`.
+- Some Kimi models (e.g. kimi-k3) support thinking mode via `GenerateOptions` (e.g. `reasoning_effort`).
+- Custom formatters can be passed via `OpenAIModel`'s `formatter` parameter.
+
+See [Model](../../docs/building-blocks/model.md) for the full interface reference.

@@ -1,83 +1,70 @@
 # 在线训练（Training）
 
-`AgentScope.Extensions.Training` 在 AgentScope 之上接入 Trinity 训练后端：把生产流量按策略采样、收集 trace、计算奖励，再周期性提交训练，形成闭环。
+`AgentScope.Extensions.Training` 提供 `TrainingManager` 客户端，用于通过 HTTP API 管理模型微调训练任务。
 
 ## 何时使用
 
-- 已有 Trinity（或兼容服务）作为模型训练后端。
-- 想把线上流量当训练数据，做强化学习或在线微调。
-- 不想改业务调用代码，希望训练流水线对 Agent 调用方"透明"。
+- 已有兼容的训练后端服务，希望通过 REST API 提交训练作业。
+- 需要在代码中控制训练任务的启停与状态查询。
 
 ## 添加依赖
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Training" Version="$(AgentScopeVersion)" />
+<PackageReference Include="AgentScope.Extensions.Training" Version="2.0.1" />
 ```
 
-## 快速上手
+## TrainingManager
 
 ```csharp
-using AgentScope.Core.Training.Runner;
-using AgentScope.Core.Training.Strategy;
+using AgentScope.Extensions.Training;
 
-TrainingRunner runner = TrainingRunner.Builder()
-    .TrinityEndpoint("http://localhost:8080")
-    .ModelName("/path/to/model")
-    .SelectionStrategy(SamplingRateStrategy.Of(0.1))   // 10% 流量进训练
-    .RewardCalculator(agent => 0.0)                    // 自定义奖励
-    .CommitIntervalSeconds(300)                        // 每 5 分钟 commit 一次
-    .Build();
+var manager = new TrainingManager(
+    http: httpClient,
+    baseUrl: "http://localhost:8080");
 
-runner.Start();          // 拦截 Agent，开始采样
+// 启动训练
+var jobId = await manager.StartTrainingAsync(
+    modelName: "my-model",
+    dataset: "production-traces",
+    config: new TrainingConfig(
+        Epochs: 3,
+        LearningRate: 1e-5,
+        BatchSize: 32));
 
-// 业务侧照常使用 Agent，无须感知 runner
-agent.Call(msg).Wait();
+// 查询状态
+var status = await manager.GetStatusAsync(jobId);
+Console.WriteLine($"状态: {status.Status}, 进度: {status.Progress}, Loss: {status.CurrentLoss}");
 
-runner.Stop();           // 停止训练流水线
+// 取消训练
+await manager.CancelTrainingAsync(jobId);
 ```
 
-## 选样策略
+### API
 
-- `SamplingRateStrategy.Of(0.1)`：按比例随机采样。
-- `ExplicitMarkingStrategy.Create()`：完全由调用方显式标记哪些请求要进训练。
-- 也可以实现 `ITrainingSelectionStrategy` 自定义。
+| 构造方法 | 说明 |
+| --- | --- |
+| `TrainingManager(HttpClient http, string baseUrl)` | 连接训练后端服务 |
 
-## 奖励计算
+| 方法 | 说明 |
+| --- | --- |
+| `StartTrainingAsync(string modelName, string dataset, TrainingConfig? config, CancellationToken ct)` | 提交训练任务，返回 `job_id` |
+| `GetStatusAsync(string jobId, CancellationToken ct)` | 查询训练进度 |
+| `CancelTrainingAsync(string jobId, CancellationToken ct)` | 取消训练任务 |
 
-`RewardCalculator` 是一个 `Func<AgentBase, double>`，每次采样产生 trajectory 后调用。可以是：
-
-- Lambda：基于回答长度、工具调用次数等启发式打分。
-- 自定义类：实现 `IRewardCalculator` 接口，封装更复杂的指标。
+### 数据模型
 
 ```csharp
-TrainingRunner runner = TrainingRunner.Builder()
-    .TrinityEndpoint(endpoint)
-    .ModelName(model)
-    .SelectionStrategy(SamplingRateStrategy.Of(0.1))
-    .RewardCalculator(new MyMetricRewardCalculator())
-    .Build();
+public sealed record TrainingConfig(
+    int Epochs = 3,
+    double LearningRate = 1e-5,
+    int? BatchSize = null);
+
+public sealed record TrainingStatus(
+    string Status,
+    double Progress,
+    double CurrentLoss);
 ```
 
 ## 工作机制
 
-1. `runner.Start()` 之后，Agent 的请求会经 `TrainingRouter` 路由：
-   - 命中采样 → 调用替换为 Trinity 后端，trace 数据被收集；
-   - 未命中 → 走原有模型，无副作用。
-2. 命中样本会调 reward calculator 算分，再通过 `TrinityClient.Feedback(...)` 反馈。
-3. `commitIntervalSeconds` 周期到达时调用 `Commit(...)`，触发训练任务。
-
-`runner.Stop()` 时会优雅关闭定时器与连接池。
-
-## 关键配置
-
-| 字段 | 说明 |
-| --- | --- |
-| `TrinityEndpoint` | Trinity 服务地址 |
-| `ModelName` | 训练目标模型路径或别名 |
-| `SelectionStrategy` | 采样策略 |
-| `RewardCalculator` | 奖励计算函数 |
-| `CommitIntervalSeconds` | commit 周期，默认 300 |
-
-## 与 Studio 配合
-
-可以同时挂载 `StudioMessageHook`，在 Studio 上实时看到哪些会话被采样进训练；reward 也可以写入 Studio 用于可视化分析。
+`TrainingManager` 仅负责 HTTP 客户端调用，不干预 Agent 的执行过程。你可以在业务代码中自行决定何时将生产流量发送到训练后端，实现"采集 → 微调 → 部署"的闭环。

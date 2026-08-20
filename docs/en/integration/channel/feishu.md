@@ -1,67 +1,53 @@
 # Feishu Channel
 
-`AgentScope.Extensions.Channel.Feishu` connects your Agent to Feishu / Lark (飞书) via the **Event Subscription v2** callback mechanism. A controller receives webhook callbacks, optionally decrypts encrypted payloads, and dispatches messages through the Gateway.
+`AgentScope.Extensions.Channel.Feishu` connects your Agent to Feishu / Lark (飞书) through webhook callbacks and the Feishu Open API.
 
-## When to use
-
-- Your Agent needs to respond to Feishu bot messages in 1:1 chats or group @-mentions.
-- Your application already runs ASP.NET Core (the callback controller auto-registers).
+Package version: **2.0.1** | Target framework: **net10.0**
 
 ## Add the dependency
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Channel.Feishu" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Channel.Feishu" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## Prerequisites
-
-1. Create a **Custom App** in the [Feishu Developer Console](https://open.feishu.cn/).
-2. Enable the **Bot** capability.
-3. Configure the **Event Subscription** callback URL to point to your application:
-   `https://your-host/api/channels/feishu/{channelId}/callback`
-4. Note down the **App ID** and **App Secret**. Optionally configure an **Encrypt Key** and **Verification Token**.
-
-## Quickstart
+## Constructor
 
 ```csharp
-var channel = FeishuChannel.FromProperties(
-    "my-feishu",
-    ChannelConfig.Of("my-feishu", "main"),
-    new Dictionary<string, string>
-    {
-        ["appId"] = "cli_xxxxx",
-        ["appSecret"] = "your-app-secret"
-    });
-
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", agent)
-    .Channel(channel)
-    .Build();
-
-gw.Start();
+public FeishuChannel(
+    HttpClient http,
+    string webhookUrl,
+    string? appSecret = null,
+    string? appId = null,
+    string? encryptKey = null,
+    string? verificationToken = null,
+    string? apiBase = null)
 ```
 
-The `FeishuCallbackController` is a controller that auto-registers at `/api/channels/feishu/{channelId}/callback`. It handles the URL verification handshake automatically.
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `http` | `HttpClient` | Yes | HTTP client for calling Feishu OpenAPI |
+| `webhookUrl` | `string` | Yes | Webhook URL for outgoing messages |
+| `appSecret` | `string?` | No | Feishu app secret |
+| `appId` | `string?` | No | Feishu app id (e.g. `cli_xxxxx`) |
+| `encryptKey` | `string?` | No | AES-256-CBC encrypt key (enables payload encryption) |
+| `verificationToken` | `string?` | No | URL verification token |
+| `apiBase` | `string?` | No | API base URL, default `https://open.feishu.cn` |
 
-## Configuration properties
+When both `appId` and `appSecret` are provided, `TokenProvider` exposes a `FeishuAccessTokenProvider`. When `encryptKey` is configured, `FeishuCrypto` is enabled.
 
-| Property | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `appId` | Yes | — | Feishu custom-app id (cli_xxx) |
-| `appSecret` | Yes | — | Feishu custom-app secret |
-| `encryptKey` | No | — | AES-256-CBC encrypt key; enables payload encryption |
-| `verificationToken` | No | — | URL verification token for the challenge handshake |
-| `callbackPath` | No | `/api/channels/feishu/{channelId}/callback` | Override the callback URL path |
-| `apiBase` | No | `https://open.feishu.cn` | Feishu Open API base URL |
+## Interface members
 
-## Encryption
+| Member | Description |
+|--------|-------------|
+| `Name` | Returns `"feishu"` |
+| `StartAsync` | No-op (stateless channel) |
+| `StopAsync` | No-op |
+| `SendAsync` | Sends text via webhook (`POST` to `webhookUrl`) |
+| `ProcessInboundAsync` | Processes callback: optional signature verify (`X-Lark-Signature`) → decrypt → url_verification challenge → event_id dedup → mapping → BotLoopGuard → fires `OnMessageReceived` |
+| `OnMessageReceived` | Inbound message event |
 
-When `encryptKey` is configured, the callback body arrives as `{"encrypt":"<base64>"}`. The adapter decrypts it automatically (AES-256-CBC with SHA-256 key derivation) and verifies the `X-Lark-Signature` header.
+### URL verification handshake
 
-## Message flow
-
-**Inbound:** `FeishuCallbackController` → optional decryption → URL verification check → event_id dedup → `FeishuInboundMapper` (text messages only in MVP) → bot-loop guard → Gateway.
-
-**Outbound:** `FeishuOutboundClient` sends replies via `POST /open-apis/im/v1/messages` with a `tenant_access_token` from `FeishuAccessTokenProvider`. Tokens are cached and proactively refreshed at ~80% of TTL.
+When a `url_verification` challenge is detected, the channel auto-validates the `token` and returns a `{"challenge":"..."}` response.

@@ -1,56 +1,61 @@
 # GLM 模型
 
-`AgentScope.Extensions.Model.OpenAI` 通过 OpenAI 兼容模型栈提供 GLM（智谱 / Z.AI）的一等支持。引入 OpenAI 模型扩展模块后，可以通过 `ModelRegistry` 使用 `glm:<model>`。
+GLM（智谱 / Z.AI）使用 OpenAI 兼容端点，通过 `OpenAIModel` 接入，无专用模型类。
 
-## 添加依赖
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.OpenAI" Version="*" />
-```
-
-## ModelRegistry
-
-设置 `ZAI_API_KEY`、`GLM_API_KEY` 或 `ZHIPUAI_API_KEY` 后，使用 `glm:<model>` 字符串 id：
+## 构造函数示例
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("glm:glm-5.2") // 底层由 ModelRegistry.Resolve(modelId) 解析
-    .Build();
+new OpenAIModel("glm-4-plus", apiKey, "https://open.bigmodel.cn/api/paas/v4")
 ```
 
-Provider 默认使用 `https://open.bigmodel.cn/api/paas/v4` ，发送请求前会去掉 `glm:` 前缀，并使用 `AgentScope.Extensions.Model.OpenAI.Compat.GLM` 下的 GLM formatter。
-
-## 思考模式
-
-通过 `ModelCreationContext` 解析模型时，可以用 `GenerateOptions` 传入 GLM 思考相关参数：
+## 最小示例
 
 ```csharp
 using AgentScope.Core.Model;
-using System.Collections.Generic;
+using AgentScope.Core.Model.OpenAI;
 
-Model model = ModelRegistry.Resolve(
-    "glm:glm-5.2",
-    ModelCreationContext.Builder()
-        .Component(
-            typeof(GenerateOptions),
-            GenerateOptions.Builder()
-                .AdditionalBodyParam("thinking", new Dictionary<string, object> { ["type"] = "disabled" })
-                .ReasoningEffort("max")
-                .Build())
-        .Build());
+string key = System.Environment.GetEnvironmentVariable("ZHIPUAI_API_KEY");
+var model = new OpenAIModel("glm-4-plus", key,
+    "https://open.bigmodel.cn/api/paas/v4");
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("What is GLM?").Build()
+        }
+    }).Result.Text;
 ```
 
-GLM-4.7 和 GLM-5 系列默认开启思考。GLM-5.2 还支持 `reasoning_effort`；如果需要流式工具调用参数，可以通过 `AdditionalBodyParam("tool_stream", true)` 开启。
+## Agent 集成
 
-## 兼容性说明
+```csharp
+using AgentScope.Core.Model.OpenAI;
+using AgentScope.Core.Agent;
 
-GLM formatter 会把 OpenAI 风格请求适配为 GLM chat-completions API 支持的格式。它会确保至少存在一条 user 消息，移除 GLM 不支持的消息 `name` 字段，省略工具 schema 的 `strict` 字段，并移除 `frequency_penalty`、`presence_penalty`、`thinking_budget`、`stream_options` 等不支持的请求字段。
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new OpenAIModel("glm-4-plus", key,
+        "https://open.bigmodel.cn/api/paas/v4"))
+    .Build();
+```
 
-GLM 只支持 `max_tokens`，因此当只设置了 `max_completion_tokens` 且没有设置 `max_tokens` 时，会自动映射到 `max_tokens`。`temperature` 和 `top_p` 会被钳制到 GLM 支持的取值范围。
+## 流式调用
 
-GLM 只接受 `tool_choice=auto`。强制工具选择会降级为 `auto`；`ToolChoice.None` 会从请求中移除 tools，以保留"不调用工具"的语义。
+`OpenAIModel` 实现 `IStreamingChatModel`，GLM 端点同样支持：
 
-结构化输出默认使用 AgentScope 的 fallback 行为，因为 GLM 的 `response_format` 仅支持 `json_object`。只有在你明确确认目标端点支持所需行为时，才需要手动开启 native structured output。
+```csharp
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
+```
 
-使用兼容端点或自托管端点时，可以通过 `ModelCreationContext` 传入 `baseUrl`、`endpointPath`、生成参数或 formatter 覆盖。
+## 与专用模型的差异
+
+- AgentScope 中没有 `GLMModel` 专用类，所有能力来自 `OpenAIModel`。
+- 环境变量建议：`ZHIPUAI_API_KEY` 或 `GLM_API_KEY`。
+- 自定义 formatter 可通过 `OpenAIModel` 的 `formatter` 参数传入。
+- 如需思考模式等 GLM 特有参数，通过 `GenerateOptions` 的 `defaultOptions` 参数传入。
+
+完整接口说明见 [模型](../../docs/building-blocks/model.md)。

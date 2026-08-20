@@ -1,72 +1,53 @@
 # AgentScope Studio
 
-`AgentScope.Extensions.Studio` 把 Agent 接入 [AgentScope Studio](https://github.com/agentscope-ai/agentscope-studio)：每次 Agent 调用都会被推送到 Studio，用作可视化调试、链路回放、Human-in-the-Loop 输入。
+`AgentScope.Extensions.Studio` 提供 `AgentScopeStudioClient`，用于将 Agent 运行记录推送到 [AgentScope Studio](https://github.com/agentscope-ai/agentscope-studio)，实现可视化调试与链路回放。
 
 ## 何时使用
 
-- 开发期想在 Studio 里看到 Agent 的事件流、推理过程、工具调用。
-- 需要在 Studio 里发起 `RequestUserInput`，让真人介入答题。
+- 开发期想在 Studio 中查看 Agent 的会话记录。
+- 需要将生产流量录制到 Studio 进行追溯分析。
 
 ## 添加依赖
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Studio" Version="$(AgentScopeVersion)" />
+<PackageReference Include="AgentScope.Extensions.Studio" Version="2.0.1" />
 ```
 
-## 快速上手
+## AgentScopeStudioClient
 
 ```csharp
-using AgentScope.Core.Studio;
+using AgentScope.Extensions.Studio;
 
-// 1) 初始化 Studio 连接（HTTP + WebSocket）
-StudioManager.Init()
-    .StudioUrl("http://localhost:8000")
-    .Project("MyProject")
-    .RunName("experiment_001")
-    .Initialize()
-    .Wait();
+var client = new AgentScopeStudioClient(
+    http: httpClient,
+    baseUrl: "http://localhost:8000");
 
-// 2) 把 StudioMessageHook 挂到 Agent 上，自动把消息推到 Studio
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(model)
-    .Hook(new StudioMessageHook(StudioManager.GetClient()))
-    .Build();
+// 创建会话
+var sessionId = await client.CreateSessionAsync("agent-1");
 
-// 3) 正常调用 Agent，Studio 上会同步看到对话
-agent.Call(msg).Wait();
+// 记录事件
+await client.LogEventAsync(sessionId, "user_input", "你好");
+
+// 查询会话
+var session = await client.GetSessionAsync(sessionId);
 ```
 
-## Studio 提供的能力
+### API
 
-- **消息推送**：每条 user / assistant / tool 消息都被同步到 Studio。
-- **链路追踪**：Studio 内部会按 `RunName` 把整次运行编排成一棵 trace 树。
-- **Human-in-the-Loop**：通过 `StudioUserAgent` 或 `RequestUserInput`，让 Studio UI 弹出输入框等待真人填写后再继续。
-
-## API 概览
-
-| 类 | 用途 |
+| 构造方法 | 说明 |
 | --- | --- |
-| `StudioManager` | 单例式入口，初始化和获取 client |
-| `StudioConfig` | URL / project / runName 等配置 |
-| `StudioClient` | HTTP 客户端，推送事件、消息、注册 run |
-| `StudioWebSocketClient` | WebSocket 客户端，接收 Studio 侧的指令（如 user input） |
-| `StudioMessageHook` | 注入到 `ReActAgent` 的 `Hook`，自动推送 `Msg` |
-| `StudioUserAgent` | "真人扮演的 Agent"，调用时阻塞等待 Studio 输入 |
+| `AgentScopeStudioClient(HttpClient http, string baseUrl)` | 连接 Studio 服务端 |
 
-## 何时关闭
+| 方法 | 说明 |
+| --- | --- |
+| `CreateSessionAsync(string agentId, CancellationToken ct)` | 创建新会话，返回 `session_id` |
+| `LogEventAsync(string sessionId, string type, string data, CancellationToken ct)` | 向会话写入事件 |
+| `GetSessionAsync(string sessionId, CancellationToken ct)` | 获取会话完整信息（JSON 格式） |
 
-生产部署一般不挂这个 Hook（避免每次调用都向 Studio 写一份）。建议通过配置控制：
+## 工作原理
 
-```csharp
-// 仅在存在配置时启用
-if (configuration.GetSection("AgentScope:Studio").Exists())
-{
-    StudioManager.Init()
-        .StudioUrl(url)
-        .Project(project)
-        .Initialize()
-        .Wait();
-    services.AddSingleton(new StudioMessageHook(StudioManager.GetClient()));
-}
-```
+1. 每次 Agent 调用前调用 `CreateSessionAsync` 创建会话。
+2. 调用过程中通过 `LogEventAsync` 记录消息、工具调用等事件。
+3. 开发者在 Studio 前端查看会话时间线。
+
+> 生产环境建议通过配置开关控制是否启用 Studio 日志，避免不必要的网络开销。

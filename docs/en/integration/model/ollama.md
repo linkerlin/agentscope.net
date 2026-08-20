@@ -1,55 +1,59 @@
 # Ollama Model
 
-`AgentScope.Extensions.Model.Ollama` integrates locally hosted Ollama models. It is useful for local development, private deployments, and offline model serving.
+`AgentScope.Core.Model.Ollama.OllamaModel` connects to a local Ollama service, extending `OpenAIModel`.
 
-## Add the dependency
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.Ollama" Version="$(AgentScopeVersion)" />
-```
-
-## ModelRegistry
-
-Use the `ollama:<model>` id. `OLLAMA_BASE_URL` is optional and defaults to the local Ollama endpoint when omitted.
+## Constructor
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("ollama:llama3") // Resolved internally by ModelRegistry.Resolve(modelId)
+OllamaModel(string modelName = "llama2", string? baseUrl = null)
+```
+
+When `baseUrl` is omitted, auto-detects the local Ollama instance (default `http://localhost:11434`).
+
+## Minimal Example
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.Ollama;
+
+var model = new OllamaModel("llama3");
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Hello").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent Integration
+
+```csharp
+using AgentScope.Core.Model.Ollama;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new OllamaModel("llama3"))
     .Build();
 ```
 
-## Explicit builder
+## Streaming
 
-Use the builder when you need a non-default Ollama endpoint, formatter, transport, proxy, or Ollama options:
+`OllamaModel` extends `OpenAIModel` and implements `IStreamingChatModel`:
 
 ```csharp
-using AgentScope.Extensions.Model.Ollama;
-
-OllamaChatModel model = OllamaChatModel.Builder()
-    .ModelName("llama3")
-    .BaseUrl("http://localhost:11434")
-    .Build();
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
 ```
 
-## Spring Boot
+## Notes
 
-Spring Boot applications can use the Ollama starter:
+- Ensure Ollama is installed and running locally, and the target model has been pulled (`ollama pull llama3`).
+- `OllamaModel` constructor only exposes `modelName` and `baseUrl`. For custom formatters or generation options, use `new OpenAIModel(modelName, baseUrl: yourUrl)`.
+- The default model name is `"llama2"`; specifying it explicitly is recommended.
 
-```xml
-<PackageReference Include="AgentScope.Ollama.SpringBoot.Starter" Version="$(AgentScopeVersion)" />
-```
-
-Configure the local Ollama model with `agentscope.model.provider=ollama`. The base URL
-is optional and defaults to `http://localhost:11434`:
-
-```yaml
-agentscope:
-  model:
-    provider: ollama
-  ollama:
-    model-name: llama3
-    # base-url: http://localhost:11434
-```
-
-Full builder options, formatters, credentials, and registry context details are covered in [Model](../../docs/building-blocks/model.md).
+See [Model](../../docs/building-blocks/model.md) for the full interface reference.

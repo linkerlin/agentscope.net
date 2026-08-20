@@ -1,68 +1,54 @@
 # 企业微信 Channel
 
-`AgentScope.Extensions.Channel.WeCom` 通过**加密回调**机制将你的 Agent 接入企业微信（WeCom / WeChat Work）。一个控制器接收消息回调，解密后通过 Gateway 分发。
+`AgentScope.Extensions.Channel.WeCom` 通过企业微信 Webhook 和加密回调机制将你的 Agent 接入企业微信（WeCom / WeChat Work）。
 
-## 适用场景
-
-- Agent 需要响应企业微信机器人消息（单聊和群聊）。
-- 你的应用已经运行 ASP.NET Core。
+包版本：**2.0.1** | 目标框架：**net10.0**
 
 ## 添加依赖
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Channel.WeCom" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Channel.WeCom" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## 前置准备
-
-1. 在[企业微信管理后台](https://work.weixin.qq.com/)创建一个**应用**。
-2. 启用**接收消息** API 并配置回调 URL：
-   `https://your-host/api/channels/wecom/{channelId}/callback`
-3. 记下 **Corp ID**、**Agent ID**、**Secret**、**Token** 和 **EncodingAESKey**。
-
-## 快速开始
+## 构造函数
 
 ```csharp
-var channel = WeComChannel.FromProperties(
-    "my-wecom",
-    ChannelConfig.Of("my-wecom", "main"),
-    new Dictionary<string, string>
-    {
-        ["corpId"] = "your-corp-id",
-        ["agentId"] = "1000002",
-        ["secret"] = "your-secret",
-        ["token"] = "your-callback-token",
-        ["encodingAesKey"] = "your-encoding-aes-key"
-    });
-
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", agent)
-    .Channel(channel)
-    .Build();
-
-gw.Start();
+public WeComChannel(
+    HttpClient http,
+    string webhookUrl,
+    string? corpId = null,
+    string? corpSecret = null,
+    string? token = null,
+    string? encodingAesKey = null,
+    string? receiveId = null,
+    string? apiBase = null)
 ```
 
-## 配置属性
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `http` | `HttpClient` | 是 | 用于调用企业微信 API 的 HTTP 客户端 |
+| `webhookUrl` | `string` | 是 | 出站消息的 Webhook 地址 |
+| `corpId` | `string?` | 否 | 企业 Corp ID |
+| `corpSecret` | `string?` | 否 | 应用密钥 |
+| `token` | `string?` | 否 | 回调 token（用于签名校验） |
+| `encodingAesKey` | `string?` | 否 | AES 密钥（用于消息加解密） |
+| `receiveId` | `string?` | 否 | 接收方 ID（corpId） |
+| `apiBase` | `string?` | 否 | API 基地址，默认 `https://qyapi.weixin.qq.com` |
 
-| 属性 | 必填 | 默认值 | 说明 |
-|------|------|--------|------|
-| `corpId` | 是 | — | 企业 Corp ID |
-| `agentId` | 是 | — | 应用 Agent ID |
-| `secret` | 是 | — | 应用密钥，用于获取 access token |
-| `token` | 是 | — | 回调 token，用于签名校验 |
-| `encodingAesKey` | 是 | — | AES 密钥，用于消息加解密 |
-| `callbackPath` | 否 | `/api/channels/wecom/{channelId}/callback` | 自定义回调路径 |
-| `apiBase` | 否 | `https://qyapi.weixin.qq.com` | 企业微信 API 基地址 |
+当 `corpId` 和 `corpSecret` 均提供时，可通过 `TokenProvider` 获取 `WeComAccessTokenProvider`。
+当 `token`、`encodingAesKey` 和 `receiveId` 均提供时启用 `WeComCrypto` 加解密。
 
-## 加密
+## 接口实现
 
-所有企业微信回调都是加密的。适配器使用 `WeComCrypto` 自动处理解密和签名校验，实现了[企业微信回调加密规范](https://developer.work.weixin.qq.com/document/path/90238)。
+| 成员 | 说明 |
+|------|------|
+| `Name` | 返回 `"wecom"` |
+| `StartAsync` | 无操作（无状态渠道） |
+| `StopAsync` | 无操作 |
+| `SendAsync` | 通过 Webhook 发送文本消息（`POST` 到 `webhookUrl`） |
+| `ProcessInboundAsync` | 处理回调：验签（`msg_signature`）→ 解密 → URL 校验（echostr）→ MsgId 去重 → mapping → BotLoopGuard → 触发 `OnMessageReceived` 事件 |
+| `OnMessageReceived` | 入站消息事件 |
 
-## 消息流转
-
-**入站：** `WeComCallbackController` → URL 验证（echostr） → 解密 → MsgId 去重 → `WeComInboundMapper`（文本消息） → 防循环 → Gateway。
-
-**出站：** `WeComOutboundClient` 通过 `/cgi-bin/message/send`（单聊）或 `/cgi-bin/appchat/send`（群聊）发送回复，使用 `WeComAccessTokenProvider` 获取 `access_token`。
+企业微信所有回调均强制加密。未配置 `token`/`encodingAesKey`/`receiveId` 时 `ProcessInboundAsync` 返回 `FailedVerification`。

@@ -1,60 +1,73 @@
-﻿```{note}
-This page has been superseded by [Distributed Storage — OSS](../distributed/oss.md). Content below is kept for reference.
-```
+﻿# OSS Session State
 
-# OSS State Store
+Persist agent session state in Alibaba Cloud Object Storage Service (OSS) using the `AgentScope.Extensions.Store.Oss` package (powered by Aliyun.OSS SDK).
 
-`agentscope-extensions-oss` persists AgentScope agent state in Alibaba Cloud Object Storage Service (OSS). Ideal for large-capacity data and Alibaba Cloud ecosystems.
-
-## Add the dependency
+## Dependency
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Oss" Version="$(AgentScopeVersion)" />
+  <PackageReference Include="AgentScope.Extensions.Store.Oss" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## Quickstart
+Target framework: net10.0.
+
+## Quick Start
 
 ```csharp
-using com.aliyun.oss.OSS;
-using com.aliyun.oss.OSSClientBuilder;
-using AgentScope.core.state.AgentStateStore;
-using AgentScope.extensions.oss.OssAgentStateStore;
-OSS ossClient = new OSSClientBuilder().Build(endpoint, accessKeyId, accessKeySecret);
-AgentStateStore stateStore = OssAgentStateStore.Builder()
-    .OssClient(ossClient)
-    .BucketName("my-agentscope-bucket")
-    .KeyPrefix("agentscope/state/")
-    .Build();
-ReActAgent agent = ReActAgent.Builder()
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.Model;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.Oss;
+
+var ossStore = new OssDistributedStore(
+    httpClient,
+    endpoint: "oss-cn-hangzhou.aliyuncs.com",
+    bucket: "my-bucket",
+    accessKeyId: "your-access-key",
+    accessKeySecret: "your-access-secret");
+
+var stateStore = new OssAgentStateStore(ossStore, keyPrefix: "agentstate");
+
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
+
+EnhancedReActAgent agent = new EnhancedReActAgentBuilder()
     .Name("assistant")
-    .Model(model)
-    .StateStore(stateStore)
+    .Model(new DashScopeModel("qwen-plus", apiKey))
+    .Memory(memory)
     .Build();
+
+await agent.CallAsync(Msg.Builder().Role("user").TextContent("Hello").Build());
 ```
 
-## Key layout
+## Custom Key Prefix
 
-The `(userId, sessionId)` pair is packed into OSS object paths:
+```csharp
+var stateStore = new OssAgentStateStore(ossStore, keyPrefix: "prod/session");
+```
 
-| Type | Key pattern |
-| --- | --- |
-| Single value | `{keyPrefix}{userId}/{sessionId}/{stateKey}.json` |
-| List | `{keyPrefix}{userId}/{sessionId}/{stateKey}.list.json` |
-| List hash | `{keyPrefix}{userId}/{sessionId}/{stateKey}.list.hash` (change detection) |
+The default `keyPrefix` is `"agentstate"`.
 
-Anonymous sessions (`userId` is null) use `__anon__` as the user segment.
+## Save and Restore Session
 
-## Builder reference
+```csharp
+using AgentScope.Core.Session;
 
-| Method | Notes |
-| --- | --- |
-| `ossClient(OSS)` | Required. Alibaba Cloud OSS client |
-| `bucketName(String)` | Required. OSS bucket name |
-| `keyPrefix(String)` | Default `agentscope/state/` |
+var sessionManager = new SessionManager();
+Session session = sessionManager.CreateSession(name: "oss-demo");
 
-## Security
+agent.SaveTo(session, "main");
+agent.LoadIfExists(session, "main");
+```
 
-- Use RAM Role + STS temporary credentials in production — avoid hardcoded AK/SK
-- Configure bucket lifecycle rules (e.g. 7-day auto-expiry) to control storage costs
+## Versioning Notes
+
+OSS does **not** support versioning (`SupportsVersioning = false`); it uses last-writer-wins semantics. For multi-replica deployments, prefer a CAS-capable backend (Redis/MySQL/PostgreSQL).
+
+## Production Considerations
+
+- Use RAM Role + STS temporary credentials instead of hardcoded AK/SK.
+- Configure bucket lifecycle rules to control storage costs.
+- OSS is best suited for large-capacity snapshot scenarios; its latency is higher than Redis.

@@ -1,107 +1,85 @@
 # A2A (Agent-to-Agent)
 
-`agentscope-extensions-a2a` implements the [A2A protocol](https://a2aproject.github.io/A2A/) and ships two sub-modules:
+`AgentScope.Core.A2A` implements the [A2A protocol](https://a2aproject.github.io/A2A/) with client and server components.
 
-- `agentscope-extensions-a2a-client`: wraps a remote A2A Agent as a local `Agent` you can `call(...)` directly.
-- `agentscope-extensions-a2a-server`: exposes a local `ReActAgent` as an A2A Server.
+## Client: calling a remote A2A Agent
 
-The two modules are independent — use either one alone.
+### A2aAgent
 
-## Client: call a remote A2A Agent
-
-### Add the dependency
-
-```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-a2a-client</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
-```
-
-### Pass an AgentCard directly
+`A2aAgent` (`AgentScope.Core.A2A.Client`) extends `AgentBase` to wrap a remote A2A Agent as a local Agent.
 
 ```csharp
-using AgentScope.A2A.Spec;
-using AgentScope.core.a2a.agent.A2aAgent;
+using AgentScope.Core.A2A.Client;
+using AgentScope.Core.A2A.Client.Card;
+using AgentScope.Core.Service.Discovery;
 
-AgentCard card = AgentCard.builder()
-    .WithName("remote-translator")
-    .WithUrl("http://other-service:8080")
-    // ...
-    .Build();
+// Resolve the remote AgentCard
+var card = new AgentCard("remote-1", "translator", "Translation service", "http://other-service:8080");
+var resolver = new FixedAgentCardResolver(card);
+var agent = new A2aAgent("translator", resolver);
 
-A2aAgent remote = A2aAgent.builder()
-    .WithName("remote-translator")
-    .WithAgentCard(card)
-    .Build();
-
-Msg result = remote.Call(new UserMessage("Translate to English: 你好")).Block();
+// Call like any local Agent
+var result = await agent.CallAsync(new Msg[] { Msg.Builder().Role("user").TextContent("Hello").Build() });
 ```
 
-### Auto-discover via well-known
+### IAgentCardResolver Implementations
+
+| Implementation | Description |
+| --- | --- |
+| `FixedAgentCardResolver(AgentCard card)` | Always returns the same AgentCard |
+| `WellKnownAgentCardResolver(HttpClient http)` | Fetches the card from `https://{agentName}/.well-known/agent-card.json` |
+
+### Interface
 
 ```csharp
-using AgentScope.core.a2a.agent.card.WellKnownAgentCardResolver;
-
-WellKnownAgentCardResolver resolver = new WellKnownAgentCardResolver(
-    "http://127.0.0.1:8080",
-    "/.well-known/agent-card.json",
-    new Dictionary<string, string>()
-);
-
-A2aAgent remote = A2aAgent.builder()
-    .WithName("remote")
-    .WithAgentCardResolver(resolver)
-    .Build();
+public interface IAgentCardResolver
+{
+    Task<AgentCard?> ResolveAsync(string agentName, CancellationToken ct = default);
+}
 ```
 
-`A2aAgent` is a subclass of `AgentBase`, so it composes naturally with Pipeline, MsgHub, Subagent, etc.
+## Server: exposing a local Agent as an A2A Server
 
-## Server: expose a ReActAgent as an A2A Server
-
-### Add the dependency
-
-```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-a2a-server</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
-```
-
-### Build the server
+### AgentScopeA2aServer
 
 ```csharp
-using AgentScope.core.a2a.server.AgentScopeA2aServer;
-using AgentScope.core.a2a.server.transport.jsonrpc.JsonRpcTransportProperties;
+using AgentScope.Core.A2A.Server;
+using AgentScope.Core.A2A.Server.Card;
+using AgentScope.Core.A2A.Server.Executor.Runner;
 
-ReActAgent.Builder agentBuilder = ReActAgent.builder()
-    .WithName("backend-agent")
-    .WithModel(model);
+// Create a runner that builds a new Agent per request
+var runner = new ReActAgentWithBuilderRunner(
+    agentFactory: () => new ReActAgent("backend-agent", model),
+    name: "backend-agent",
+    description: "Backend service Agent");
 
-AgentScopeA2aServer server = AgentScopeA2aServer.builder()
-    .WithAgentBuilder(agentBuilder)
-    .WithTransportProperties(new JsonRpcTransportProperties())
-    // .WithAgentCard(customCard)
-    // .agentRegistry(myRegistry)
-    .Build();
+// Build the A2A Server
+var server = new AgentScopeA2aServer(runner, new ConfigurableAgentCard
+{
+    Name = "backend-agent",
+    Description = "Backend service Agent",
+    Url = "http://localhost:5000"
+});
 
-// Delegate inbound requests to the transport wrapper from your web framework
-TransportWrapper wrapper = server.GetTransportWrapper("JSONRPC");
-// ... Spring/Quarkus controller forwards to wrapper.Handle(...)
+// Register with external registry (e.g. Nacos)
+server.AddRegistry(nacosRegistry);
 
-server.PostEndpointReady();   // Call after the web server is listening — triggers registration etc.
+// Handle requests from your web framework
+var response = await server.HandleRequestAsync(requestBody, headers);
+
+// Trigger registration after the web server is ready
+await server.PostEndpointReadyAsync();
 ```
 
-`AgentScopeA2aServer` does not bind a port or expose endpoints itself; it only assembles components and the request-handling chain. You wire transport into Spring Boot, Quarkus, Vert.x, etc. as you prefer.
+### Key Components
 
-### Optional components
+| Class | Namespace | Description |
+| --- | --- | --- |
+| `AgentScopeA2aServer` | `AgentScope.Core.A2A.Server` | Server entry point — assembles components and handles requests |
+| `ConfigurableAgentCard` | `AgentScope.Core.A2A.Server.Card` | Configurable AgentCard builder; call `Build()` to produce `AgentCard` |
+| `AgentScopeAgentCardConverter` | `AgentScope.Core.A2A.Server.Card` | Converts `ConfigurableAgentCard` to `AgentCard` |
+| `AgentScopeAgentExecutor` | `AgentScope.Core.A2A.Server.Executor` | Executor with blocking `ExecuteAsync` and streaming `StreamAsync` |
+| `ReActAgentWithBuilderRunner` | `AgentScope.Core.A2A.Server.Executor.Runner` | Default runner creating a new Agent per request |
+| `IAgentRunner` | `AgentScope.Core.A2A.Server.Executor.Runner` | Runner interface with `StreamAsync` and `StopAsync` |
 
-- `TaskStore` / `QueueManager`: task and event queue stores; in-memory by default, swap for persistent versions in production.
-- `PushNotificationConfigStore` / `PushNotificationSender`: outbound notifications.
-- `AgentRegistry`: register `AgentCard` to an external registry such as Nacos (see [Nacos](../infrastructure/nacos.md)).
-
-## Spring Boot Starter
-
-If you're on Spring Boot, prefer `agentscope-spring-boot-starter-a2a-server` — it auto-configures the server and controller. See [Quickstart](../../docs/quickstart.md).
+> `AgentScopeA2aServer` does not bind a port. It only builds components and the request-handling chain — HTTP serving is handled by your web framework.

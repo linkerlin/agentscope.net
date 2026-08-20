@@ -1,85 +1,49 @@
 # Git Skill Repository
 
-`agentscope-extensions-skill-git-repository` treats a remote Git repo as a skill repository. It runs a lightweight remote-ref check on each read and only pulls when the remote HEAD changes — near-zero overhead at idle.
+`AgentScope.Extensions.Skill.Git` uses **LibGit2Sharp** to load skill definitions (`.skill.yaml` files) from a remote Git repository. Supports both HTTPS and SSH.
+
+Package version: **2.0.1** | Target framework: **net10.0**
 
 ## When to use
 
-- You want Git to manage versioning and review of skill content.
-- You want to share a single skill set across multiple projects.
-- You don't want to embed a database or config center in production.
+- You want Git-based version control and review for skills
+- You want to share skills across multiple projects
 
 ## Add the dependency
 
 ```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-skill-git-repository</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
+<ItemGroup>
+    <PackageReference Include="AgentScope.Extensions.Skill.Git" Version="2.0.1" />
+</ItemGroup>
 ```
 
-It uses JGit under the hood and supports both HTTPS and SSH.
-
-## Quickstart
+## Constructor
 
 ```csharp
-using AgentScope.core.skill.repository.GitSkillRepository;
-using AgentScope.core.skill.AgentSkill;
-
-// Public repo + default branch, temporary local directory
-GitSkillRepository repo = new GitSkillRepository(
-    "https://github.com/agentscope/skills.git"
-);
-
-// Register all skills into a Toolkit
-Toolkit toolkit = new Toolkit();
-repo.GetAllSkills().ForEach(toolkit.RegisterSkill);
-
-// Clean up the temp directory on shutdown
-Runtime.getRuntime().AddShutdownHook(new Thread(repo.Close));
+public GitSkillRepository(
+    string repoUrl,
+    string branch = "main",
+    string? localPath = null)
 ```
 
-## Pin branch / use a fixed local path
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `repoUrl` | `string` | Yes | — | Remote repository URL |
+| `branch` | `string` | No | `"main"` | Branch to check out |
+| `localPath` | `string?` | No | Temp directory | Local clone path (null = auto temp dir) |
 
-```csharp
-GitSkillRepository repo = new GitSkillRepository(
-    "https://github.com/agentscope/skills.git",
-    "develop",                   // branch
-    Path.of("/var/skills/repo"), // local path (null = temp dir)
-    "agentscope-public",         // source label (visible in Toolkit)
-    true                         // autoSync
-);
-```
+On construction, the repository clones (or opens an existing clone), scans all `*.skill.yaml` files, and caches them in memory.
 
-## Auth for private repos
+## Public methods
 
-`GitSkillRepository` reuses system-level Git config; it doesn't manage credentials in Java:
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `GetSkillAsync(string, CancellationToken)` | `Task<Skill?>` | Gets a skill by name |
+| `GetAllSkillNamesAsync(CancellationToken)` | `Task<IReadOnlyList<string>>` | Lists all skill names |
+| `SkillExistsAsync(string, CancellationToken)` | `Task<bool>` | Checks if a skill exists |
+| `Sync()` | `void` | Manually fetches remote updates and reloads the cache |
+| `Dispose()` | `void` | Releases the LibGit2Sharp Repository |
 
-- **HTTPS**: uses the credential helper from `~/.gitconfig` (osxkeychain, libsecret, ...).
-- **SSH**: uses keys under `~/.ssh/` and `ssh-agent`.
+## Sync
 
-```csharp
-// Private SSH repository
-GitSkillRepository repo = new GitSkillRepository(
-    "git@github.com:my-org/private-skills.git"
-);
-```
-
-In CI, make sure the runner user has the credentials or has the SSH agent configured.
-
-## Auto-sync vs. manual sync
-
-- `autoSync=true` (default): every read first runs `ls-remote`; pull happens only if the remote moved.
-- `autoSync=false`: never pulls automatically; call `repo.sync()` to refresh.
-
-```csharp
-GitSkillRepository repo = new GitSkillRepository(remoteUrl, false);
-repo.Sync();              // Sync once at startup
-schedule(() => repo.Sync(), 5, TimeUnit.MINUTES);
-```
-
-## Operational notes
-
-- Hold the repo as a singleton Spring Bean; close it once during shutdown.
-- The temp directory has a JVM shutdown hook, but force-killed processes may leave residue — clean up externally if needed.
-- Multi-instance deployments each maintain their own clone; no lock contention.
+The initial clone happens at construction. Call `Sync()` to pull remote changes. The repository implements `IDisposable` — always dispose when done.

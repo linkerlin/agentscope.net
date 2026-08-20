@@ -1,44 +1,61 @@
 # Anthropic Model
 
-`AgentScope.Extensions.Model.Anthropic` integrates Anthropic Claude models, including Anthropic-specific formatter and request DTO support.
+`AgentScope.Core.Model.Anthropic.AnthropicModel` connects to Anthropic Claude models.
 
-## Add the dependency
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.Anthropic" Version="$(AgentScopeVersion)" />
-```
-
-## ModelRegistry
-
-Set `ANTHROPIC_API_KEY`, then use the `anthropic:<model>` id:
+## Constructor
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("anthropic:claude-sonnet-4.5") // Resolved internally by ModelRegistry.Resolve(modelId)
+AnthropicModel(string modelName, string? apiKey = null, string? baseUrl = null,
+    AnthropicChatFormatter? formatter = null, GenerateOptions? defaultOptions = null)
+```
+
+Constants: `DefaultBaseUrl = "https://api.anthropic.com"`, `MessagesEndpoint = "/v1/messages"`.
+
+## Minimal Example
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.Anthropic;
+
+string key = System.Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+var model = new AnthropicModel("claude-sonnet-4-20250514", key);
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("What is AgentScope?").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent Integration
+
+```csharp
+using AgentScope.Core.Model.Anthropic;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new AnthropicModel("claude-sonnet-4-20250514", key))
     .Build();
 ```
 
-## Explicit builder
+## Streaming
 
-Use the builder when you need a custom endpoint, formatter, transport, prompt caching, thinking, or generation options:
+`AnthropicModel` implements `IStreamingChatModel`:
 
 ```csharp
-using AgentScope.Extensions.Model.Anthropic;
-
-AnthropicChatModel model = AnthropicChatModel.Builder()
-    .ApiKey(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"))
-    .ModelName("claude-sonnet-4.5")
-    .Stream(true)
-    .Build();
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
 ```
 
-## Spring Boot
+## Notes
 
-Spring Boot applications can use the Anthropic starter:
+- When `apiKey` is omitted, read from the `ANTHROPIC_API_KEY` environment variable.
+- The endpoint uses the Messages API (`/v1/messages`), which differs from OpenAI's Chat Completions format.
+- Custom `AnthropicChatFormatter` or `GenerateOptions` can be passed via the constructor.
 
-```xml
-<PackageReference Include="AgentScope.Anthropic.SpringBoot.Starter" Version="$(AgentScopeVersion)" />
-```
-
-Full builder options, formatters, credentials, and registry context details are covered in [Model](../../docs/building-blocks/model.md).
+See [Model](../../docs/building-blocks/model.md) for the full interface reference.

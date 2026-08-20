@@ -1,35 +1,54 @@
-# 技能仓库（Skill Repository）
+# 技能仓库概述
 
-`AgentSkill` 是 AgentScope 用 Markdown + 资源文件来描述一个可复用"技能"的格式（参考 [Harness · 技能](../../docs/harness/skill.md)）。`AgentSkillRepository` 接口负责把这些技能从外部存储里加载进来，再交给 `Toolkit` / `ReActAgent` 使用。
-
-`agentscope-extensions-*` 仓库提供了以下开箱即用的实现：
-
-| 扩展 | 后端 | 适合场景 |
-| --- | --- | --- |
-| [Git Repository](git-repository.md) | 远程 Git 仓库 | 用 Git 流程管控技能版本，跨团队共享 |
-| [MySQL Repository](mysql-repository.md) | MySQL 数据库 | 通过控制台 / 业务系统在线编辑、动态发布 |
-| [PostgreSQL Repository](postgresql-repository.md) | PostgreSQL 数据库 | 已有 PostgreSQL 基础设施，在线编辑、动态发布 |
-
-> Nacos 也提供了一个 `AgentSkillRepository` 实现：见 [Nacos](../infrastructure/nacos.md)。
-
-## 接入方式
+`AgentScope.Extensions.Skill.ISkillRepository` 接口定义了从外部存储加载技能的异步方法：
 
 ```csharp
-AgentSkillRepository repo = ...;        // 任选一种实现
-List<AgentSkill> skills = repo.GetAllSkills();
-
-Toolkit toolkit = new Toolkit();
-skills.ForEach(toolkit.RegisterSkill);
-
-ReActAgent agent = ReActAgent.builder()
-    .WithName("Assistant")
-    .WithModel(model)
-    .WithToolkit(toolkit)
-    .Build();
+public interface ISkillRepository
+{
+    Task<Skill?> GetSkillAsync(string name, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> GetAllSkillNamesAsync(CancellationToken ct = default);
+    Task<bool> SkillExistsAsync(string name, CancellationToken ct = default);
+}
 ```
 
-## 选型建议
+返回的 `Skill` 是一个不可变记录：
 
-- **想用 Git PR 流程管控、可读可 review** → Git
-- **要在管理后台 / 配置中心动态修改、立即生效** → MySQL、PostgreSQL 或 Nacos
-- **多种来源混用** → 实现 `AgentSkillRepository` 自己组合，或多个 repo 都注册到 toolkit
+```csharp
+public sealed record Skill(string Name, string Description, string Content, string? Source = null);
+```
+
+> **Core 层**另有 `AgentScope.Core.Skill.ISkillRepository`（`Scan()` / `Load(RegisteredSkill)`），两者不同。Extensions 层仓库实现了 `AgentScope.Extensions.Skill.ISkillRepository`，可与 Core 层的 `SkillRegistry` 配合使用。
+
+## 可用实现
+
+| 扩展 | 命名空间 | 构造函数 |
+| --- | --- | --- |
+| [Git 仓库](git-repository.md) | `AgentScope.Extensions.Skill.Git` | `(string repoUrl, string branch = "main", string? localPath = null)` |
+| [MySQL 仓库](mysql-repository.md) | `AgentScope.Extensions.Skill.MySql` | `(string connectionString)` |
+| [PostgreSQL 仓库](postgresql-repository.md) | `AgentScope.Extensions.Skill.PostgreSql` | `(string connectionString)` |
+
+## 技能文件格式
+
+技能由 `MarkdownSkillParser`（`AgentScope.Core.Skill`）解析，格式为 YAML front matter + Markdown 正文：
+
+```markdown
+---
+name: my-skill
+description: 一个示例技能
+tools: [tool1, tool2]
+active: true
+---
+
+# 技能正文
+
+在此编写技能的详细说明……
+```
+
+解析结果返回 `RegisteredSkill`，包含 `Id`、`Name`、`Description`、`ToolNames`、`IsActiveByDefault`、`RawContent` 等属性。
+
+## 集成到 Harness
+
+1. 创建扩展仓库实例（如 `GitSkillRepository`）
+2. 通过 `SkillRegistry` 注册或通过 Harness `SkillCatalog` 构建快照
+3. `SkillLoadTool` 接收 `HarnessSkillEntry` 列表，暴露为 `load_skill` 工具
+4. 通过 `HarnessAgentBuilder.WithToolkit(...)` 将工具注入 Agent

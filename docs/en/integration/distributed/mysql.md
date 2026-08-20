@@ -1,91 +1,74 @@
-# MySQL / JDBC
+# MySQL Distributed Storage
 
-`AgentScope.Extensions.MySql` provides full-stack JDBC-based distributed storage for teams with existing relational database infrastructure.
+`AgentScope.Extensions.Store.MySql` provides MySQL-based distributed state storage powered by MySqlConnector 2.x.
 
 ## Dependency
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.MySql" Version="$(AgentScopeVersion)" />
+<ItemGroup>
+  <PackageReference Include="AgentScope.Extensions.Store.MySql" Version="2.0.1" />
+</ItemGroup>
 ```
 
-Add your database driver separately (e.g. `MySqlConnector`, `Npgsql`).
+Target framework: net10.0.
 
-## One-Line Setup
+## MySqlDistributedStore
+
+Low-level distributed store implementing `IDistributedStore`:
 
 ```csharp
-using AgentScope.Extensions.MySql;
+using AgentScope.Extensions.Store.MySql;
 
-DataSource dataSource = ...;  // HikariCP, Druid, etc.
-DistributedStore store = MysqlDistributedStore.Create(dataSource);
-
-HarnessAgent agent = HarnessAgent.Builder()
-    .DistributedStore(store)
-    .Filesystem(new RemoteFilesystemSpec()
-            .IsolationScope(IsolationScope.USER))
-    .Build();
+var store = new MySqlDistributedStore(
+    "Server=localhost;Database=agentscope;User=root;Password=***;");
 ```
 
-## Components Provided
+The connection string follows the standard MySQL format with support for all MySqlConnector options:
 
-### 1. MysqlAgentStateStore
+```
+Server=host;Port=3306;Database=agentscope;User=root;Password=***;SslMode=Preferred;
+```
 
-Agent state persisted to a MySQL table.
+## MySqlAgentStateStore
 
 ```csharp
-using AgentScope.Extensions.MySql.State;
+using AgentScope.Extensions.Store.MySql;
 
-// auto-create schema
-AgentStateStore store = new MysqlAgentStateStore(dataSource, true);
+var mysqlStore = new MySqlDistributedStore(connectionString);
+var stateStore = new MySqlAgentStateStore(mysqlStore);
 
-// custom DB/table names
-AgentStateStore store = new MysqlAgentStateStore(
-    dataSource, "agentscope_prod", "session_state", true);
+// Custom key prefix
+var stateStore = new MySqlAgentStateStore(mysqlStore, keyPrefix: "prod:state");
 ```
 
-### 2. JdbcStore (BaseStore)
+The default `keyPrefix` is `"agentstate"`.
 
-Workspace filesystem KV storage with auto-detected dialect.
+## Integration with StateBackedMemory
 
 ```csharp
-using AgentScope.Extensions.MySql.Store;
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.MySql;
 
-BaseStore store = JdbcStore.Builder(dataSource)
-    .InitializeSchema(true)
-    .Build();
+var stateStore = new MySqlAgentStateStore(
+    new MySqlDistributedStore(connectionString));
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
 ```
 
-Supported dialects (auto-detected): MySQL, PostgreSQL, H2, SQLite.
+## Versioning Support
 
-### 3. JdbcSnapshotSpec
+`MySqlAgentStateStore.SupportsVersioning = true`. CAS is implemented using MySQL row-level locks or optimistic locking.
 
-Sandbox snapshots as LONGBLOB in a database table.
+## Production Considerations
 
-```csharp
-using AgentScope.Extensions.MySql.Snapshot;
+- Use a connection pool for MySQL connections.
+- Schedule regular backups for the `agentscope` database.
+- Monitor slow queries to ensure state read/write performance.
+- Enable versioned CAS to prevent state conflicts in multi-replica deployments.
 
-SandboxSnapshotSpec spec = new JdbcSnapshotSpec(dataSource);
-```
+## Related Documentation
 
-### 4. JdbcSandboxExecutionGuard
-
-Distributed lock via MySQL `GET_LOCK()` / `RELEASE_LOCK()`.
-
-```csharp
-using AgentScope.Extensions.MySql.Sandbox;
-
-SandboxExecutionGuard guard = JdbcSandboxExecutionGuard.Builder(dataSource)
-    .KeyPrefix("myapp:lock:")
-    .LockTimeout(TimeSpan.FromMinutes(30))
-    .Build();
-```
-
-Lock is tied to the JDBC connection — auto-released on connection close.
-
-## When to Use
-
-| Scenario | Recommendation |
-|----------|---------------|
-| Existing MySQL, don't want Redis | **First choice**: MySQL |
-| Need SQL audit / reporting / joins | MySQL |
-| Large snapshots (>100MB) | MySQL BLOB works but consider OSS |
-| Lowest latency | Redis |
+- [Session State — MySQL](../session/mysql.md) — MySqlAgentStateStore + Session usage examples
+- [Distributed Storage Overview](index.md) — Backend comparison and selection guide

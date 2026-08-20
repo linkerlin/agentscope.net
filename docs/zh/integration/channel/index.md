@@ -1,21 +1,23 @@
-# Channel 适配器
+# Channel 扩展
 
-这些扩展通过 Harness 的 [Channel](../../docs/harness/channel.md) 接口将你的 Agent 接入真实的消息平台。每个适配器负责平台特有的认证、webhook 签名校验、消息解析和回复投递——你的 Agent 代码无需感知平台差异。
+这些扩展通过 `AgentScope.Extensions.Channel.IChannel` 接口将你的 Agent 接入外部消息平台。每个渠道类负责平台特有的认证、签名校验、消息解析和回复投递。
 
-| 扩展 | 平台 | 传输方式 |
+> **注意区分**：`AgentScope.Extensions.Channel.IChannel`（事件回调 + `SendAsync`，webhook 客户端风格）与 `AgentScope.Harness.Gateway.Channel.IChannel`（`DispatchAsync`/`Deliver`，网关路由风格）是两个不同的接口。扩展渠道需通过适配层接入 Harness。
+
+| 扩展 | 命名空间 | 传输方式 |
 | --- | --- | --- |
-| [钉钉](dingtalk.md) | DingTalk（钉钉） | Stream 协议（持久 WebSocket） |
-| [飞书](feishu.md) | Feishu / Lark（飞书） | 事件订阅回调（HTTP） |
-| [GitHub](github.md) | GitHub | Webhook（HTTP） |
-| [GitLab](gitlab.md) | GitLab | Webhook（HTTP） |
-| [企业微信](wecom.md) | WeCom（企业微信） | 加密回调（HTTP） |
+| [钉钉](dingtalk.md) | `AgentScope.Extensions.Channel.DingTalk` | Webhook 回调（HTTP） |
+| [飞书](feishu.md) | `AgentScope.Extensions.Channel.Feishu` | 事件订阅回调（HTTP） |
+| [企业微信](wecom.md) | `AgentScope.Extensions.Channel.WeCom` | 加密回调（HTTP） |
+| [GitHub](github.md) | `AgentScope.Extensions.Channel.GitHub` | Webhook（HTTP） |
+| [GitLab](gitlab.md) | `AgentScope.Extensions.Channel.GitLab` | Webhook（HTTP） |
 
 ## 工作原理
 
-所有 channel 适配器遵循相同模式：
+所有渠道实现遵循相同模式：
 
-1. **入站** — 从平台接收消息（通过 webhook、WebSocket 等），解析为统一的 `InboundMessage`，去重、防循环，然后通过 Gateway 分发。
-2. **出站** — 通过平台的发送 API 把 Agent 回复投递回去。
+1. **入站** — `ProcessInboundAsync` 接收平台回调（原始请求体 + 请求头），依次执行签名校验、消息去重、BotLoopGuard 防循环保护，然后通过 `OnMessageReceived` 事件触发分发。
+2. **出站** — `SendAsync` 接收 `Msg` 对象，通过平台 API 或 webhook URL 发送出去。
 
 所有适配器共享 `AgentScope.Extensions.Channel.Common` 中的两个通用组件：
 
@@ -24,4 +26,4 @@
 
 ## 共享依赖
 
-每个 channel 适配器都依赖 `AgentScope.Extensions.Channel.Common`（传递依赖自动引入）和 `AgentScope.Harness`（由你的应用在运行时提供）。
+每个 channel 扩展包依赖 `AgentScope.Extensions.Channel.Common`（传递依赖自动引入）和 `AgentScope.Extensions.Channel`（`IChannel` 接口定义所在伞工程），运行时由宿主提供 `HttpClient`。

@@ -1,56 +1,58 @@
 ﻿# ReMe
 
-`agentscope-extensions-reme` integrates with the self-hosted ReMe memory service. Its distinguishing features are **trajectory-based** memory extraction and **workspace-level** isolation.
-
-## When to use
-
-- You want a lightweight self-hosted memory service that's easy to spin up.
-- You care about summarizing whole conversation trajectories rather than individual messages.
-- You can express logical workspaces by `userId` (one workspace per user).
+`AgentScope.Extensions.Mem.ReMe.ReMeLongTermMemory` integrates with a self-hosted ReMe memory service.
 
 ## Add the dependency
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.ReMe" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Mem.ReMe" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## Quickstart
+## Construction
 
 ```csharp
-using AgentScope.core.memory.reme.ReMeLongTermMemory;
-ReMeLongTermMemory memory = ReMeLongTermMemory.Builder()
-    .UserId("task_workspace")            // Maps to ReMe's workspace_id
-    .ApiBaseUrl("http://localhost:8002") // Your ReMe server
-    .Build();
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(model)
-    .LongTermMemory(memory)
-    .LongTermMemoryMode(LongTermMemoryMode.BOTH)
-    .Build();
+using AgentScope.Extensions.Mem.ReMe;
+
+var client = new ReMeLongTermMemory(
+    new HttpClient(),
+    baseUrl: "http://localhost:8002" // defaults to https://api.reme.ai/v1
+);
 ```
 
-`userId` is mapped to ReMe's `workspace_id` — the smallest unit of memory partitioning in ReMe.
+Constructor: `(HttpClient http, string? baseUrl = null)`
 
-## How it works
+## Methods
 
-- **Write (record)**: filtered messages are joined into a single `ReMeTrajectory` and posted to ReMe's `add` endpoint; the server then runs LLM extraction over the trajectory to produce searchable memory snippets.
-- **Retrieve**: the current message is used as the query against ReMe's `search`. The server-aggregated `answer` field is returned when present, otherwise multiple memory snippets are joined.
+```csharp
+// Save memory
+string memoryId = await client.SaveAsync(userId: "workspace_001", memoryText: "User prefers quiet workspace");
 
-Writes use the same filtering as Bailian:
+// Query memories
+List<string> memories = await client.QueryAsync(userId: "workspace_001", query: "workspace preference");
+```
 
-- Only `USER` and `ASSISTANT` messages are kept.
-- Assistant messages containing `ToolUseBlock` (tool-call requests) are skipped.
-- Messages containing the `<compressed_history>` marker are skipped.
+## Adapter example
 
-## Builder reference
+```csharp
+public class ReMeAdapter : AgentScope.Core.Memory.ILongTermMemory
+{
+    private readonly ReMeLongTermMemory _client;
+    private readonly string _userId;
 
-| Method | Required | Default | Notes |
-| --- | --- | --- | --- |
-| `userId(String)` | ✅ | - | Workspace ID (used for both writes and reads) |
-| `apiBaseUrl(String)` | ✅ | - | ReMe service URL, e.g. `http://localhost:8002` |
-| `timeout(Duration)` | ❌ | `60s` | HTTP timeout |
+    public ReMeAdapter(ReMeLongTermMemory client, string userId)
+    {
+        _client = client;
+        _userId = userId;
+    }
 
-> ReMe does not yet expose finer-grained metadata filtering. If you need tag-based segmentation, encode it inside `userId` (e.g. `tenant-a:project-1`).
+    public async Task AddAsync(string text, Dictionary<string, object>? metadata = null)
+        => await _client.SaveAsync(_userId, text);
+
+    public async Task<List<string>> SearchAsync(string query, int topK = 5)
+        => await _client.QueryAsync(_userId, query);
+
+    public Task<string> SummarizeAsync() => Task.FromResult("");
+}
+```

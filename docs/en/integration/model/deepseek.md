@@ -1,46 +1,58 @@
 # DeepSeek Model
 
-`AgentScope.Extensions.Model.OpenAI` provides first-class DeepSeek support through the OpenAI-compatible model stack. Add the OpenAI model extension module, then use `deepseek:<model>` with `ModelRegistry`.
+`AgentScope.Core.Model.DeepSeek.DeepSeekModel` connects to the DeepSeek API, extending `OpenAIModel`.
 
-## Add the dependency
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.OpenAI" Version="$(AgentScopeVersion)" />
-```
-
-## ModelRegistry
-
-Set `DEEPSEEK_API_KEY`, then use the `deepseek:<model>` id:
+## Constructor
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("deepseek:deepseek-v4-flash") // Resolved internally by ModelRegistry.Resolve(modelId)
-    .Build();
+DeepSeekModel(string modelName = "deepseek-chat", string? apiKey = null)
 ```
 
-The provider defaults to `https://api.deepseek.com`, strips the `deepseek:` prefix before sending the model name, and uses the DeepSeek formatter from `AgentScope.Extensions.Model.OpenAI.Compat.DeepSeek`.
+When `apiKey` is omitted, automatically reads `DEEPSEEK_API_KEY` from environment.
 
-## Thinking mode
-
-Enable DeepSeek thinking mode through `ModelCreationContext` when resolving the model:
+## Minimal Example
 
 ```csharp
 using AgentScope.Core.Model;
+using AgentScope.Core.Model.DeepSeek;
 
-Model model = ModelRegistry.Resolve(
-    "deepseek:deepseek-v4-flash",
-    ModelCreationContext.Builder()
-        .EnableThinking(true)
-        .Build());
+var model = new DeepSeekModel("deepseek-chat");
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Hello").Build()
+        }
+    }).Result.Text;
 ```
 
-Streaming callers can render `ThinkingBlockDeltaEvent` separately from `TextBlockDeltaEvent`.
+## Agent Integration
 
-## Compatibility notes
+```csharp
+using AgentScope.Core.Model.DeepSeek;
+using AgentScope.Core.Agent;
 
-The DeepSeek formatter preserves DeepSeek-compatible message fields, including `system` roles and supported `name` fields. It also removes stale reasoning content from previous turns while preserving reasoning content needed by current tool-call context.
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new DeepSeekModel("deepseek-chat"))
+    .Build();
+```
 
-DeepSeek's stable endpoint does not use the tool schema `strict` field by default, so the default formatter omits `strict` even when a tool is registered with strict schema validation. Structured output uses the normal AgentScope fallback behavior unless you explicitly configure native structured output for a compatible endpoint.
+## Streaming
 
-For beta or compatible endpoints, pass `baseUrl`, `endpointPath`, generation options, or formatter overrides through `ModelCreationContext`.
+`DeepSeekModel` extends `OpenAIModel` and implements `IStreamingChatModel`:
+
+```csharp
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
+```
+
+## Notes
+
+- `DeepSeekModel` inherits from `OpenAIModel`, which supports more constructor parameters (custom `baseUrl`, `client`, `formatter`, `defaultOptions`), but the `DeepSeekModel` constructor only exposes `modelName` and `apiKey`.
+- For custom endpoints, use `new OpenAIModel("deepseek-chat", key, "https://api.deepseek.com")` directly.
+
+See [Model](../../docs/building-blocks/model.md) for the full interface reference.

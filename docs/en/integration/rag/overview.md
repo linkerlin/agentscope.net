@@ -1,42 +1,78 @@
-﻿# RAG Knowledge Base
+﻿# RAG Overview
 
-`AgentScope.Core.Rag.Knowledge` is AgentScope's interface for plugging in an external knowledge base. The Agent uses it during inference to retrieve documents that are then handed to the model. The `agentscope-extensions-*` repository ships several implementations:
+## Core RAG
 
-| Extension | Type | Best for |
-| --- | --- | --- |
-| [Simple](simple.md) | Self-managed: embeddings + vector store | Bring-your-own vector store (PgVector / Milvus / Qdrant / Elasticsearch / in-memory) |
-| [Bailian](bailian.md) | Alibaba Cloud Bailian Knowledge Base | Use a Bailian-hosted enterprise KB |
-| [Dify](dify.md) | Dify dataset | Already maintaining KB content in Dify |
-| [HayStack](haystack.md) | Self-hosted HayStack RAG | Existing HayStack pipelines |
-| [RAGFlow](ragflow.md) | RAGFlow service | Complex documents needing OCR / knowledge graphs |
+Located in `AgentScope.Core.RAG`:
 
-## Same wiring everywhere
+### IKnowledge Interface
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(model)
-    .Knowledge(knowledge)        // any Knowledge implementation
-    .RagMode(RAGMode.AGENTIC)    // or STATIC, NONE
-    .Build();
+public interface IKnowledge
+{
+    Task<string> AddDocumentAsync(KnowledgeDocument document, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> AddDocumentsAsync(IEnumerable<KnowledgeDocument> documents, CancellationToken ct = default);
+    Task<IReadOnlyList<KnowledgeSearchResult>> SearchAsync(string query, KnowledgeSearchOptions? options = null, CancellationToken ct = default);
+    Task<IReadOnlyList<KnowledgeSearchResult>> SearchByEmbeddingAsync(float[] embedding, KnowledgeSearchOptions? options = null, CancellationToken ct = default);
+    Task<bool> DeleteDocumentAsync(string documentId, CancellationToken ct = default);
+    Task<int> DeleteDocumentsAsync(Dictionary<string, object> filters, CancellationToken ct = default);
+    Task<KnowledgeDocument?> GetDocumentAsync(string documentId, CancellationToken ct = default);
+    Task<bool> UpdateDocumentAsync(KnowledgeDocument document, CancellationToken ct = default);
+    Task<int> GetDocumentCountAsync(CancellationToken ct = default);
+    Task ClearAsync(CancellationToken ct = default);
+}
 ```
 
-You can also expose retrieval as a tool that the Agent calls explicitly:
+### InMemoryVectorStore
+
+`InMemoryVectorStore(IEmbeddingGenerator? embeddingGenerator = null)` implements `IKnowledge`. With an `IEmbeddingGenerator` injected, it enables vector-based semantic search.
+
+### VectorStore Extensions
+
+`AgentScope.Extensions.Vector.IVectorStore`:
 
 ```csharp
-KnowledgeRetrievalTools tools = new KnowledgeRetrievalTools(knowledge);
-Toolkit toolkit = new Toolkit();
-toolkit.RegisterObject(tools);
+public interface IVectorStore : IAsyncDisposable
+{
+    int Dimension { get; }
+    ValueTask UpsertAsync(string collection, string id, float[] vector,
+        IDictionary<string, object>? payload = null, CancellationToken ct = default);
+    IAsyncEnumerable<SearchHit> SearchAsync(string collection, float[] query,
+        int topK = 5, CancellationToken ct = default);
+}
 ```
 
-## Choosing one
-
-| Need | Recommendation |
+| Implementation | Constructor |
 | --- | --- |
-| Full control over embeddings + store | **Simple** |
-| Alibaba Cloud ecosystem, enterprise hosting | **Bailian** |
-| Team already curates content in Dify | **Dify** |
-| Complex ETL (PDF tables, OCR, knowledge graphs) | **RAGFlow** |
-| Existing HayStack RAG pipeline | **HayStack** |
+| `ElasticsearchStore` | `(ElasticsearchClient client, string indexName, int dimension)` |
+| `MilvusStore` | `(HttpClient httpClient, string baseUrl, string collectionName, int dimension)` |
+| `PgVectorStore` | `(NpgsqlDataSource dataSource, string tableName, int dimension)` |
+| `QdrantStore` | `(QdrantClient client, int dimension)` |
 
-> Aside from Simple, the platform-backed implementations are **retrieval only**: document ingestion / updates happen via the platform console or its native API. This keeps `Knowledge` implementations swappable on the Agent side.
+### GenericRAGHook
+
+`GenericRAGHook(IKnowledge, KnowledgeSearchOptions?, RAGMode, Func<Msg, string>?)` retrieves context before Agent reasoning.
+
+`RAGMode`:
+
+| Value | Behavior |
+| --- | --- |
+| `Retrieval` | Prepend context to the message |
+| `RetrievalQA` | Replace with a QA prompt |
+| `RetrievalOnly` | Store context in `Msg.Metadata`, don't modify message |
+
+### RAGTools & KnowledgeRetrievalTools
+
+`RAGTools.CreateAll(IKnowledge)` returns `KnowledgeSearchTool`, `KnowledgeGetDocumentTool`, `KnowledgeAddDocumentTool`. Use `KnowledgeSearchTool` individually for search-only.
+
+## Managed RAG Clients
+
+Extension packages provide independent HTTP clients, **not implementing** `IKnowledge`:
+
+| Extension | Class | Constructor |
+| --- | --- | --- |
+| Bailian | `BailianRagClient` | `(HttpClient, apiKey, baseUrl?)` |
+| Dify | `DifyRagClient` | `(HttpClient, apiKey, baseUrl?)` |
+| RagFlow | `RagFlowRagClient` | `(HttpClient, apiKey, baseUrl?)` |
+| HayStack | `HaystackRagClient` | `(HttpClient, baseUrl)` |
+
+Wrap them as `IKnowledge` or call their methods directly.

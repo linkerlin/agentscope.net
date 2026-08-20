@@ -1,99 +1,62 @@
 ﻿# Mem0
 
-`agentscope-extensions-mem0` 接入 [Mem0](https://mem0.ai/) 记忆服务，提供基于向量检索 + LLM 抽取的长期记忆能力，支持 Mem0 Platform、自托管以及本地部署三种模式。
-
-## 何时使用
-
-- 需要给 Agent 加上跨会话的事实记忆，例如用户偏好、历史决策。
-- 想用 `agentId / userId / runId` 三层 metadata 隔离不同租户、不同 session 的记忆。
-- 想用自定义 metadata（例如 `category=travel`）做检索过滤。
+`AgentScope.Extensions.Mem.Mem0.Mem0LongTermMemory` 接入 [Mem0](https://mem0.ai/) 记忆服务。
 
 ## 添加依赖
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Mem0" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Mem.Mem0" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## 快速上手
+## 构造
 
 ```csharp
-using AgentScope.core.memory.mem0.Mem0LongTermMemory;
-using AgentScope.core.memory.mem0.Mem0ApiType;
-// 1. 构造记忆实例（本地无鉴权部署）
-Mem0LongTermMemory memory = Mem0LongTermMemory.Builder()
-    .AgentName("Assistant")
-    .UserId("user_123")
-    .ApiBaseUrl("http://localhost:8000")
-    .ApiType(Mem0ApiType.SELF_HOSTED)
-    .Build();
-// 2. 挂到 Agent
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(model)
-    .LongTermMemory(memory)
-    .LongTermMemoryMode(LongTermMemoryMode.BOTH)
-    .Build();
-// 3. 正常调用，记忆会自动在 record / retrieve 之间往返
-agent.Call(new UserMessage("我出差喜欢住民宿")).GetAwaiter().GetResult();
-```
+using AgentScope.Extensions.Mem.Mem0;
 
-## 部署模式
-
-`Mem0ApiType` 决定客户端调用的 URL 与鉴权方式：
-
-| 枚举 | 用途 | apiBaseUrl 示例 | apiKey |
-| --- | --- | --- | --- |
-| `PLATFORM`（默认） | 直连 Mem0 SaaS | `https://api.mem0.ai` | 必填 |
-| `SELF_HOSTED` | 自托管 Mem0 Server | `http://your-host:8000` | 视部署而定 |
-
-## 多租户隔离
-
-`agentName / userId / runName` 是 Mem0 用来组织记忆的三层 ID：
-
-```csharp
-Mem0LongTermMemory memory = Mem0LongTermMemory.Builder()
-    .AgentName("travel-bot")     // 跨用户共享的 Agent 维度记忆
-    .UserId("alice")             // 用户维度（租户）
-    .RunName("trip-2026-spring") // 单次会话维度
-    .ApiBaseUrl("http://localhost:8000")
-    .Build();
-```
-
-至少要提供其中之一，全部为空时 `build()` 抛出 `IllegalArgumentException`。检索时只会返回 metadata 完全匹配的记忆。
-
-## 自定义 metadata 过滤
-
-`metadata(...)` 同时影响写入和读取：写入时随记忆持久化，检索时作为 filter 注入。
-
-```csharp
-Dictionary<string, Object> tags = new Dictionary<string, object> { 
-    "category", "travel",
-    "project_id", "proj_001"
+var client = new Mem0LongTermMemory(
+    new HttpClient(),
+    apiKey: "your-mem0-api-key",
+    baseUrl: null // 默认 https://api.mem0.ai/v1
 );
-Mem0LongTermMemory memory = Mem0LongTermMemory.Builder()
-    .AgentName("Assistant")
-    .UserId("user_123")
-    .ApiBaseUrl("http://localhost:8000")
-    .Metadata(tags)
-    .Build();
-// 之后所有 record() 都带上 tags，retrieve() 也只命中相同 tags 的记忆
 ```
 
-适合按项目、按业务线切分知识；如果只是按用户切分，用 `userId` 就够了。
+构造函数：`(HttpClient http, string apiKey, string? baseUrl = null)`
 
-## Builder 配置参数
+## 方法
 
-| 方法 | 是否必填 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `apiBaseUrl(String)` | ✅ | - | Mem0 服务地址 |
-| `apiKey(String)` | 视部署 | - | API Key；本地无鉴权部署可省略 |
-| `apiType(Mem0ApiType)` | ❌ | `PLATFORM` | 选择 SaaS 或自托管路由 |
-| `agentName(String)` | 三选一 | - | Agent 维度 ID |
-| `userId(String)` | 三选一 | - | 用户维度 ID |
-| `runName(String)` | 三选一 | - | 会话/运行维度 ID |
-| `metadata(Map)` | ❌ | `null` | 写入与检索时的额外 filter |
-| `timeout(Duration)` | ❌ | `60s` | HTTP 请求超时 |
+```csharp
+// 存储记忆
+string memoryId = await client.AddAsync(userId: "user_123", agentId: "agent_456", message: "用户喜欢民宿");
 
-> 三个 ID（agentName / userId / runName）至少要填一个，否则 `build()` 抛 `IllegalArgumentException`。
+// 检索记忆
+List<string> memories = await client.SearchAsync(userId: "user_123", agentId: "agent_456", query: "住宿偏好");
+```
+
+## 适配示例
+
+此类不实现 `ILongTermMemory`，接入时需包装：
+
+```csharp
+public class Mem0Adapter : AgentScope.Core.Memory.ILongTermMemory
+{
+    private readonly Mem0LongTermMemory _client;
+    private readonly string _userId, _agentId;
+
+    public Mem0Adapter(Mem0LongTermMemory client, string userId, string agentId)
+    {
+        _client = client;
+        _userId = userId;
+        _agentId = agentId;
+    }
+
+    public async Task AddAsync(string text, Dictionary<string, object>? metadata = null)
+        => await _client.AddAsync(_userId, _agentId, text);
+
+    public async Task<List<string>> SearchAsync(string query, int topK = 5)
+        => await _client.SearchAsync(_userId, _agentId, query);
+
+    public Task<string> SummarizeAsync() => Task.FromResult("");
+}
+```

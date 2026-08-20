@@ -1,106 +1,71 @@
-﻿```{note}
-This page has been superseded by [Distributed Storage — MySQL](../distributed/mysql.md). Content below is kept for reference.
-```
+﻿# MySQL Session State
 
-# MySQL State Store
+Persist agent session state in MySQL using the `AgentScope.Extensions.Store.MySql` package (powered by MySqlConnector 2.x).
 
-`agentscope-extensions-mysql` persists AgentScope agent state into MySQL. A good fit when you already have a MySQL infrastructure or need transactional / SQL-based access to state data.
-
-## Add the dependency
+## Dependency
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.MySql" Version="$(AgentScopeVersion)" />
+  <PackageReference Include="AgentScope.Extensions.Store.MySql" Version="2.0.1" />
 </ItemGroup>
 ```
 
-Bring the matching JDBC driver yourself (e.g. `mysql:mysql-connector-j`).
+Target framework: net10.0.
 
-## Quickstart
+## Quick Start
 
 ```csharp
-using com.zaxxer.hikari.HikariDataSource;
-using AgentScope.core.state.AgentStateStore;
-using AgentScope.extensions.mysql.state.MysqlAgentStateStore;
-HikariDataSource ds = new HikariDataSource();
-ds.SetJdbcUrl("jdbc:mysql://localhost:3306/agentscope?serverTimezone=UTC");
-ds.SetUsername("root");
-ds.SetPassword("***");
-// Second arg createIfNotExist=true: auto-create database and table
-AgentStateStore stateStore = new MysqlAgentStateStore(ds, true);
-ReActAgent agent = ReActAgent.Builder()
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.Model;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.MySql;
+
+var mysqlStore = new MySqlDistributedStore(
+    "Server=localhost;Database=agentscope;User=root;Password=***;");
+
+var stateStore = new MySqlAgentStateStore(mysqlStore, keyPrefix: "agentstate");
+
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
+
+EnhancedReActAgent agent = new EnhancedReActAgentBuilder()
     .Name("assistant")
-    .Model(model)
-    .StateStore(stateStore)
+    .Model(new DashScopeModel("qwen-plus", apiKey))
+    .Memory(memory)
     .Build();
+
+await agent.CallAsync(Msg.Builder().Role("user").TextContent("Hello").Build());
 ```
 
-If the database and table are pre-created, use the safer form:
+## Custom Key Prefix
 
 ```csharp
-AgentStateStore stateStore = new MysqlAgentStateStore(ds);          // throws IllegalStateException if missing
-AgentStateStore stateStore = new MysqlAgentStateStore(ds, false);   // explicit
+var stateStore = new MySqlAgentStateStore(
+    new MySqlDistributedStore(connectionString),
+    keyPrefix: "myapp");
 ```
 
-## Custom database / table names
+The default `keyPrefix` is `"agentstate"`.
+
+## Save and Restore Session
 
 ```csharp
-AgentStateStore stateStore = new MysqlAgentStateStore(
-    ds,
-    "agentscope_prod",        // database name
-    "session_state",          // table name
-    true                      // auto-create
-);
+using AgentScope.Core.Session;
+
+var sessionManager = new SessionManager();
+Session session = sessionManager.CreateSession(name: "mysql-demo");
+
+agent.SaveTo(session, "main");
+agent.LoadIfExists(session, "main");
 ```
 
-Database and table names must match `[a-zA-Z_][a-zA-Z0-9_-]*` and be ≤ 64 chars to avoid SQL injection.
+## Versioning Support
 
-## Schema
+`MySqlAgentStateStore` supports `SupportsVersioning` with row-level optimistic concurrency. See [Distributed Storage — MySQL](../distributed/mysql.md).
 
-When `createIfNotExist=true`, the table is created automatically:
+## Production Considerations
 
-```sql
-CREATE TABLE IF NOT EXISTS agentscope_sessions (
-    session_id VARCHAR(255) NOT NULL,
-    state_key  VARCHAR(255) NOT NULL,
-    item_index INT NOT NULL DEFAULT 0,
-    state_data LONGTEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (session_id, state_key, item_index)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-- The `(userId, sessionId)` pair is packed into the `session_id` column as `{userSegment}:{sessionId}` (`userSegment` = `userId`, or `__anon__` for anonymous sessions).
-- Single value: `item_index = 0`
-- List: `item_index = 0, 1, 2, ...` — one row per item; an extra row with `state_key='xxx:_hash'` is used for change detection.
-
-## Direct API usage
-
-`MysqlAgentStateStore` implements the `AgentStateStore` interface:
-
-```csharp
-// Single value (userId may be null for anonymous sessions)
-stateStore.Save("user-42", "session-1", "agent_state", state);
-string? got = stateStore.Get<string>("user-42", "session-1", "agent_state");
-// List (append-only growth; full rewrite on change)
-stateStore.Save("user-42", "session-1", "messages", listOfMessages);
-List<MyState> all = stateStore.GetList("user-42", "session-1", "messages", typeof(MyState));
-// Maintenance
-bool exists = stateStore.Exists("user-42", "session-1");
-stateStore.Delete("user-42", "session-1");
-HashSet<string> sessions = stateStore.ListSessionIds("user-42");   // null lists anonymous sessions
-// Cleanup (use with care, test/ops only)
-stateStore.TruncateAllSessions();
-```
-
-## Configuration
-
-| Constructor / parameter | Notes |
-| --- | --- |
-| `dataSource` | Required. Recommended: HikariCP / Druid pool |
-| `databaseName` | Default `agentscope` |
-| `tableName` | Default `agentscope_sessions` |
-| `createIfNotExist` | If `true`, run `CREATE DATABASE` + `CREATE TABLE` automatically |
-
-> `truncateAllSessions()` issues `TRUNCATE TABLE` and requires DROP privilege; DDL is non-rollbackable, so reserve it for tests or ops cleanup.
+- Use a connection pool for database connections.
+- Set a descriptive `keyPrefix` to share the database across multiple applications.
+- MySQL is ideal when you already have a relational database infrastructure and need SQL auditing capabilities.

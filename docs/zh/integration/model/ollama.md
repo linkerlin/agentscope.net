@@ -1,55 +1,59 @@
 # Ollama 模型
 
-`AgentScope.Extensions.Model.Ollama` 接入本地托管的 Ollama 模型，适合本地开发、私有化部署和离线模型服务。
+`AgentScope.Core.Model.Ollama.OllamaModel` 接入本地 Ollama 服务，继承 `OpenAIModel`。
 
-## 添加依赖
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.Ollama" Version="*" />
-```
-
-## ModelRegistry
-
-使用 `ollama:<model>` 字符串 id。`OLLAMA_BASE_URL` 是可选环境变量，不设置时默认使用本地 Ollama endpoint。
+## 构造函数
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("ollama:llama3") // 底层由 ModelRegistry.Resolve(modelId) 解析
+OllamaModel(string modelName = "llama2", string? baseUrl = null)
+```
+
+`baseUrl` 缺省自动探测本机 Ollama（默认 `http://localhost:11434`）。
+
+## 最小示例
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.Ollama;
+
+var model = new OllamaModel("llama3");
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Hello").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent 集成
+
+```csharp
+using AgentScope.Core.Model.Ollama;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new OllamaModel("llama3"))
     .Build();
 ```
 
-## 显式 builder
+## 流式调用
 
-需要非默认 Ollama endpoint、formatter、transport、proxy 或 Ollama options 时，使用 builder：
+`OllamaModel` 继承 `OpenAIModel`，实现 `IStreamingChatModel`：
 
 ```csharp
-using AgentScope.Extensions.Model.Ollama;
-
-OllamaChatModel model = OllamaChatModel.Builder()
-    .ModelName("llama3")
-    .BaseUrl("http://localhost:11434")
-    .Build();
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
 ```
 
-## Spring Boot
+## 注意事项
 
-Spring Boot 应用可以使用 Ollama starter：
+- 确保本机已安装并启动 Ollama，且目标模型已拉取（`ollama pull llama3`）。
+- `OllamaModel` 构造函数仅暴露 `modelName` 和 `baseUrl`。如需自定义 formatter 或生成参数，使用 `new OpenAIModel(modelName, baseUrl: yourUrl)` 方式。
+- 默认模型名为 `"llama2"`，建议显式指定。
 
-```xml
-<PackageReference Include="AgentScope.Ollama" Version="*" />
-```
-
-通过 `agentscope.model.provider=ollama` 配置本地 Ollama 模型。base URL 为可选项，默认是
-`http://localhost:11434`：
-
-```yaml
-agentscope:
-  model:
-    provider: ollama
-  ollama:
-    model-name: llama3
-    # base-url: http://localhost:11434
-```
-
-完整 builder 选项、formatter、credential 和 registry context 细节见 [模型](../../docs/building-blocks/model.md)。
+完整接口说明见 [模型](../../docs/building-blocks/model.md)。

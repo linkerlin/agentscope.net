@@ -1,44 +1,53 @@
 # Gemini Model
 
-`AgentScope.Extensions.Model.Gemini` integrates Google Gemini models through the Gemini API and supports the Vertex AI path through explicit configuration.
+`AgentScope.Core.Model.Gemini.GeminiModel` connects to Google Gemini models.
 
-## Add the dependency
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.Gemini" Version="$(AgentScopeVersion)" />
-```
-
-## ModelRegistry
-
-Set `GEMINI_API_KEY`, then use the `gemini:<model>` id:
+## Constructor
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("gemini:gemini-2.0-flash") // Resolved internally by ModelRegistry.Resolve(modelId)
+GeminiModel(string modelName = "gemini-pro", string? apiKey = null,
+    string? baseUrl = null, GenerateOptions? defaultOptions = null)
+```
+
+## Minimal Example
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.Gemini;
+
+string key = System.Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+var model = new GeminiModel("gemini-2.0-flash", key);
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Hello").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent Integration
+
+```csharp
+using AgentScope.Core.Model.Gemini;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new GeminiModel("gemini-2.0-flash", key))
     .Build();
 ```
 
-## Explicit builder
+## Streaming
 
-Use the builder when you need custom API settings, Vertex AI credentials, formatter, transport, or generation options:
+`GeminiModel` does **not** implement `IStreamingChatModel`. Use `GenerateAsync` for the full response.
 
-```csharp
-using AgentScope.Extensions.Model.Gemini;
+## Notes
 
-GeminiChatModel model = GeminiChatModel.Builder()
-    .ApiKey(Environment.GetEnvironmentVariable("GEMINI_API_KEY"))
-    .ModelName("gemini-2.0-flash")
-    .StreamEnabled(true)
-    .Build();
-```
+- `modelName` defaults to `"gemini-pro"`.
+- When `apiKey` is omitted, read from the `GEMINI_API_KEY` environment variable.
+- `GeminiModel` has no formatter parameter — the constructor is simpler than OpenAI's.
+- Custom `GenerateOptions` can be passed via the constructor.
 
-## Spring Boot
-
-Spring Boot applications can use the Gemini starter:
-
-```xml
-<PackageReference Include="AgentScope.Gemini.SpringBoot.Starter" Version="$(AgentScopeVersion)" />
-```
-
-Full builder options, formatters, credentials, and registry context details are covered in [Model](../../docs/building-blocks/model.md).
+See [Model](../../docs/building-blocks/model.md) for the full interface reference.

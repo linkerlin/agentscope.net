@@ -1,70 +1,43 @@
-﻿# RAGFlow Knowledge
+﻿# RAGFlow RAG
 
-`agentscope-extensions-rag-ragflow` integrates with [RAGFlow](https://ragflow.io/). RAGFlow is strong on document parsing (OCR, table extraction, knowledge graph augmentation) and shines for unstructured-heavy KBs.
-
-## When to use
-
-- Your KB is mostly scanned PDFs, complex layouts, or images and tables.
-- You want to use RAGFlow's chunking strategies and reranker.
+`AgentScope.Extensions.Rag.RagFlow.RagFlowRagClient` integrates with [RAGFlow](https://ragflow.io/).
 
 ## Add the dependency
 
 ```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-rag-ragflow</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
+<ItemGroup>
+    <PackageReference Include="AgentScope.Extensions.Rag.RagFlow" Version="2.0.1" />
+</ItemGroup>
 ```
 
-## Quickstart
+## Construction
 
 ```csharp
-using AgentScope.Core.Rag.Integration.RagFlow.RAGFlowConfig
-using AgentScope.Core.Rag.Integration.RagFlow.RAGFlowKnowledge
-using AgentScope.Core.Rag.Model.RetrieveConfig
+using AgentScope.Extensions.Rag.RagFlow;
 
-RAGFlowConfig config = RAGFlowConfig.Builder()
-    .ApiKey("ragflow-xxxxxxxx")
-    .BaseUrl("http://localhost:9380")
-    .KnowledgeBaseId("kb-xxxxx")
-    .TopK(10)
-    .SimilarityThreshold(0.5)
-    .EnableRerank(true)
-    .Build();
-
-RAGFlowKnowledge knowledge = RAGFlowKnowledge.Builder()
-    .Config(config)
-    .Build();
-
-List<Document> hits = knowledge.Retrieve(
-    "What is AI?",
-    RetrieveConfig.Builder().limit(5).Build()
+var client = new RagFlowRagClient(
+    new HttpClient(),
+    apiKey: "ragflow-xxxxxxxx",
+    baseUrl: null // defaults to https://api.ragflow.io/v1
 );
 ```
 
-## How it works
+## Methods
 
-The plugin calls RAGFlow's `POST /api/v1/datasets/{dataset_id}/retrieve-chunks`:
+```csharp
+// Search chunks
+List<string> chunks = await client.SearchAsync(
+    datasetId: "kb-xxxxx",
+    query: "What is AI?",
+    topK: 5
+);
 
-- Vector similarity search with configurable `topK`.
-- Server-side `similarityThreshold` filtering.
-- Metadata filtering via `RAGFlowConfig`.
-- Optional RAGFlow rerank.
+// Upload document
+string docId = await client.UploadDocumentAsync(
+    datasetId: "kb-xxxxx",
+    fileName: "report.pdf",
+    content: File.ReadAllBytes("report.pdf")
+);
+```
 
-> Note: RAGFlow's retrieve-chunks API does not currently accept conversation history for context-aware retrieval. If you need that, prepend instructions into the query yourself.
-
-## Document management goes through RAGFlow
-
-`addDocuments(...)` is unsupported — upload and index documents through the RAGFlow console or its native API.
-
-## Key parameters
-
-| Field | Notes |
-| --- | --- |
-| `apiKey` | RAGFlow API key (required) |
-| `baseUrl` | RAGFlow service URL (required) |
-| `knowledgeBaseId` | Dataset / KB ID (required) |
-| `topK` | Server-side top-K |
-| `similarityThreshold` | Server-side minimum similarity |
-| `enableRerank` | Enable rerank |
+This class does not implement `IKnowledge`.

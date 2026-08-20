@@ -1,63 +1,47 @@
 # DingTalk Channel
 
-`AgentScope.Extensions.Channel.DingTalk` connects your Agent to DingTalk (钉钉) using the **Stream protocol** — a persistent WebSocket that receives bot messages in real time without exposing a public webhook endpoint.
+`AgentScope.Extensions.Channel.DingTalk` connects your Agent to DingTalk (钉钉) through webhook callbacks and the DingTalk OpenAPI.
 
-## When to use
-
-- Your Agent needs to respond to DingTalk bot messages (DM and group @-mentions).
-- You prefer a WebSocket-based push model over polling or webhook callbacks.
+Package version: **2.0.1** | Target framework: **net10.0**
 
 ## Add the dependency
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Channel.DingTalk" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Channel.DingTalk" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## Prerequisites
-
-1. Create an **Enterprise Internal App** in the [DingTalk Developer Console](https://open-dev.dingtalk.com/).
-2. Enable the **Bot** capability and subscribe to the bot-messages topic.
-3. Note down the **App Key**, **App Secret**, and **Robot Code**.
-
-## Quickstart
+## Constructor
 
 ```csharp
-var channel = DingTalkChannel.FromProperties(
-    "my-dingtalk",
-    ChannelConfig.Of("my-dingtalk", "main"),
-    new Dictionary<string, string>
-    {
-        ["appKey"] = "your-app-key",
-        ["appSecret"] = "your-app-secret",
-        ["robotCode"] = "your-robot-code"
-    });
-
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", agent)
-    .Channel(channel)
-    .Build();
-
-gw.Start();   // opens the Stream WebSocket and begins dispatching
+public DingTalkChannel(
+    HttpClient http,
+    string webhookUrl,
+    string? appSecret = null,
+    string? appKey = null,
+    string? apiBase = null)
 ```
 
-## Configuration properties
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `http` | `HttpClient` | Yes | HTTP client for calling DingTalk APIs |
+| `webhookUrl` | `string` | Yes | Webhook URL for outgoing messages |
+| `appSecret` | `string?` | No | DingTalk app secret (for token-based API calls) |
+| `appKey` | `string?` | No | DingTalk app key |
+| `apiBase` | `string?` | No | Custom API base URL, default `https://api.dingtalk.com` |
 
-| Property | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `appKey` | Yes | — | Enterprise internal app key |
-| `appSecret` | Yes | — | Enterprise internal app secret |
-| `robotCode` | Yes | — | Robot code used as outbound sender id |
-| `apiBase` | No | `https://api.dingtalk.com` | OpenAPI base URL |
-| `streamRegisterUrl` | No | `https://api.dingtalk.com/v1.0/gateway/connections/open` | Stream gateway registration endpoint |
+When both `appKey` and `appSecret` are provided, `TokenProvider` exposes a `DingTalkAccessTokenProvider`.
 
-## Message flow
+## Interface members
 
-**Inbound:** The `DingTalkStreamClient` opens a WebSocket to the DingTalk gateway, receives bot-message callbacks, ACKs each frame, then dispatches through `DingTalkInboundMapper` → idempotency check → bot-loop guard → Gateway.
+| Member | Description |
+|--------|-------------|
+| `Name` | Returns `"dingtalk"` |
+| `StartAsync` | No-op (stateless channel) |
+| `StopAsync` | No-op |
+| `SendAsync` | Sends text via webhook (`POST` to `webhookUrl`) |
+| `ProcessInboundAsync` | Processes callback: JSON parse → msgId dedup → mapping → BotLoopGuard → fires `OnMessageReceived` |
+| `OnMessageReceived` | Inbound message event |
 
-**Outbound:** Replies are sent via `DingTalkOutboundClient` using the OpenAPI `batchSend` endpoints — `oToMessages/batchSend` for DMs and `groupMessages/send` for groups. Text and Markdown formats are auto-detected.
-
-## Reconnection
-
-The Stream client reconnects automatically with exponential backoff (1s → 60s cap) when the WebSocket drops.
+Inbound callbacks have no signature verification (DingTalk webhook callback format).

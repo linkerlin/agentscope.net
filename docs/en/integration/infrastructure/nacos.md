@@ -1,94 +1,109 @@
 # Nacos
 
-`AgentScope.Extensions.Nacos` uses [Nacos](https://nacos.io/) as AgentScope's unified control plane: register and discover A2A Agents, hot-load prompts, and host skills. It contains three sub-modules — pick the ones you need.
+`AgentScope.Extensions.Nacos` uses [Nacos](https://nacos.io/) as AgentScope's unified control plane: register/discover A2A Agents, hot-load prompts, and host skills. Three sub-modules — pick what you need.
 
 | Sub-module | Problem it solves |
 | --- | --- |
-| `AgentScope.Extensions.Nacos.A2A` | A2A AgentCard / instance registry and discovery |
-| `AgentScope.Extensions.Nacos.Prompt` | Manage prompt templates in Nacos with hot updates |
-| `AgentScope.Extensions.Nacos.Skill` | Load skill packages (ZIP) from the Nacos AI module |
+| `AgentScope.Extensions.Nacos` (core) | A2A AgentCard registry & discovery, implements `IAgentRegistry` |
+| `AgentScope.Extensions.Nacos.Prompt` | Manage prompt templates in Nacos with runtime hot-update |
+| `AgentScope.Extensions.Nacos.Skill` | Load skill packages from Nacos |
 
-## A2A registry & discovery
-
-### Add the dependency
+## Add the dependency
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Nacos.A2A" Version="$(AgentScopeVersion)" />
+<PackageReference Include="AgentScope.Extensions.Nacos" Version="2.0.1" />
 ```
 
-### Server side: register the AgentCard with Nacos
+## A2A Registry & Discovery
+
+### NacosAgentRegistry (server-side)
+
+`NacosAgentRegistry` implements `AgentScope.Core.Service.Discovery.IAgentRegistry` via the Nacos HTTP Open API.
 
 ```csharp
-using AgentScope.Core.Nacos.A2A.Registry;
+using AgentScope.Extensions.Nacos;
+using AgentScope.Core.Service.Discovery;
 
-Properties props = new();
-props.SetProperty("serverAddr", "127.0.0.1:8848");
-NacosA2aRegistry registry = new(props);
+var registry = new NacosAgentRegistry(
+    httpClient,
+    serverAddr: "http://localhost:8848",
+    groupName: "DEFAULT_GROUP");
 
-NacosA2aRegistryProperties props2 = new();
-// props2.SetNamespace(...) / SetGroup(...) / etc.
-registry.RegisterAgent(agentCard, props2);
+// Register an AgentCard
+await registry.RegisterAsync(new AgentCard(
+    "agent-1", "translator", "Translation Agent", "192.168.1.1:8080"));
+
+// Resolve by name
+var card = await registry.ResolveAsync("translator");
+
+// List all registered Agents
+await foreach (var c in registry.ListAsync()) { ... }
+
+// Unregister
+await registry.UnregisterAsync("translator");
 ```
 
-After registration, the AgentCard and the service endpoint are written into the Nacos AI Service for consumers to discover.
+### IAgentRegistry Interface
 
-### Client side: resolve a remote AgentCard via Nacos
+| Method | Description |
+| --- | --- |
+| `ValueTask RegisterAsync(AgentCard card, CancellationToken ct)` | Register as ephemeral Nacos instance |
+| `ValueTask UnregisterAsync(string agentId, CancellationToken ct)` | Delete instance from Nacos |
+| `ValueTask<AgentCard?> ResolveAsync(string agentId, CancellationToken ct)` | Query healthy instances and build AgentCard |
+| `IAsyncEnumerable<AgentCard> ListAsync(CancellationToken ct)` | List all registered AgentCards |
+
+### NacosAgentCardResolver (client-side)
 
 ```csharp
-using AgentScope.Core.Nacos.A2A.Discovery;
+var resolver = new NacosAgentCardResolver(
+    httpClient,
+    serverAddr: "http://localhost:8848",
+    groupName: "DEFAULT_GROUP");
 
-NacosAgentCardResolver resolver = new(props, "translator-agent");
-A2aAgent remote = A2aAgent.Builder()
-    .Name("translator")
-    .AgentCardResolver(resolver)
-    .Build();
+var card = await resolver.ResolveAsync("translator");
 ```
 
-## Prompt config center
-
-### Add the dependency
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Nacos.Prompt" Version="$(AgentScopeVersion)" />
-```
-
-### Usage
+### Configuration
 
 ```csharp
-using AgentScope.Core.Nacos.Prompt;
-
-NacosPromptListener prompts = new(aiService);
-
-string tpl = prompts.GetPrompt("system-prompt", new Dictionary<string, string>
+var options = new NacosA2aRegistryOptions
 {
-    ["userName"] = "Alice"
-});
+    ServerAddr = "http://localhost:8848",
+    Namespace = "",
+    GroupName = "DEFAULT_GROUP",
+    HeartbeatInterval = TimeSpan.FromSeconds(5)
+};
 ```
 
-The listener maintains a local cache; when prompts change in Nacos, updates are pushed in. The next `GetPrompt(...)` call returns the new version with no restart.
-
-## Skill repository
-
-`AgentScope.Extensions.Nacos.Skill` provides an `AgentSkillRepository` implementation that downloads and parses skill ZIP packages managed by the Nacos AI module.
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Nacos.Skill" Version="$(AgentScopeVersion)" />
-```
+## Prompt Config Center
 
 ```csharp
-using AgentScope.Core.Nacos.Skill;
+using AgentScope.Extensions.Nacos.Prompt;
 
-Properties props = new();
-props.SetProperty(NacosSkillRepository.SKILL_VERSION_PATH, "1.2.0");
-// or SKILL_LABEL_PATH = "stable"
-
-NacosSkillRepository repo = new(aiService, "default-namespace", props);
-AgentSkill skill = repo.GetSkill("calculator");
+var repo = new NacosPromptRepository(
+    serverAddr: "http://localhost:8848",
+    namespaceId: null,
+    group: null,
+    http: httpClient);
 ```
 
-Version/label resolution order: `Properties` provided to the constructor → system properties → environment variables. When both version and label resolve, **version wins** and the label is not used for download.
+`NacosPromptRepository` reads prompt templates from the Nacos config center with runtime hot-update support.
+
+## Skill Repository
+
+```csharp
+using AgentScope.Extensions.Nacos.Skill;
+
+var repo = new NacosSkillRepository(
+    serverAddr: "http://localhost:8848",
+    namespaceId: null,
+    group: null,
+    http: httpClient);
+```
+
+`NacosSkillRepository` loads skill packages from Nacos, implementing `AgentScope.Extensions.Skill.ISkillRepository`.
 
 ## Pairs well with
 
-- [A2A](../protocol/a2a.md): inject a Nacos-backed `AgentRegistry` into `AgentScopeA2aServer.Builder().AgentRegistry(...)` to publish AgentCards cluster-wide on startup.
-- [Skill repositories](../skill/): coexist with Git/MySQL `AgentSkillRepository` to assemble a Toolkit from multiple sources.
+- [A2A](../protocol/a2a.md): call `AgentScopeA2aServer.AddRegistry(registry)` to publish AgentCards to Nacos on startup.
+- [A2A client](../protocol/a2a.md): use `NacosAgentCardResolver` as the `IAgentCardResolver` for `A2aAgent`.

@@ -1,29 +1,80 @@
-﻿# 记忆（Memory）
+﻿# 记忆概览
 
-`LongTermMemory` 是 AgentScope 用来在多轮、多会话之间持久化用户偏好、事实、要点的接口。`agentscope-extensions-*` 仓库下提供了对接主流记忆服务的开箱即用实现：
+## Core 记忆接口
 
-| 扩展 | 后端 | 适合场景 |
-| --- | --- | --- |
-| [Mem0](mem0.md) | [Mem0](https://mem0.ai/) 平台 / 自托管 | 通用语义记忆，支持多租户隔离与自定义 metadata 过滤 |
-| [Bailian](bailian.md) | 阿里云百炼记忆服务 | 云上托管，支持 rerank / judge / rewrite 等高级特性 |
-| [ReMe](reme.md) | 自托管 ReMe 服务 | 工作区级别记忆，支持轨迹（trajectory）摘要 |
-
-三者都实现了同一个 `AgentScope.core.memory.LongTermMemory` 接口，可通过 `ReActAgent.builder().longTermMemory(...)` 直接挂入 Agent，使用方式相同：
+`ILongTermMemory` 定义在 `AgentScope.Core.Memory`：
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(model)
-    .LongTermMemory(memory)                       // 任选一种实现
-    .LongTermMemoryMode(LongTermMemoryMode.BOTH)  // 同时记录与检索
-    .Build();
+public interface ILongTermMemory
+{
+    Task AddAsync(string text, Dictionary<string, object>? metadata = null);
+    Task<List<string>> SearchAsync(string query, int topK = 5);
+    Task<string> SummarizeAsync();
+}
 ```
 
-## 选型建议
+### 内置实现：InMemoryLongTermMemory
 
-- **想要本地一把 `docker run` 跑起来 → Mem0** 或 **ReMe**
-- **已经在阿里云百炼上有记忆库 → Bailian**
-- **需要 metadata 过滤（按业务维度切分） → Mem0**
-- **关注会话轨迹整体摘要 → ReMe**
+```csharp
+public InMemoryLongTermMemory(
+    LongTermMemoryMode mode = LongTermMemoryMode.Plaintext,
+    IEmbeddingGenerator? embedding = null)
 
-每个实现仅在初始化参数和过滤模型上有差异，对 Agent 侧透明。详见各分页。
+public enum LongTermMemoryMode { Plaintext, Semantic, Hybrid }
+```
+
+- `Plaintext`：子串匹配。
+- `Semantic`：注入 `IEmbeddingGenerator` 后使用向量余弦相似度。
+- `Hybrid`：向量召回 ∪ 子串召回，去重融合。
+
+### LongTermMemoryTools（静态工具类）
+
+将 `ILongTermMemory` 暴露为模型可调用的工具：
+
+```csharp
+// StoreMemory(ILongTermMemory memory, string content, string? tags = null)
+// SearchMemory(ILongTermMemory memory, string query, int topK = 5)
+// GetMemoriesByTag(ILongTermMemory memory, string tag)
+// DeleteMemory(ILongTermMemory memory, string memoryId)
+```
+
+注册到 `Toolkit` 即可让 LLM 自主读写记忆。
+
+### StaticLongTermMemoryHook
+
+`StaticLongTermMemoryHook(ILongTermMemory)` 自动将每次 Agent 响应的 Assistant 消息归档到 `ILongTermMemory`：
+
+```csharp
+var hook = new StaticLongTermMemoryHook(memory);
+await hook.OnAfterResponseAsync(responseMsg);
+```
+
+### 其他 Core 记忆类型
+
+- `SqliteMemory(string databasePath)`：实现 `IPersistentMemory`（扩展自 `IMemory`），提供 `SearchAsync(string query, int limit = 10)`。
+- `StateBackedMemory(IAgentStateStore store, AgentState initial, string stateKey = "default")`：实现 `IMemory`，通过 `IAgentStateStore` 持久化。
+- `MemoryBase`：`IMemory` 的纯内存实现。
+
+## 适配第三方记忆客户端
+
+Mem0、ReMe、百炼扩展包**不实现** `ILongTermMemory`，需自行包装：
+
+```csharp
+public class MyMem0Adapter : ILongTermMemory
+{
+    private readonly Mem0LongTermMemory _client;
+    public MyMem0Adapter(Mem0LongTermMemory client) => _client = client;
+
+    public async Task AddAsync(string text, Dictionary<string, object>? metadata = null)
+    {
+        var userId = metadata?.TryGetValue("user_id", out var u) == true ? u.ToString()! : "default";
+        var agentId = metadata?.TryGetValue("agent_id", out var a) == true ? a.ToString()! : "default";
+        await _client.AddAsync(userId, agentId, text);
+    }
+
+    public async Task<List<string>> SearchAsync(string query, int topK = 5) { /* ... */ }
+    public Task<string> SummarizeAsync() => Task.FromResult(""); // 按需实现
+}
+```
+
+包装后即可通过 `LongTermMemoryTools` 暴露为工具，或直接传入 Agent。

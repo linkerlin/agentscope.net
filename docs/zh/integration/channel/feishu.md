@@ -1,67 +1,53 @@
 # 飞书 Channel
 
-`AgentScope.Extensions.Channel.Feishu` 通过**事件订阅 v2** 回调机制将你的 Agent 接入飞书 / Lark。一个控制器接收 webhook 回调，可选地解密加密载荷，然后通过 Gateway 分发消息。
+`AgentScope.Extensions.Channel.Feishu` 通过飞书开放平台 Webhook 和事件订阅回调机制将你的 Agent 接入飞书 / Lark。
 
-## 适用场景
-
-- Agent 需要响应飞书机器人消息（单聊和群 @提醒）。
-- 你的应用已经运行 ASP.NET Core（回调控制器自动注册）。
+包版本：**2.0.1** | 目标框架：**net10.0**
 
 ## 添加依赖
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Channel.Feishu" Version="$(AgentScopeVersion)" />
+    <PackageReference Include="AgentScope.Extensions.Channel.Feishu" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## 前置准备
-
-1. 在[飞书开发者后台](https://open.feishu.cn/)创建一个**自建应用**。
-2. 启用**机器人**能力。
-3. 配置**事件订阅**回调地址指向你的应用：
-   `https://your-host/api/channels/feishu/{channelId}/callback`
-4. 记下 **App ID** 和 **App Secret**。可选地配置 **Encrypt Key** 和 **Verification Token**。
-
-## 快速开始
+## 构造函数
 
 ```csharp
-var channel = FeishuChannel.FromProperties(
-    "my-feishu",
-    ChannelConfig.Of("my-feishu", "main"),
-    new Dictionary<string, string>
-    {
-        ["appId"] = "cli_xxxxx",
-        ["appSecret"] = "your-app-secret"
-    });
-
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", agent)
-    .Channel(channel)
-    .Build();
-
-gw.Start();
+public FeishuChannel(
+    HttpClient http,
+    string webhookUrl,
+    string? appSecret = null,
+    string? appId = null,
+    string? encryptKey = null,
+    string? verificationToken = null,
+    string? apiBase = null)
 ```
 
-`FeishuCallbackController` 是一个控制器，自动注册在 `/api/channels/feishu/{channelId}/callback`，并自动处理 URL 验证握手。
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `http` | `HttpClient` | 是 | 用于调用飞书 OpenAPI 的 HTTP 客户端 |
+| `webhookUrl` | `string` | 是 | 出站消息的 Webhook 地址 |
+| `appSecret` | `string?` | 否 | 飞书应用密钥 |
+| `appId` | `string?` | 否 | 飞书应用 app_id（如 `cli_xxxxx`） |
+| `encryptKey` | `string?` | 否 | AES-256-CBC 加密密钥（启用载荷加密） |
+| `verificationToken` | `string?` | 否 | URL 校验验证令牌 |
+| `apiBase` | `string?` | 否 | API 基地址，默认 `https://open.feishu.cn` |
 
-## 配置属性
+当 `appId` 和 `appSecret` 均提供时，可通过 `TokenProvider` 获取 `FeishuAccessTokenProvider`。配置 `encryptKey` 后启用 `FeishuCrypto` 加解密。
 
-| 属性 | 必填 | 默认值 | 说明 |
-|------|------|--------|------|
-| `appId` | 是 | — | 飞书自建应用 ID（cli_xxx） |
-| `appSecret` | 是 | — | 飞书自建应用密钥 |
-| `encryptKey` | 否 | — | AES-256-CBC 加密密钥；启用载荷加密 |
-| `verificationToken` | 否 | — | URL 验证 token |
-| `callbackPath` | 否 | `/api/channels/feishu/{channelId}/callback` | 自定义回调路径 |
-| `apiBase` | 否 | `https://open.feishu.cn` | 飞书开放平台 API 基地址 |
+## 接口实现
 
-## 加密
+| 成员 | 说明 |
+|------|------|
+| `Name` | 返回 `"feishu"` |
+| `StartAsync` | 无操作（无状态渠道） |
+| `StopAsync` | 无操作 |
+| `SendAsync` | 通过 Webhook 发送文本消息（`POST` 到 `webhookUrl`） |
+| `ProcessInboundAsync` | 处理回调：可选验签（`X-Lark-Signature`）→ 解密 → url_verification 挑战 → event_id 去重 → mapping → BotLoopGuard → 触发 `OnMessageReceived` 事件 |
+| `OnMessageReceived` | 入站消息事件 |
 
-配置 `encryptKey` 后，回调 body 以 `{"encrypt":"<base64>"}` 形式到达。适配器自动解密（AES-256-CBC + SHA-256 密钥派生）并校验 `X-Lark-Signature` 头。
+### URL 校验握手
 
-## 消息流转
-
-**入站：** `FeishuCallbackController` → 可选解密 → URL 验证检查 → event_id 去重 → `FeishuInboundMapper`（当前仅支持文本消息） → 防循环 → Gateway。
-
-**出站：** `FeishuOutboundClient` 通过 `POST /open-apis/im/v1/messages` 发送回复，使用 `FeishuAccessTokenProvider` 获取 `tenant_access_token`。Token 自动缓存并在约 80% TTL 时主动刷新。
+当 `ProcessInboundAsync` 检测到 `url_verification` 挑战时，自动校验 `token` 并返回 `{"challenge":"..."}` 响应。

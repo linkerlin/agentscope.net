@@ -1,91 +1,42 @@
-﻿# Bailian Knowledge
+﻿# Bailian RAG
 
-`agentscope-extensions-rag-bailian` integrates Alibaba Cloud Bailian Knowledge Base — embeddings, indexing, and retrieval are all managed by Bailian. The Agent only sends the query and receives documents back.
-
-## When to use
-
-- Your documents are already uploaded and processed in the Bailian console.
-- You want enterprise features: rerank, filtering, and structured / unstructured / image KBs.
-- You don't want to run your own vector store.
+`AgentScope.Extensions.Rag.Bailian.BailianRagClient` integrates with Alibaba Cloud Bailian Knowledge Base.
 
 ## Add the dependency
 
 ```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-rag-bailian</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
+<ItemGroup>
+    <PackageReference Include="AgentScope.Extensions.Rag.Bailian" Version="2.0.1" />
+</ItemGroup>
 ```
 
-## Quickstart
+## Construction
 
 ```csharp
-using AgentScope.Core.Rag.Integration.Bailian.BailianConfig
-using AgentScope.Core.Rag.Integration.Bailian.BailianKnowledge
-using AgentScope.Core.Rag.Model.RetrieveConfig
+using AgentScope.Extensions.Rag.Bailian;
 
-BailianConfig config = BailianConfig.Builder()
-    .AccessKeyId(Environment.GetEnvironmentVariable("ALIBABA_CLOUD_ACCESS_KEY_ID"))
-    .AccessKeySecret(Environment.GetEnvironmentVariable("ALIBABA_CLOUD_ACCESS_KEY_SECRET"))
-    .WorkspaceId("llm-xxxxxx")
-    .IndexId("kb-xxxxxx")
-    .Build();
-
-BailianKnowledge knowledge = BailianKnowledge.Builder()
-    .Config(config)
-    .Build();
-
-List<Document> hits = knowledge.Retrieve(
-    "How do I request an invoice?",
-    RetrieveConfig.Builder().limit(5).scoreThreshold(0.5).Build()
+var client = new BailianRagClient(
+    new HttpClient(),
+    apiKey: Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY"),
+    baseUrl: null // defaults to https://bailian.aliyuncs.com/api/v1/rag
 );
 ```
 
-## Wire into an Agent
+## Methods
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(chatModel)
-    .Knowledge(knowledge)
-    .RagMode(RAGMode.AGENTIC)
-    .Build();
+// Search
+List<string> results = await client.SearchAsync(
+    indexId: "kb-xxxxx",
+    query: "How do I request an invoice?",
+    topK: 5
+);
+
+// Create index
+string indexId = await client.CreateIndexAsync(
+    name: "product-kb",
+    description: "Product FAQ"
+);
 ```
 
-Or expose it as a tool:
-
-```csharp
-KnowledgeRetrievalTools tools = new KnowledgeRetrievalTools(knowledge);
-Toolkit toolkit = new Toolkit();
-toolkit.RegisterObject(tools);
-```
-
-## Rerank / rewrite
-
-`BailianConfig.Builder()` accepts optional `rerankConfig(...)` and `rewriteConfig(...)`:
-
-```csharp
-BailianConfig config = BailianConfig.Builder()
-    .AccessKeyId(ak).AccessKeySecret(sk)
-    .WorkspaceId("llm-xxx").IndexId("kb-xxx")
-    .RerankConfig(RerankConfig.Builder().Enable(true).TopN(5).Build())
-    .RewriteConfig(RewriteConfig.Builder().Enable(true).Build())
-    .Build();
-```
-
-When enabled, Bailian re-ranks initial recall results or rewrites the query for better relevance — at the cost of more latency and quota usage. Turn on what you actually need.
-
-## Retrieval only
-
-`BailianKnowledge.AddDocuments(...)` is unsupported — use the Bailian console or platform SDK to manage documents. This is consistent with Dify, HayStack, and RAGFlow integrations: third-party RAG platforms keep ingestion responsibility, the .NET side only reads.
-
-## Configuration
-
-| Field | Notes |
-| --- | --- |
-| `accessKeyId / accessKeySecret` | Alibaba Cloud credentials (required) |
-| `workspaceId` | Bailian workspace ID (required) |
-| `indexId` | KB index ID (required) |
-| `rerankConfig` | Rerank toggle and parameters |
-| `rewriteConfig` | Query rewrite toggle and parameters |
+This class does not implement `IKnowledge`. Document management goes through the Bailian console.

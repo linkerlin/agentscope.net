@@ -1,44 +1,60 @@
 # OpenAI Model
 
-`AgentScope.Extensions.Model.OpenAI` integrates OpenAI Chat Completions-style models. It is also the module to use for OpenAI-compatible endpoints such as DeepSeek, GLM, Kimi, MiniMax, and similar services when their wire format follows the OpenAI API.
+`AgentScope.Core.Model.OpenAI.OpenAIModel` connects to the OpenAI Chat Completions API. OpenAI-compatible endpoints (e.g. DeepSeek, GLM, Kimi, MiniMax) also use this class.
 
-## Add the dependency
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.OpenAI" Version="$(AgentScopeVersion)" />
-```
-
-## ModelRegistry
-
-Set `OPENAI_API_KEY`, then use the `openai:<model>` id:
+## Constructor
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("openai:gpt-4.1-mini") // Resolved internally by ModelRegistry.Resolve(modelId)
+OpenAIModel(string modelName, string? apiKey = null, string? baseUrl = null,
+    OpenAIClient? client = null, OpenAIChatFormatter? formatter = null,
+    GenerateOptions? defaultOptions = null)
+```
+
+## Minimal Example
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.OpenAI;
+
+string key = System.Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+var model = new OpenAIModel("gpt-4o", key);
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Hello").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent Integration
+
+```csharp
+using AgentScope.Core.Model.OpenAI;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new OpenAIModel("gpt-4o", key))
     .Build();
 ```
 
-## Explicit builder
+## Streaming
 
-Use the builder when you need a custom endpoint, formatter, transport, or generation options:
+`OpenAIModel` implements `IStreamingChatModel`:
 
 ```csharp
-using AgentScope.Extensions.Model.OpenAI;
-
-OpenAIChatModel model = OpenAIChatModel.Builder()
-    .ApiKey(Environment.GetEnvironmentVariable("OPENAI_API_KEY"))
-    .ModelName("gpt-4.1-mini")
-    .Stream(true)
-    .Build();
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
 ```
 
-## Spring Boot
+## Notes
 
-Spring Boot applications can use the OpenAI starter:
+- When `apiKey` is omitted, reads from the `OPENAI_API_KEY` environment variable.
+- When `baseUrl` is omitted, uses the default OpenAI endpoint.
+- Custom `OpenAIClient`, `OpenAIChatFormatter`, or `GenerateOptions` can be passed via the constructor.
 
-```xml
-<PackageReference Include="AgentScope.OpenAI.SpringBoot.Starter" Version="$(AgentScopeVersion)" />
-```
-
-Full builder options, formatters, credentials, and registry context details are covered in [Model](../../docs/building-blocks/model.md).
+See [Model](../../docs/building-blocks/model.md) for the full interface reference.

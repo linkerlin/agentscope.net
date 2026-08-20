@@ -1,51 +1,61 @@
 # DashScope Model
 
-`AgentScope.Extensions.Model.DashScope` integrates Alibaba Cloud DashScope Qwen models, including multimodal and reasoning-capable Qwen models.
+`AgentScope.Core.Model.DashScope.DashScopeModel` connects to Alibaba Cloud DashScope Qwen models.
 
-## Add the dependency
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.DashScope" Version="$(AgentScopeVersion)" />
-```
-
-## ModelRegistry
-
-Set `DASHSCOPE_API_KEY`, then use either `dashscope:<model>` or the Qwen short form:
+## Constructor
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("dashscope:qwen-plus") // Resolved internally by ModelRegistry.Resolve(modelId)
+DashScopeModel(string modelName, string? apiKey = null, string? baseUrl = null,
+    DashScopeChatFormatter? formatter = null, GenerateOptions? defaultOptions = null)
+```
+
+Constants: `DefaultBaseUrl = "https://dashscope.aliyuncs.com"`, `ChatEndpoint = "/compatible-mode/v1/chat/completions"`.
+
+## Minimal Example
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.DashScope;
+
+string key = System.Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
+var model = new DashScopeModel("qwen-plus", key);
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Explain AgentScope").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent Integration
+
+```csharp
+using AgentScope.Core.Model.DashScope;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new DashScopeModel("qwen-plus", key))
     .Build();
 ```
 
-```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("qwen-plus") // Resolved internally by ModelRegistry.Resolve(modelId)
-    .Build();
-```
+## Streaming
 
-## Explicit builder
-
-Use the builder when you need DashScope-specific options such as endpoint type, thinking, search, encryption:
+`DashScopeModel` implements `IStreamingChatModel`:
 
 ```csharp
-using AgentScope.Extensions.Model.DashScope;
-
-DashScopeChatModel model = DashScopeChatModel.Builder()
-    .ApiKey(Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY"))
-    .ModelName("qwen-plus")
-    .Stream(true)
-    .Build();
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
 ```
 
-## Spring Boot
+## Notes
 
-Spring Boot applications can use the DashScope starter:
+- When `apiKey` is omitted, read from the `DASHSCOPE_API_KEY` environment variable.
+- The endpoint uses OpenAI-compatible format (`/compatible-mode/v1/chat/completions`).
+- Custom `DashScopeChatFormatter` or `GenerateOptions` can be passed via the constructor.
 
-```xml
-<PackageReference Include="AgentScope.DashScope.SpringBoot.Starter" Version="$(AgentScopeVersion)" />
-```
-
-Full builder options, formatters, credentials, and registry context details are covered in [Model](../../docs/building-blocks/model.md).
+See [Model](../../docs/building-blocks/model.md) for the full interface reference.

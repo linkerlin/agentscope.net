@@ -1,104 +1,66 @@
-# Distributed Storage (Distributed Store)
+# Distributed Storage Overview
 
-AgentScope unifies all components that need distributed persistence under the `DistributedStore` interface. One line of configuration switches agent state, workspace filesystem, sandbox snapshots, and concurrency locks to the same distributed store.
+AgentScope abstracts distributed state storage through the `IAgentStateStore` interface, providing a unified Get/Set/Delete contract with optional versioned optimistic concurrency.
 
-## Quick Start
+## IAgentStateStore Interface
 
-```csharp
-// Redis — one-line setup
-DistributedStore store = RedisDistributedStore.FromJedis(
-        new JedisPooled("redis://localhost:6379"));
-
-HarnessAgent agent = HarnessAgent.Builder()
-    .Name("my-agent")
-    .Model("dashscope:qwen-plus")
-    .DistributedStore(store)
-    .Filesystem(new RemoteFilesystemSpec()            // baseStore auto-injected
-            .IsolationScope(IsolationScope.USER))
-    .Build();
-```
-
-## Capability Matrix
-
-| Component | Interface | Redis | OSS | MySQL |
-|-----------|----------|:-----:|:---:|:-----:|
-| Agent state persistence | `AgentStateStore` | `RedisAgentStateStore` | `OssAgentStateStore` | `MysqlAgentStateStore` |
-| Workspace filesystem KV | `BaseStore` | `RedisStore` | `OssBaseStore` | `JdbcStore` |
-| Sandbox snapshots | `SandboxSnapshotSpec` | `RedisSnapshotSpec` | `OssSnapshotSpec` | `JdbcSnapshotSpec` |
-| Sandbox concurrency lock | `SandboxExecutionGuard` | `RedisSandboxExecutionGuard` | — | `JdbcSandboxExecutionGuard` |
-
-> OSS does not provide `SandboxExecutionGuard` — object storage is unsuitable for distributed locking. Mix in a Redis guard via `DistributedStore.Builder()`.
-
-## Mixed Stores
-
-Different components can come from different storage stores:
+Defined in `AgentScope.Core.State`:
 
 ```csharp
-DistributedStore mysql = MysqlDistributedStore.Create(dataSource);
-DistributedStore redis = RedisDistributedStore.FromJedis(jedis);
+public interface IAgentStateStore
+{
+    bool SupportsVersioning { get; }
 
-// MySQL for state and files, Redis for sandbox lock and snapshots
-DistributedStore mixed = DistributedStore.Builder()
-    .AgentStateStore(mysql.AgentStateStore())
-    .BaseStore(mysql.BaseStore())
-    .SandboxSnapshotSpec(redis.SandboxSnapshotSpec())
-    .SandboxExecutionGuard(redis.SandboxExecutionGuard())
-    .Build();
-
-HarnessAgent.Builder()
-    .DistributedStore(mixed)
-    .Filesystem(new DockerFilesystemSpec()
-            .Image("ubuntu:24.04"))
-    .Build();
+    Task<AgentState?> GetAsync(string userId, string sessionId, string key);
+    Task<VersionedState<AgentState>?> GetVersionedAsync(string userId, string sessionId, string key);
+    Task SaveAsync(string userId, string sessionId, string key, AgentState state);
+    Task<long> SaveIfVersionAsync(string userId, string sessionId, string key, AgentState state, long expectedVersion);
+}
 ```
 
-## Components
+- `SupportsVersioning` — Indicates whether the backend supports versioned operations
+- `GetVersionedAsync` — Retrieves the state together with its current version number
+- `SaveIfVersionAsync` — CAS (Compare-And-Swap) write: succeeds only when `expectedVersion` matches; returns the new version number
 
-### AgentStateStore — Agent State Persistence
+## Backend Matrix
 
-Conversation context, compaction summaries, permission rules, Plan Mode state, addressed by `(userId, sessionId)`. Auto-wired by `DistributedStore`; can be overridden via `.StateStore(...)`.
+| Backend | Package | Construction | Versioning | Use Case |
+|---------|---------|-------------|:----------:|----------|
+| **Redis** | `AgentScope.Extensions.Store.Redis` | `RedisAgentStateStore(RedisDistributedStore)` / `RedisAgentStateStore(connectionString)` | ✅ | Multi-replica production, low latency |
+| **MySQL** | `AgentScope.Extensions.Store.MySql` | `MySqlAgentStateStore(MySqlDistributedStore)` | ✅ | Existing MySQL infrastructure |
+| **PostgreSQL** | `AgentScope.Extensions.Store.PostgreSql` | `PostgreSqlAgentStateStore(PostgreSqlDistributedStore)` | ✅ | PostgreSQL ecosystem |
+| **OSS** | `AgentScope.Extensions.Store.Oss` | `OssAgentStateStore(OssDistributedStore)` | ❌ | Alibaba Cloud, large capacity |
+| **COS** | `AgentScope.Extensions.Store.Cos` | `CosAgentStateStore(CosStore)` | ❌ | Tencent Cloud ecosystem |
 
-### BaseStore — Workspace Filesystem KV
+## IDistributedStore Low-Level Interface
 
-Storage provider for `RemoteFilesystemSpec`, routing `MEMORY.md`, `memory/`, `skills/`, `sessions/` to shared KV storage. Auto-injected into `RemoteFilesystemSpec` when using the no-arg constructor.
+All `*DistributedStore` types implement `IDistributedStore`:
 
-### SandboxSnapshotSpec — Sandbox Snapshots
+- `Get(string key)` — Fetches raw data
+- `Set(string key, byte[] value)` — Stores raw data
+- `Delete(string key)` — Deletes data
+- `ListKeys(string prefix)` — Lists keys by prefix
 
-Persists Docker/K8s sandbox workspace as tar archives for cross-call recovery. Auto-wired into `SandboxFilesystemSpec` by `DistributedStore`.
+## How to Choose
 
-### SandboxExecutionGuard — Sandbox Concurrency Lock
+1. **Low latency, multi-replica** → **Redis** (versioning supported, production-first)
+2. **Existing MySQL/PostgreSQL** → **MySQL/PostgreSQL** (versioning supported, shared database)
+3. **Alibaba/Tencent Cloud ecosystem, large archives** → **OSS/COS** (no versioning, last-writer-wins)
+4. **Local development / debugging** → `InMemoryAgentStateStore` or `JsonFileAgentStateStore`
 
-Distributed lock for `AGENT` / `GLOBAL` isolation scope under multi-replica deployment. Auto-wired into `SandboxFilesystemSpec` by `DistributedStore`.
+## Integration with StateBackedMemory
 
-## Priority
-
-```
-Explicit builder methods (.StateStore(), .SnapshotSpec() on FilesystemSpec, etc.)
-    > DistributedStore auto-wiring
-        > local defaults (JsonFileAgentStateStore, NoopSnapshotSpec, etc.)
-```
-
-## Store Documentation
-
-- [Redis](redis.md) — full capability coverage, recommended for multi-replica production
-- [MySQL / JDBC](mysql.md) — for existing relational database infrastructure
-- [Alibaba Cloud OSS](oss.md) — object storage, best for large-capacity snapshots
-
-## aistio Hosted Store
-
-When you already run an aistio control plane, it can host the coordination side of `DistributedStore` (BaseStore, sandbox lock/snapshot, MessageBus, AsyncToolRegistry, **TaskRepository**, optional **SessionTurnGate**). You still provide **one** `AgentStateStore` backend yourself (Redis / MySQL / Postgres / OSS); core exposes `GetVersioned` / `SaveIfVersion` optimistic concurrency, but state storage stays off the control plane.
+Any `IAgentStateStore` can be used with `StateBackedMemory`:
 
 ```csharp
-ControlPlaneStores cp = ControlPlaneStores.FromEnv();
-HarnessAgent.Builder()
-    .DistributedStore(cp.WithAgentStateStore(redis.AgentStateStore()))
-    .Filesystem(new RemoteFilesystemSpec().IsolationScope(IsolationScope.USER))
-    .Build();
+var stateStore = new RedisAgentStateStore("redis://localhost:6379");
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
 ```
 
-- Enable on the control plane with `--enable-hosted-store` (Postgres recommended for production).
-- **`WithAgentStateStore` includes** hosted `TaskRepository` and `SessionTurnGate`. With **`SandboxFilesystemSpec` and subagent background tasks**, use this path — the workspace `TaskRepository` cannot persist tasks across replicas.
-- **AgentStateStore versioning**: Redis, Postgres, MySQL, and InMemory support CAS; JsonFile, OSS, COS, and JPA remain last-writer-wins. Prefer a versioning backend for multi-replica deployments.
-- **Turn gate + `ConflictPolicy.FAIL`** are optional: they reduce duplicate LLM turns on multi-replica setups; correctness still comes from CAS when the backend supports versioning.
-- Auth today is a shared internal token; tenant (`agentName` / `namespace`) comes from the request body — **not** for mutually untrusted multi-tenant agents on one control plane.
-- `MessageBus.QueueDrain` is **destructive** (ack-on-read); a wrong tenant key drops messages.
+## Detailed Documentation
+
+- [Redis Backend](redis.md) — Connection string format, construction, production advice
+- [MySQL Backend](mysql.md) — Connection string format, construction
+- [OSS Backend](oss.md) — Alibaba Cloud OSS integration
+- [Session State Integration](../session/index.md) — SessionManager and state persistence usage

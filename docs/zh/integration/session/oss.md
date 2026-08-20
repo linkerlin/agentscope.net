@@ -1,60 +1,73 @@
-﻿```{note}
-本页面内容已迁移至 [分布式存储 — OSS](../distributed/oss.md)。以下内容保留作为参考，但建议使用新文档。
-```
+﻿# OSS 会话状态
 
-# OSS 状态存储
+使用 `AgentScope.Extensions.Store.Oss` 包（基于 Aliyun.OSS SDK）将 Agent 会话状态持久化到阿里云对象存储。
 
-`agentscope-extensions-oss` 把 AgentScope 的 Agent 状态持久化到阿里云对象存储（OSS）。适合大容量数据和阿里云生态的场景。
-
-## 添加依赖
+## 安装
 
 ```xml
 <ItemGroup>
-    <PackageReference Include="AgentScope.Extensions.Oss" Version="$(AgentScopeVersion)" />
+  <PackageReference Include="AgentScope.Extensions.Store.Oss" Version="2.0.1" />
 </ItemGroup>
 ```
 
-## 快速上手
+目标框架：net10.0。
+
+## 快速开始
 
 ```csharp
-using com.aliyun.oss.OSS;
-using com.aliyun.oss.OSSClientBuilder;
-using AgentScope.core.state.AgentStateStore;
-using AgentScope.extensions.oss.OssAgentStateStore;
-OSS ossClient = new OSSClientBuilder().Build(endpoint, accessKeyId, accessKeySecret);
-AgentStateStore stateStore = OssAgentStateStore.Builder()
-    .OssClient(ossClient)
-    .BucketName("my-agentscope-bucket")
-    .KeyPrefix("agentscope/state/")
-    .Build();
-ReActAgent agent = ReActAgent.Builder()
+using AgentScope.Core;
+using AgentScope.Core.Memory;
+using AgentScope.Core.Model;
+using AgentScope.Core.State;
+using AgentScope.Extensions.Store.Oss;
+
+var ossStore = new OssDistributedStore(
+    httpClient,
+    endpoint: "oss-cn-hangzhou.aliyuncs.com",
+    bucket: "my-bucket",
+    accessKeyId: "your-access-key",
+    accessKeySecret: "your-access-secret");
+
+var stateStore = new OssAgentStateStore(ossStore, keyPrefix: "agentstate");
+
+var initial = new AgentState("demo-session", userId: "alice");
+IMemory memory = new StateBackedMemory(stateStore, initial);
+
+EnhancedReActAgent agent = new EnhancedReActAgentBuilder()
     .Name("assistant")
-    .Model(model)
-    .StateStore(stateStore)
+    .Model(new DashScopeModel("qwen-plus", apiKey))
+    .Memory(memory)
     .Build();
+
+await agent.CallAsync(Msg.Builder().Role("user").TextContent("你好").Build());
 ```
 
-## Key 结构
+## 自定义 key 前缀
 
-`(userId, sessionId)` 二元组会被打包进 OSS 对象路径：
+```csharp
+var stateStore = new OssAgentStateStore(ossStore, keyPrefix: "prod/session");
+```
 
-| 类型 | Key 模式 |
-| --- | --- |
-| 单值 | `{keyPrefix}{userId}/{sessionId}/{stateKey}.json` |
-| 列表 | `{keyPrefix}{userId}/{sessionId}/{stateKey}.list.json` |
-| 列表 hash | `{keyPrefix}{userId}/{sessionId}/{stateKey}.list.hash`（变更检测用） |
+默认 `keyPrefix` 为 `"agentstate"`。
 
-匿名 session（`userId` 为 null）时 `userId` 用 `__anon__` 替代。
+## 会话保存与恢复
 
-## Builder 配置参数
+```csharp
+using AgentScope.Core.Session;
 
-| 方法 | 说明 |
-| --- | --- |
-| `ossClient(OSS)` | 必填。阿里云 OSS 客户端 |
-| `bucketName(String)` | 必填。OSS Bucket 名称 |
-| `keyPrefix(String)` | 默认 `agentscope/state/` |
+var sessionManager = new SessionManager();
+Session session = sessionManager.CreateSession(name: "oss-demo");
 
-## 安全提示
+agent.SaveTo(session, "main");
+agent.LoadIfExists(session, "main");
+```
 
-- 生产环境建议使用 RAM Role + STS 临时凭证，避免在代码中硬编码 AK/SK
-- 为 bucket 配置生命周期规则（如 7 天自动过期），避免存储成本失控
+## 版本化说明
+
+OSS 后端**不支持**版本化（`SupportsVersioning = false`），使用 last-writer-wins 语义。多副本场景建议使用支持 CAS 的后端（Redis/MySQL/PostgreSQL）。
+
+## 生产建议
+
+- 使用 RAM Role + STS 临时凭证替代硬编码 AK/SK。
+- 配置 Bucket 生命周期规则控制存储成本。
+- OSS 适合大容量快照场景，但延迟高于 Redis。

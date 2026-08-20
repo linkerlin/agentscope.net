@@ -1,6 +1,6 @@
 # Higress AI Gateway
 
-`AgentScope.Extensions.Higress` brings tools published as MCP (Model Context Protocol) on [Higress](https://higress.io/) into AgentScope. Higress handles tool search, auth, rate-limiting, and observability at the gateway layer; the Agent only invokes the resulting tools.
+`AgentScope.Extensions.Higress` brings tools published as MCP (Model Context Protocol) on [Higress](https://higress.io/) into AgentScope. The gateway handles tool search, auth, rate-limiting, and observability; the Agent only invokes the resulting tools.
 
 ## When to use
 
@@ -10,7 +10,7 @@
 ## Add the dependency
 
 ```xml
-<PackageReference Include="AgentScope.Extensions.Higress" Version="$(AgentScopeVersion)" />
+<PackageReference Include="AgentScope.Extensions.Higress" Version="2.0.1" />
 ```
 
 ## Quickstart
@@ -18,42 +18,40 @@
 ```csharp
 using AgentScope.Extensions.Higress;
 
-// 1) Create a client against an MCP endpoint published by Higress
-HigressMcpClientWrapper client = HigressMcpClientBuilder
-    .Create("higress")
-    .StreamableHttpEndpoint("http://gateway/mcp-servers/union-tools-search")
-    .Build();
+// Create a Higress MCP client
+var client = new HigressMcpClient(httpClient, "http://gateway/mcp-servers/union-tools-search");
 
-// 2) Register with HigressToolkit (a Toolkit subclass that caches the Higress client)
-HigressToolkit toolkit = new();
-toolkit.RegisterMcpClient(client).Wait();
+// Create a toolkit and discover remote tools
+var toolkit = new HigressToolkit(client);
+var tools = await toolkit.DiscoverAsync();
 
-// 3) Use it from an Agent
-ReActAgent agent = ReActAgent.Builder()
-    .Name("Assistant")
-    .Model(model)
-    .Toolkit(toolkit)
-    .Build();
+// Wrap as local ITool instances and inject into an Agent
+var agent = new ReActAgent("Assistant", model, toolkit.AsTools().ToList());
 ```
 
-## Selectively enable tools
+## Core API
 
-`HigressToolkit` reuses the standard `Toolkit` fluent registration API for finer-grained control by group / allowlist:
+### HigressMcpClient
 
-```csharp
-toolkit.Registration()
-    .McpClient(client)
-    .EnableTools(new List<string> { "search-doc", "fetch-url" })
-    .Group("knowledge")
-    .Apply();
-```
+| Constructor | Description |
+| --- | --- |
+| `HigressMcpClient(HttpClient http, string baseUrl)` | Connect to a Higress MCP endpoint via HttpClient |
 
-## Access the underlying MCP client
+| Method | Description |
+| --- | --- |
+| `ListToolsAsync(CancellationToken ct)` | List all tool names registered on the gateway |
+| `CallToolAsync(string toolName, JsonElement args, CancellationToken ct)` | Invoke a remote tool |
 
-If you need to call Higress-specific extensions (e.g. tool search via `HigressToolSearchResult`):
+### HigressToolkit
 
-```csharp
-HigressMcpClientWrapper higressClient = toolkit.GetHigressMcpClient();
-```
+| Constructor | Description |
+| --- | --- |
+| `HigressToolkit(HigressMcpClient client)` | Pass an initialized MCP client |
 
-> Tool governance (auth, rate-limiting, routing, observability) lives on the gateway, so you don't reimplement it on the Agent side.
+| Method | Description |
+| --- | --- |
+| `DiscoverAsync(CancellationToken ct)` | Discover and cache tools from the gateway; returns `IReadOnlyList<HigressToolSearchResult>` |
+| `Search(string keyword)` | Search cached tools by keyword |
+| `AsTools()` | Wrap discovered tools as `IEnumerable<ITool>` for Agent use |
+
+> Tool governance (auth, rate-limiting, routing, observability) lives on the gateway — no need to reimplement on the Agent side.

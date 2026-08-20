@@ -1,112 +1,86 @@
 # Scheduler（定时调度）
 
-`AgentScope.Extensions.Scheduler` 让 Agent 可以按调度器配置周期性执行——比如"每天 8 点跑一次日报 Agent"、"每 5 秒做一次健康巡检"。模块抽出统一的 `AgentScheduler` 接口，提供两个实现：
+`AgentScope.Extensions.Scheduler` 让 Agent 可以按调度器配置周期性执行。模块抽出统一接口 `IAgentScheduler`，提供两个实现：
 
 | 子模块 | 实现 | 部署形态 |
 | --- | --- | --- |
-| `AgentScope.Extensions.Scheduler.Quartz` | [Quartz](https://www.quartz-scheduler.org/) | 单机或集群（共享 Quartz 数据库） |
-| `AgentScope.Extensions.Scheduler.XxlJob` | [XXL-Job](https://www.xuxueli.com/xxl-job/) | 分布式调度，依赖 admin server |
+| `AgentScope.Extensions.Scheduler.Quartz` | [Quartz.NET](https://www.quartz-scheduler.net/) | 单机或集群 |
+| `AgentScope.Extensions.Scheduler.XxlJob` | [XXL-Job](https://www.xuxueli.com/xxl-job/) | 分布式，依赖 Admin Server |
 
-底层 SPI 在 `AgentScope.Extensions.Scheduler.Common`，可以自己实现接入其他调度框架。
+## 公共接口
 
-## 共享概念
+### IAgentScheduler
 
-- `AgentConfig`（或 `RuntimeAgentConfig`）：定义 Agent 怎么"造"出来——名字、模型配置、system prompt、工具集等。
-- `ScheduleConfig`：定义调度策略——CRON、固定速率、最大并发等。
-- `AgentScheduler`：核心接口，`Schedule(...)` / `Pause(...)` / `Resume(...)` / `Cancel(...)` / `Shutdown()`。
-- `ScheduleAgentTask`：一次注册返回的"被调度的 Agent 任务"句柄。
+| 方法 | 说明 |
+| --- | --- |
+| `Task<string> ScheduleAsync(ScheduleAgentTask task, CancellationToken ct)` | 注册一个定时 Agent 任务，返回任务 ID |
+| `Task CancelAsync(string taskId, CancellationToken ct)` | 取消已注册的任务 |
+| `Task<IReadOnlyList<ScheduleAgentTask>> ListTasksAsync(CancellationToken ct)` | 列举所有已注册任务 |
 
-每次任务触发时，调度器会"现造"一个新的 Agent 实例并执行，避免状态串台。
+### ScheduleAgentTask
 
-## Quartz 模式（单机/集群）
-
-### 添加依赖
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Scheduler.Quartz" Version="$(AgentScopeVersion)" />
+```csharp
+public sealed record ScheduleAgentTask(
+    string TaskId,
+    string AgentName,
+    string CronExpression,
+    IDictionary<string, object>? InputParams = null);
 ```
 
-### 用法
+## 添加依赖
+
+```xml
+<PackageReference Include="AgentScope.Extensions.Scheduler.Quartz" Version="2.0.1" />
+<!-- 或 -->
+<PackageReference Include="AgentScope.Extensions.Scheduler.XxlJob" Version="2.0.1" />
+```
+
+## Quartz 模式
 
 ```csharp
 using AgentScope.Extensions.Scheduler;
-using AgentScope.Extensions.Scheduler.Config;
 using AgentScope.Extensions.Scheduler.Quartz;
 
-AgentScheduler scheduler = QuartzAgentScheduler.Builder()
-    .AutoStart(true)
-    .Build();
+var scheduler = new QuartzAgentScheduler(
+    agentResolver: name => agentFactory(name));
 
-AgentConfig agent = AgentConfig.Builder()
-    .Name("DailyReportAgent")
-    .ModelConfig(DashScopeModelConfig.Builder()
-        .ApiKey(apiKey).ModelName("qwen-plus").Build())
-    .SysPrompt("你是日报助手，请每天生成销售汇总")
-    .Build();
+var taskId = await scheduler.ScheduleAsync(new ScheduleAgentTask(
+    TaskId: "daily-report",
+    AgentName: "DailyReportAgent",
+    CronExpression: "0 0 8 * * ?",
+    InputParams: new Dictionary<string, object> { ["text"] = "生成销售日报" }
+));
 
-ScheduleConfig schedule = ScheduleConfig.Builder()
-    .ScheduleMode(ScheduleMode.FIXED_RATE)
-    .FixedRate(5000L)   // 每 5 秒
-    // 或 .ScheduleMode(ScheduleMode.CRON).Cron("0 0 8 * * ?")
-    .Build();
-
-scheduler.Schedule(agent, schedule);
+// 运行时管控
+await scheduler.CancelAsync("daily-report");
+var tasks = await scheduler.ListTasksAsync();
 ```
 
-支持运行时管控：
+`QuartzAgentScheduler` 构造时可选传入 `Func<string, IAgent>? agentResolver`，若提供则每次触发时使用该解析器获取 Agent 实例并执行。
 
-```csharp
-scheduler.Pause("DailyReportAgent");
-scheduler.Resume("DailyReportAgent");
-scheduler.Cancel("DailyReportAgent");
-scheduler.Shutdown();
-```
-
-## XXL-Job 模式（分布式）
-
-### 添加依赖
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Scheduler.XxlJob" Version="$(AgentScopeVersion)" />
-```
-
-### 用法
+## XXL-Job 模式
 
 ```csharp
 using AgentScope.Extensions.Scheduler.XxlJob;
 
-// 1) 启动 XXL-Job Executor
-XxlJobSpringExecutor executor = new();
-executor.SetAdminAddresses("http://localhost:8080/xxl-job-admin");
-executor.SetAppname("agentscope-demo");
-executor.SetAccessToken("xxxxxxxx");
-executor.SetPort(9999);
-executor.Start();
+var scheduler = new XxlJobAgentScheduler(
+    http: httpClient,
+    adminUrl: "http://localhost:8080/xxl-job-admin",
+    appName: "agentscope");
 
-// 2) 把它包成 AgentScheduler
-AgentScheduler scheduler = new XxlJobAgentScheduler(executor);
-
-// 3) 注册一个 Agent 作为 JobHandler
-ScheduleAgentTask task = scheduler.Schedule(agentConfig, ScheduleConfig.Builder().Build());
+var taskId = await scheduler.ScheduleAsync(new ScheduleAgentTask(
+    TaskId: "health-check",
+    AgentName: "HealthCheckAgent",
+    CronExpression: "0 */5 * * * ?"
+));
 ```
 
-之后，**调度策略（CRON、并发、路由）在 XXL-Job 控制台配置**，Agent 名 `DailyReportAgent` 会作为 JobHandler 显示。
-
-## 工具绑定
-
-绑定 Toolkit 时使用 `RuntimeAgentConfig`（过渡 API，未来可能调整）：
-
-```csharp
-RuntimeAgentConfig agent = RuntimeAgentConfig.Builder()
-    .Name("OpsAgent")
-    .ModelConfig(modelConfig)
-    .SysPrompt("巡检并发送告警")
-    .Toolkit(toolkit)
-    .Build();
-```
+`XxlJobAgentScheduler` 通过 XXL-Job Admin HTTP API 注册定时任务。调度策略（CRON、并发、路由）在 XXL-Job 控制台配置。
 
 ## 选型建议
 
-- **本地或小集群、不想引入外部调度服务** → Quartz
-- **需要可视化控制台、跨节点路由、任务日志** → XXL-Job
-- **想接其他调度框架** → 自己实现 `AgentScheduler` 接口
+| 场景 | 推荐 |
+| --- | --- |
+| 本地或小集群，无需外部调度服务 | Quartz |
+| 需要可视化控制台、跨节点路由、任务日志 | XXL-Job |
+| 接入其他调度框架 | 实现 `IAgentScheduler` 接口 |

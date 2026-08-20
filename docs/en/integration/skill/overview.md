@@ -1,35 +1,54 @@
-# Skill Repository
+# Skill Repository Overview
 
-An `AgentSkill` is AgentScope's Markdown + resource-file format for describing a reusable "skill" (see [Harness · Skill](../../docs/harness/skill.md)). The `AgentSkillRepository` interface loads skills from external storage and hands them to the `Toolkit` / `ReActAgent`.
-
-The `agentscope-extensions-*` repository ships the following ready-to-use implementations:
-
-| Extension | Backend | Best for |
-| --- | --- | --- |
-| [Git Repository](git-repository.md) | Remote Git repo | Git-based versioning and review |
-| [MySQL Repository](mysql-repository.md) | MySQL database | Online editing via admin console / business systems |
-| [PostgreSQL Repository](postgresql-repository.md) | PostgreSQL database | Existing PostgreSQL infra, online editing |
-
-> Nacos also provides an `AgentSkillRepository` implementation: see [Nacos](../infrastructure/nacos.md).
-
-## Wiring
+`AgentScope.Extensions.Skill.ISkillRepository` defines the async contract for loading skills from external storage:
 
 ```csharp
-AgentSkillRepository repo = ...;        // any implementation
-List<AgentSkill> skills = repo.GetAllSkills();
-
-Toolkit toolkit = new Toolkit();
-skills.ForEach(toolkit.RegisterSkill);
-
-ReActAgent agent = ReActAgent.builder()
-    .WithName("Assistant")
-    .WithModel(model)
-    .WithToolkit(toolkit)
-    .Build();
+public interface ISkillRepository
+{
+    Task<Skill?> GetSkillAsync(string name, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> GetAllSkillNamesAsync(CancellationToken ct = default);
+    Task<bool> SkillExistsAsync(string name, CancellationToken ct = default);
+}
 ```
 
-## Choosing one
+The return type `Skill` is an immutable record:
 
-- **Want Git PR flow, reviewable text** → Git
-- **Want admin console / live config edits** → MySQL, PostgreSQL, or Nacos
-- **Mix multiple sources** → implement `AgentSkillRepository`, or register multiple repos to the same toolkit
+```csharp
+public sealed record Skill(string Name, string Description, string Content, string? Source = null);
+```
+
+> **Core** defines a separate `AgentScope.Core.Skill.ISkillRepository` (`Scan()` / `Load(RegisteredSkill)`). The Extensions repository (`AgentScope.Extensions.Skill.ISkillRepository`) can be used with Core's `SkillRegistry`.
+
+## Available implementations
+
+| Extension | Namespace | Constructor |
+| --- | --- | --- |
+| [Git Repository](git-repository.md) | `AgentScope.Extensions.Skill.Git` | `(string repoUrl, string branch = "main", string? localPath = null)` |
+| [MySQL Repository](mysql-repository.md) | `AgentScope.Extensions.Skill.MySql` | `(string connectionString)` |
+| [PostgreSQL Repository](postgresql-repository.md) | `AgentScope.Extensions.Skill.PostgreSql` | `(string connectionString)` |
+
+## Skill file format
+
+Skills are parsed by `MarkdownSkillParser` (`AgentScope.Core.Skill`) from YAML front matter + Markdown body:
+
+```markdown
+---
+name: my-skill
+description: An example skill
+tools: [tool1, tool2]
+active: true
+---
+
+# Skill Body
+
+Detailed instructions go here...
+```
+
+The parser returns a `RegisteredSkill` with `Id`, `Name`, `Description`, `ToolNames`, `IsActiveByDefault`, and `RawContent`.
+
+## Harness integration
+
+1. Create an extension repository (e.g. `GitSkillRepository`)
+2. Register via `SkillRegistry` or build a `SkillCatalog` snapshot
+3. `SkillLoadTool` accepts `HarnessSkillEntry` items, exposed as the `load_skill` tool
+4. Inject into Agent via `HarnessAgentBuilder.WithToolkit(...)`

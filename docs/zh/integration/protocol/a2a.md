@@ -1,107 +1,86 @@
 # A2A（Agent-to-Agent）
 
-`agentscope-extensions-a2a` 实现了 [A2A 协议](https://a2aproject.github.io/A2A/)，包含两个子模块：
-
-- `agentscope-extensions-a2a-client`：把一个远端 A2A Agent 包装成本地 `Agent`，可以直接 `agent.call(...)`。
-- `agentscope-extensions-a2a-server`：把本地 `ReActAgent` 暴露成 A2A Server。
-
-两个模块完全独立，可以单用其一。
+`AgentScope.Core` 在 `AgentScope.Core.A2A` 命名空间下实现了 [A2A 协议](https://a2aproject.github.io/A2A/)，包含客户端和服务端两部分。
 
 ## 客户端：调用远端 A2A Agent
 
-### 添加依赖
+### A2aAgent
 
-```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-a2a-client</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
-```
-
-### 直接传入 AgentCard
+`A2aAgent`（`AgentScope.Core.A2A.Client`）继承自 `AgentBase`，将远程 A2A Agent 包装成本地 Agent 实例。
 
 ```csharp
-using io.a2a.spec.AgentCard;
-using AgentScope.core.a2a.agent.A2aAgent;
+using AgentScope.Core.A2A.Client;
+using AgentScope.Core.A2A.Client.Card;
+using AgentScope.Core.Service.Discovery;
 
-AgentCard card = AgentCard.builder()
-    .WithName("remote-translator")
-    .WithUrl("http://other-service:8080")
-    // ...
-    .Build();
+// 通过 IAgentCardResolver 解析远端 AgentCard
+var card = new AgentCard("remote-1", "translator", "翻译服务", "http://other-service:8080");
+var resolver = new FixedAgentCardResolver(card);
+var agent = new A2aAgent("translator", resolver);
 
-A2aAgent remote = A2aAgent.builder()
-    .WithName("remote-translator")
-    .WithAgentCard(card)
-    .Build();
-
-Msg result = remote.Call(new UserMessage("Translate to English: 你好")).Block();
+// 像普通 Agent 一样调用
+var result = await agent.CallAsync(new Msg[] { Msg.Builder().Role("user").TextContent("你好").Build() });
 ```
 
-### 用 well-known 自动获取 AgentCard
+### IAgentCardResolver
+
+| 实现 | 说明 |
+| --- | --- |
+| `FixedAgentCardResolver(AgentCard card)` | 固定返回同一张 AgentCard |
+| `WellKnownAgentCardResolver(HttpClient http)` | 从 `https://{agentName}/.well-known/agent-card.json` 获取 AgentCard |
+
+### 接口
 
 ```csharp
-using AgentScope.core.a2a.agent.card.WellKnownAgentCardResolver;
-
-WellKnownAgentCardResolver resolver = new WellKnownAgentCardResolver(
-    "http://127.0.0.1:8080",
-    "/.well-known/agent-card.json",
-    new Dictionary<string, string>()
-);
-
-A2aAgent remote = A2aAgent.builder()
-    .WithName("remote")
-    .WithAgentCardResolver(resolver)
-    .Build();
+public interface IAgentCardResolver
+{
+    Task<AgentCard?> ResolveAsync(string agentName, CancellationToken ct = default);
+}
 ```
 
-`A2aAgent` 是 `AgentBase` 的子类，可以像普通 Agent 一样组合到 Pipeline、MsgHub、Subagent 中。
+## 服务端：暴露本地 Agent 为 A2A Server
 
-## 服务端：把 ReActAgent 暴露成 A2A Server
-
-### 添加依赖
-
-```xml
-<dependency>
-    <groupId>io.agentscope</groupId>
-    <artifactId>agentscope-extensions-a2a-server</artifactId>
-    <version>${agentscope.version}</version>
-</dependency>
-```
-
-### 构建 server
+### AgentScopeA2aServer
 
 ```csharp
-using AgentScope.core.a2a.server.AgentScopeA2aServer;
-using AgentScope.core.a2a.server.transport.jsonrpc.JsonRpcTransportProperties;
+using AgentScope.Core.A2A.Server;
+using AgentScope.Core.A2A.Server.Card;
+using AgentScope.Core.A2A.Server.Executor.Runner;
 
-ReActAgent.Builder agentBuilder = ReActAgent.builder()
-    .WithName("backend-agent")
-    .WithModel(model);
+// 创建 Runner（每次调用使用工厂创建新 Agent 实例）
+var runner = new ReActAgentWithBuilderRunner(
+    agentFactory: () => new ReActAgent("backend-agent", model),
+    name: "backend-agent",
+    description: "后端服务 Agent");
 
-AgentScopeA2aServer server = AgentScopeA2aServer.builder()
-    .WithAgentBuilder(agentBuilder)
-    .WithTransportProperties(new JsonRpcTransportProperties())
-    // .WithAgentCard(customCard)
-    // .agentRegistry(myRegistry)
-    .Build();
+// 构建 A2A Server
+var server = new AgentScopeA2aServer(runner, new ConfigurableAgentCard
+{
+    Name = "backend-agent",
+    Description = "后端服务 Agent",
+    Url = "http://localhost:5000"
+});
 
-// 在你的 Web 框架里把请求委托给 transportWrapper
-TransportWrapper wrapper = server.GetTransportWrapper("JSONRPC");
-// ... Spring/Quarkus controller 转发到 wrapper.Handle(...)
+// 注入外部注册中心（如 Nacos）
+server.AddRegistry(nacosRegistry);
 
-server.PostEndpointReady();   // Web 服务监听端口后再调用，触发注册等动作
+// 在 Web 框架中处理请求
+// 将收到的 JSON-RPC 请求体传给 HandleRequestAsync
+var response = await server.HandleRequestAsync(requestBody, headers);
+
+// 服务启动后触发注册
+await server.PostEndpointReadyAsync();
 ```
 
-`AgentScopeA2aServer` 本身不监听端口、不暴露 endpoint，只负责构建组件、组装请求处理链；具体监听由你的 Web 框架完成。这样可以无缝接入 Spring Boot、Quarkus、Vert.x 等。
+### 关键组件
 
-### 可选组件
+| 类 | 命名空间 | 说明 |
+| --- | --- | --- |
+| `AgentScopeA2aServer` | `AgentScope.Core.A2A.Server` | 服务端入口，组装组件、处理请求 |
+| `ConfigurableAgentCard` | `AgentScope.Core.A2A.Server.Card` | 可配置的 AgentCard Builder，调用 `Build()` 生成 `AgentCard` |
+| `AgentScopeAgentCardConverter` | `AgentScope.Core.A2A.Server.Card` | 将 `ConfigurableAgentCard` 转换为 `AgentCard` |
+| `AgentScopeAgentExecutor` | `AgentScope.Core.A2A.Server.Executor` | 执行器，支持阻塞 `ExecuteAsync` 和流式 `StreamAsync` |
+| `ReActAgentWithBuilderRunner` | `AgentScope.Core.A2A.Server.Executor.Runner` | 默认 Runner，为每次请求创建新 Agent 实例 |
+| `IAgentRunner` | `AgentScope.Core.A2A.Server.Executor.Runner` | Runner 接口，含 `StreamAsync` 和 `StopAsync` |
 
-- `TaskStore` / `QueueManager`：任务和事件队列存储，默认是内存实现，生产可换成持久化版本。
-- `PushNotificationConfigStore` / `PushNotificationSender`：推送通知。
-- `AgentRegistry`：把 `AgentCard` 注册到外部注册中心（如 Nacos，见 [Nacos](../infrastructure/nacos.md)）。
-
-## Spring Boot Starter
-
-如果你使用 Spring Boot，建议直接引入 `agentscope-spring-boot-starter-a2a-server`，自动装配上述 server 和控制器，详见[快速开始](../../docs/quickstart.md)。
+> `AgentScopeA2aServer` 本身不监听端口。它只负责组件组装和请求处理链，具体 HTTP 监听由你的 Web 框架完成。
