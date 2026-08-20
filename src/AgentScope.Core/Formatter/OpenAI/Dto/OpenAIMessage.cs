@@ -85,6 +85,14 @@ public record OpenAIMessage
     [JsonPropertyName("reasoning_content")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReasoningContent { get; init; }
+
+    /// <summary>
+    /// vllm 兼容推理字段（reasoning 模型，如 DeepSeek-V4-Flash 通过 vllm 部署时返回）<br />
+    /// vllm-compatible reasoning field (reasoning models deployed via vllm)
+    /// </summary>
+    [JsonPropertyName("reasoning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reasoning { get; init; }
 }
 
 /// <summary>

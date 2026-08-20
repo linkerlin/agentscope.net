@@ -1,44 +1,60 @@
 # OpenAI 模型
 
-`AgentScope.Extensions.Model.OpenAI` 接入 OpenAI Chat Completions 风格的模型。OpenAI 兼容端点也使用这个适配模块，例如 DeepSeek、GLM、Kimi、MiniMax 等遵循 OpenAI API 载荷格式的服务。
+`AgentScope.Core.Model.OpenAI.OpenAIModel` 接入 OpenAI Chat Completions API。OpenAI 兼容端点（如 DeepSeek、GLM、Kimi、MiniMax）也使用此类。
 
-## 添加依赖
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.OpenAI" Version="*" />
-```
-
-## ModelRegistry
-
-设置 `OPENAI_API_KEY` 后，使用 `openai:<model>` 字符串 id：
+## 构造函数
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("openai:gpt-4.1-mini") // 底层由 ModelRegistry.Resolve(modelId) 解析
+OpenAIModel(string modelName, string? apiKey = null, string? baseUrl = null,
+    OpenAIClient? client = null, OpenAIChatFormatter? formatter = null,
+    GenerateOptions? defaultOptions = null)
+```
+
+## 最小示例
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.OpenAI;
+
+string key = System.Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+var model = new OpenAIModel("gpt-4o", key);
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Hello").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent 集成
+
+```csharp
+using AgentScope.Core.Model.OpenAI;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new OpenAIModel("gpt-4o", key))
     .Build();
 ```
 
-## 显式 builder
+## 流式调用
 
-需要自定义 endpoint、formatter、transport 或生成参数时，使用 builder：
+`OpenAIModel` 实现了 `IStreamingChatModel`：
 
 ```csharp
-using AgentScope.Extensions.Model.OpenAI;
-
-OpenAIChatModel model = OpenAIChatModel.Builder()
-    .ApiKey(System.Environment.GetEnvironmentVariable("OPENAI_API_KEY"))
-    .ModelName("gpt-4.1-mini")
-    .Stream(true)
-    .Build();
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
 ```
 
-## Spring Boot
+## 注意事项
 
-Spring Boot 应用可以使用 OpenAI starter：
+- `apiKey` 缺省时从环境变量 `OPENAI_API_KEY` 读取。
+- `baseUrl` 缺省使用 OpenAI 官方端点。
+- 自定义 `OpenAIClient`、`OpenAIChatFormatter` 或 `GenerateOptions` 可通过构造函数传入。
 
-```xml
-<PackageReference Include="AgentScope.OpenAI" Version="*" />
-```
-
-完整 builder 选项、formatter、credential 和 registry context 细节见 [模型](../../docs/building-blocks/model.md)。
+完整接口说明见 [模型](../../docs/building-blocks/model.md)。

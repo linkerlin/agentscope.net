@@ -1,51 +1,61 @@
 # DashScope 模型
 
-`AgentScope.Extensions.Model.DashScope` 接入阿里云 DashScope Qwen Model，包括多模态和推理能力的 Qwen 模型。
+`AgentScope.Core.Model.DashScope.DashScopeModel` 接入阿里云 DashScope 通义千问系列模型。
 
-## 添加依赖
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.DashScope" Version="*" />
-```
-
-## ModelRegistry
-
-设置 `DASHSCOPE_API_KEY` 后，可以使用 `dashscope:<model>`，也可以使用 Qwen 短名：
+## 构造函数
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("dashscope:qwen-plus") // 底层由 ModelRegistry.Resolve(modelId) 解析
+DashScopeModel(string modelName, string? apiKey = null, string? baseUrl = null,
+    DashScopeChatFormatter? formatter = null, GenerateOptions? defaultOptions = null)
+```
+
+常量：`DefaultBaseUrl = "https://dashscope.aliyuncs.com"`、`ChatEndpoint = "/compatible-mode/v1/chat/completions"`。
+
+## 最小示例
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.DashScope;
+
+string key = System.Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
+var model = new DashScopeModel("qwen-plus", key);
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("Explain AgentScope").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent 集成
+
+```csharp
+using AgentScope.Core.Model.DashScope;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new DashScopeModel("qwen-plus", key))
     .Build();
 ```
 
-```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("qwen-plus") // 底层由 ModelRegistry.Resolve(modelId) 解析
-    .Build();
-```
+## 流式调用
 
-## 显式 builder
-
-需要 DashScope 专属配置时使用 builder，例如 endpoint type、thinking、search、encryption：
+`DashScopeModel` 实现了 `IStreamingChatModel`：
 
 ```csharp
-using AgentScope.Extensions.Model.DashScope;
-
-DashScopeChatModel model = DashScopeChatModel.Builder()
-    .ApiKey(System.Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY"))
-    .ModelName("qwen-plus")
-    .Stream(true)
-    .Build();
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
 ```
 
-## Spring Boot
+## 注意事项
 
-Spring Boot 应用可以使用 DashScope starter：
+- `apiKey` 缺省时建议从 `DASHSCOPE_API_KEY` 环境变量读取。
+- 端点默认使用 OpenAI 兼容格式（`/compatible-mode/v1/chat/completions`）。
+- 自定义 `DashScopeChatFormatter` 或 `GenerateOptions` 可通过构造函数传入。
 
-```xml
-<PackageReference Include="AgentScope.DashScope" Version="*" />
-```
-
-完整 builder 选项、formatter、credential 和 registry context 细节见 [模型](../../docs/building-blocks/model.md)。
+完整接口说明见 [模型](../../docs/building-blocks/model.md)。

@@ -1,354 +1,153 @@
 ---
 title: "Channel"
-description: "通过 Channel 路由消息、管理会话、流式传输事件"
+description: "Harness IChannel、ChannelRouter 与渠道扩展"
 ---
 
-## 它们做什么
+## 概述
 
-**Gateway** 位于你的应用代码和 agent 之间，负责：
+Channel（`AgentScope.Harness.Gateway.Channel`）把外部消息渠道（聊天平台、Web UI、机器人 webhook）接入智能体。一个 Channel 负责**入站**（`DispatchAsync` 处理消息）与**出站**（`Deliver` 投递回复）。
 
-- **会话管理** — 把每个用户对话映射到稳定的 session id。agent 在跨轮次时看到一致的记忆。
-- **Per-session 并发控制** — 同一 session 的并发消息会公平排队，agent 不会和自己竞争。
-- **Agent 路由** — 在多 agent 场景下，把每条消息路由到正确的 agent。
-
-**Channel** 把消息平台（HTTP、WebSocket、Slack 等）适配成 Gateway 的路由模型。它负责解析消息来源、选定目标 agent、以及把回复投递回去。
-
-大多数场景下你不需要直接和 Gateway 或 Channel 打交道——`agent.channel(...)` 会在后台自动完成所有接线。
-
-## 快速开始
+## IChannel
 
 ```csharp
-var agent = HarnessAgent.Builder()
-    .Name("assistant")
-    .SysPrompt("你是一个有用的助手。")
-    .Model("dashscope:qwen-plus")
-    .Build();
-
-// 绑定一个 ChatUI channel。
-var chat = agent.Channel(ChatUiChannel.Create());
-
-// 发送消息。每个 userId 自动获得独立的 session。
-var reply = chat.Send(SendOptions.UserId("user-1"), "你好！").GetAwaiter().GetResult();
-
-// 同一个用户，同一个 session——对话继续。
-var followUp = chat.Send(SendOptions.UserId("user-1"), "再多说一些。").GetAwaiter().GetResult();
-
-// 不同用户，不同 session。
-var otherUser = chat.Send(SendOptions.UserId("user-2"), "你好").GetAwaiter().GetResult();
-```
-
-`agent.channel(...)` 会懒加载创建内部 gateway，注册当前 agent，并把 gateway 注入到 channel 中。调用之后 `chat` 就可以直接使用了。
-
-### SendOptions
-
-`SendOptions` 告诉 channel **谁**在说话、这属于**哪个对话**：
-
-| 工厂方法 | 行为 |
-|---------|------|
-| `SendOptions.userId("user-1")` | 每个用户一个 session（最常用） |
-| `SendOptions.of("user-1", "session-a")` | 指定 session——同一用户多个对话 |
-| `SendOptions.userId("user-1").withAgentId("support")` | 在多 agent 场景下路由到指定 agent |
-| `SendOptions.userId("user-1").withAttribute("tenant", "acme")` | 给本轮 agent 调用附带字符串/类型化属性 |
-| `SendOptions.userId("user-1").withRuntimeContext(rtc)` | 携带完整 `RuntimeContext`（例如 force-sync 开关） |
-
-```csharp
-// 同一用户，两个独立对话
-chat.Send(SendOptions.Of("user-1", "session-a"), "话题 A").GetAwaiter().GetResult();
-chat.Send(SendOptions.Of("user-1", "session-b"), "话题 B").GetAwaiter().GetResult();
-
-// 把应用侧上下文传入本轮 agent 调用
-chat.Send(
-        SendOptions.UserId("user-1")
-                .WithAttribute("tenant", "acme")
-                .WithRuntimeContext(
-                        RuntimeContext.Builder()
-                                .Put(AgentSpawnTool.CTX_FORCE_SYNC, true)
-                                .Build()),
-        "排查这张工单")
-        .GetAwaiter().GetResult();
-```
-
-### 多模态 / 结构化消息
-
-纯文本 `send(String)` 只是便捷方法。图片、音频或多段内容请传预构建的 `Msg`（或 `List<Msg>`）——每个 String 重载都有对应的 `Msg` / `List<Msg>` 版本（含 `SendOptions` 与 `sendStream`）：
-
-```csharp
-var multimodal = Msg.Builder()
-        .Role(MsgRole.USER)
-        .Content(
-                TextBlock.Builder().Text("这张图里有什么？").Build(),
-                ImageBlock.Builder()
-                        .Source(URLSource.Builder().Url("https://example.com/photo.png").Build())
-                        .Build())
-        .Build();
-
-chat.Send(SendOptions.UserId("user-1"), multimodal).GetAwaiter().GetResult();
-chat.Send(SendOptions.UserId("user-1"), new List<Msg> { multimodal }).GetAwaiter().GetResult();
-chat.Send(multimodal).GetAwaiter().GetResult(); // 单 session 模式
-```
-
-### RuntimeContext 合并
-
-Channel 路径会在 Gateway 内构建 `RuntimeContext`。调用方可通过 `SendOptions` / `InboundMessage.RuntimeContext()` / `ChannelRuntimeContextResolver` 提供 **caller base**。合并顺序：
-
-1. 以 caller 上下文为起点（可为空）
-2. 若配置了 `ChannelRuntimeContextResolver` 且返回非 null，则 **替换** caller base
-3. Gateway 再覆盖身份字段——`sessionId`（`gw-…`）、`userId`、`msgContext`、`gateKey`、`outboundAddress`——冲突时以 Gateway 为准
-
-通过 `GatewayBootstrap` 接线：
-
-```csharp
-var gw = GatewayBootstrap.Builder()
-        .Agent("main", b => b.Name("assistant").Model(model))
-        .RuntimeContextResolver(req =>
-                RuntimeContext.Builder(req.CallerContext())
-                        .Put("tenant", ResolveTenant(req))
-                        .Build())
-        .Build();
-var chat = gw.ChatUiChannel();
-```
-
-也可以拿到 gateway 后调用 `gateway.SetRuntimeContextResolver(...)`。**不要**把业务属性写进 `MsgContext.extra`——该 map 参与 session key 计算。
-
-## 流式事件 + SSE
-
-`SendStream()` 返回 `IAsyncEnumerable<AgentEvent>`，和 `agent.StreamEventsAsync()` 一样的细粒度事件流，但经过 gateway 路由并带有会话管理。
-
-```csharp
-await foreach (var evt in chat.SendStream(SendOptions.UserId("user-1"), "北京今天天气怎么样？"))
+public interface IChannel
 {
-    if (evt is TextBlockDeltaEvent delta)
-    {
-        Console.Write(delta.Delta);
-    }
-    else if (evt is ToolCallStartEvent tc)
-    {
-        Console.WriteLine("\n[tool] " + tc.ToolCallName);
-    }
+    string ChannelId { get; }
+    ChannelConfig Config { get; }
+    void Init(IGateway gateway);                              // 绑定网关
+    Task StartAsync(CancellationToken ct = default);
+    Task StopAsync(CancellationToken ct = default);
+    Task<Msg> DispatchAsync(InboundMessage message, CancellationToken ct = default);   // 处理入站
+    void Deliver(OutboundAddress address, IReadOnlyList<Msg> messages);               // 投递出站
 }
 ```
 
-### ASP.NET Core SSE Controller
+### 核心类型
 
 ```csharp
-[HttpGet("/chat")]
-public async IAsyncEnumerable<ServerSentEvent<string>> Chat(
-    [FromQuery] string message,
-    [FromQuery] string userId,
-    [FromQuery] string? sessionId = null)
+// 渠道配置
+public sealed record ChannelConfig
 {
-    var options = sessionId != null
-            ? SendOptions.Of(userId, sessionId)
-            : SendOptions.UserId(userId);
+    public string ChannelId { get; init; }
+    public string DefaultAgentId { get; init; } = "";
+    public DmScope DmScope { get; init; } = DmScope.Main;
+    public IReadOnlyList<ChannelBinding> Bindings { get; init; } = [];
+    public static ChannelConfig Of(string channelId);
+    public static ChannelConfig Of(string channelId, string defaultAgentId);
+}
 
-    await foreach (var evt in chat.SendStream(options, message))
+// 入站消息
+public sealed record InboundMessage
+{
+    public string ChannelId { get; init; }
+    public string? AccountId { get; init; }
+    public Peer Peer { get; init; }                 // Direct / Channel / Group / Thread
+    public string? SenderId { get; init; }
+    public string? Guild { get; init; }             // 群/组织
+    public string? Team { get; init; }
+    public IReadOnlySet<string> Roles { get; init; }
+    public IReadOnlyList<Msg> Messages { get; init; }
+    public string? PreferredAgentId { get; init; }
+    public bool IsDm => Peer.Kind == PeerKind.Direct;
+    public bool IsThread => Peer.Kind == PeerKind.Thread;
+}
+
+// 出站地址
+public sealed record OutboundAddress
+{
+    public string ChannelId { get; init; }
+    public string? AccountId { get; init; }
+    public string To { get; init; }
+    public string? ThreadId { get; init; }
+    public static OutboundAddress Direct(string channelId, string to);
+}
+
+public enum PeerKind { Direct, Channel, Group, Thread }
+public enum DmScope { Main, PerPeer, PerChannelPeer, PerAccountChannelPeer }
+```
+
+`Peer.Direct(id)` / `Peer.Channel(id)` / `Peer.Group(id)` / `Peer.Thread(id)` 是 Peer 的静态工厂。
+
+## ChannelRouter：入站路由
+
+`ChannelRouter(globalDefaultAgentId)` 对入站消息做 8 层优先级路由（`RouteResult(AgentId, MatchedBy, OutboundAddress)`）：按 `PreferredAgentId` → `ChannelBinding`（`ForPeer` / `ForGuild` / `ForTeam` / `ForAccount` / `ForChannel`，可带 `Roles` 约束）→ `DmScope` 会话映射 → 全局默认。
+
+```csharp
+var router = new ChannelRouter(globalDefaultAgentId: "main-agent");
+
+var config = ChannelConfig.Of("wecom", defaultAgentId: "main-agent");
+config.Bindings = new[]
+{
+    ChannelBinding.ForPeer("alice", agentId: "personal-agent"),
+    ChannelBinding.ForGuild("dev-team", agentId: "team-agent")
+};
+
+RouteResult route = router.ResolveRoute(config, inboundMessage);
+```
+
+## ChannelFactory 与内置 ChatUiChannel
+
+```csharp
+using AgentScope.Harness.Gateway.Channel;
+
+var factory = new ChannelFactory();
+factory.Register("chatui", config => new ChatUiChannel(config));
+
+IChannel channel = factory.Create("chatui", ChannelConfig.Of("chatui"));
+```
+
+`ChatUiChannel`（`ChannelIdConst = "chatui"`）是内置的进程内渠道：`Send(string text)` 模拟用户入站，`PollOutbound()` 拉取待投递的出站消息（`OutboundEnvelope(Address, Messages, TimestampMs)`）——Web / TUI 宿主可以直接轮询它。
+
+## 实现一个自定义 Channel
+
+```csharp
+public class MyChannel : IChannel
+{
+    public string ChannelId => "my-channel";
+    public ChannelConfig Config { get; }
+    private IGateway? _gateway;
+
+    public MyChannel(ChannelConfig? config = null) => Config = config ?? ChannelConfig.Of("my-channel");
+
+    public void Init(IGateway gateway) => _gateway = gateway;
+
+    public async Task<Msg> DispatchAsync(InboundMessage message, CancellationToken ct = default)
     {
-        var payload = new Dictionary<string, object?>
-        {
-            ["type"] = evt.Type.Name,
-            ["id"] = evt.Id
-        };
-        if (evt is TextBlockDeltaEvent delta)
-        {
-            payload["delta"] = delta.Delta;
-        }
-        else if (evt is SubagentExposedEvent se)
-        {
-            payload["subagentId"] = se.SubagentId;
-            payload["agentId"] = se.AgentId;
-            payload["label"] = se.Label;
-        }
-        yield return new ServerSentEvent<string>
-        {
-            Data = JsonSerializer.Serialize(payload)
-        };
+        // 1. 构造会话上下文（UserId/SessionId 由渠道自行决定映射）
+        RuntimeContext rc = RuntimeContext.Empty
+            .WithSessionId($"{ChannelId}:{message.Peer.Key}");
+        // 2. 通过网关调用 Agent
+        Msg reply = await _gateway!.RunAsync(message.Messages.Last(), rc, ct);
+        // 3. 投递回复
+        Deliver(OutboundAddress.Direct(ChannelId, message.Peer.Id), new[] { reply });
+        return reply;
     }
+
+    public void Deliver(OutboundAddress address, IReadOnlyList<Msg> messages)
+    {
+        // 发送到外部平台
+    }
+
+    public Task StartAsync(CancellationToken ct = default) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken ct = default) => Task.CompletedTask;
 }
 ```
 
-## 与暴露的子 Agent 对话
+## 渠道扩展
 
-当 agent 通过 `expose_to_user=true` spawn 子 agent 时，gateway 会把这个子 agent 暴露为用户可直接寻址的入口。一个 `SubagentExposedEvent` 会出现在 `SendStream()` 的事件流中，携带 `subagentId`。
+`AgentScope.Extensions.Channel.*` 提供即时通讯渠道实现（实现的是 `AgentScope.Extensions.Channel.IChannel` 接口，位于伞工程，与 Harness `IChannel` 平行，需适配器接入）：
 
-### 发现暴露的子 Agent
+| 扩展 | 核心类型 | 构造 |
+|------|----------|------|
+| `AgentScope.Extensions.Channel.DingTalk` | `DingTalkChannel` | `(HttpClient http, string webhookUrl, string? appSecret = null, string? appKey = null, string? apiBase = null)` |
+| `AgentScope.Extensions.Channel.Feishu` | `FeishuChannel` | `(HttpClient http, string webhookUrl, string? appSecret = null, string? appId = null, string? encryptKey = null, string? verificationToken = null, string? apiBase = null)` |
+| `AgentScope.Extensions.Channel.WeCom` | `WeComChannel` | `(HttpClient http, string webhookUrl, string? corpId = null, string? corpSecret = null, string? token = null, string? encodingAesKey = null, string? receiveId = null, string? apiBase = null)` |
+| `AgentScope.Extensions.Channel.GitHub` | `GitHubChannel` | `(HttpClient http, string owner, string repo, string token, string? webhookSecret = null)` |
+| `AgentScope.Extensions.Channel.GitLab` | `GitLabChannel` | `(HttpClient http, string gitlabUrl, string accessToken, string projectId, string? webhookToken = null)` |
 
-```csharp
-string? foundSubagentId = null;
-
-await foreach (var evt in chat.SendStream(SendOptions.UserId("user-1"), "找一个研究员帮我调查 AI 趋势"))
-{
-    if (evt is SubagentExposedEvent se)
-    {
-        foundSubagentId = se.SubagentId;
-        Console.WriteLine($"子 Agent 已暴露: id={se.SubagentId} agent={se.AgentId} label={se.Label}");
-    }
-    if (evt is TextBlockDeltaEvent delta)
-    {
-        Console.Write(delta.Delta);
-    }
-}
-```
-
-`SubagentExposedEvent` 字段：
-
-| 字段 | 说明 |
-|------|------|
-| `subagentId` | 用于向该子 agent 发消息的句柄 |
-| `agentId` | 子 agent 类型（如 `"researcher"`） |
-| `sessionId` | 子 agent 的 session id |
-| `label` | 可选的人类可读名称 |
-
-### 向子 Agent 发消息
-
-拿到 `subagentId` 之后，可以直接和子 agent 对话——完全绕过父 agent：
-
-```csharp
-// 非流式
-var reply = chat.SendToSubagent(subagentId, "重点关注 LLM agent").GetAwaiter().GetResult();
-
-// 流式
-await foreach (var evt in chat.SendToSubagentStream(subagentId, "重点关注 LLM agent"))
-{
-    if (evt is TextBlockDeltaEvent delta)
-    {
-        Console.Write(delta.Delta);
-    }
-}
-```
-
-### 带子 Agent 支持的 SSE
-
-典型的 SSE controller 同时处理主 agent 和子 agent 消息：
-
-```csharp
-[HttpGet("/chat")]
-public async IAsyncEnumerable<ServerSentEvent<string>> Chat(
-    [FromQuery] string userId,
-    [FromQuery] string message,
-    [FromQuery] string? subagentId = null)
-{
-    IAsyncEnumerable<AgentEvent> events;
-    if (subagentId != null)
-    {
-        events = chat.SendToSubagentStream(subagentId, message);
-    }
-    else
-    {
-        events = chat.SendStream(SendOptions.UserId(userId), message);
-    }
-    await foreach (var evt in events)
-    {
-        yield return ToSSE(evt);
-    }
-}
-```
-
-客户端监听 `SUBAGENT_EXPOSED` 事件来渲染新的对话标签页，后续请求时把 `subagentId` 传回来即可。
-
-## 多 HarnessAgent 路由
-
-如果有多个 `HarnessAgent` 实例，使用 `GatewayBootstrap`：
-
-```csharp
-var salesAgent = HarnessAgent.Builder()
-    .Name("sales").SysPrompt("你是一个销售助手。")
-    .Model("dashscope:qwen-plus").Build();
-
-var supportAgent = HarnessAgent.Builder()
-    .Name("support").SysPrompt("你是一个客服 agent。")
-    .Model("dashscope:qwen-plus").Build();
-
-var gw = GatewayBootstrap.Builder()
-    .Agent("sales", salesAgent)
-    .Agent("support", supportAgent)
-    .MainAgent("sales")          // 没有指定 agent 时的默认
-    .Build();
-
-var chat = gw.ChatUiChannel();
-```
-
-### 按 agentId 路由
-
-使用 `SendOptions.WithAgentId()` 把消息路由到指定 agent：
-
-```csharp
-// 路由到 sales（默认 main agent）
-chat.Send(SendOptions.UserId("user-1"), "有什么产品？").GetAwaiter().GetResult();
-
-// 显式路由到 support
-chat.Send(SendOptions.UserId("user-1").WithAgentId("support"), "账单问题").GetAwaiter().GetResult();
-```
-
-### GatewayBootstrap 下暴露子 Agent
-
-要在 GatewayBootstrap 模式下启用 `expose_to_user`，需要把 gateway bridge 接到每个 agent 的子 agent 中间件上：
-
-```csharp
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", mainAgent)
-    .Build();
-
-// 接入 bridge，让 agent_spawn(expose_to_user=true) 生效。
-var bridge = gw.GatewayBridge();
-// 通过 setGatewayBridge() 传给 agent 的 SubagentsMiddleware。
-```
-
-使用 `agent.channel(...)` 时，这个接线会自动完成。
-
-## 自定义 Channel
-
-实现 `Channel` 接口来适配新的消息平台：
-
-```csharp
-public class MySlackChannel : Channel
-{
-    public string ChannelId() => "slack";
-    public ChannelConfig Config() => myConfig;
-    public void Init(Gateway gateway) => this.gateway = gateway;
-    public void Start() { /* 连接 Slack */ }
-    public void Stop() { /* 断开连接 */ }
-
-    public Task<Msg> Dispatch(InboundMessage message)
-    {
-        var route = router.ResolveRoute(Config(), message);
-        return gateway.Run(route.Context(), message.Messages(), route.OutboundAddress());
-    }
-
-    // 可选：流式分发
-    public IAsyncEnumerable<AgentEvent> DispatchStream(InboundMessage message)
-    {
-        var route = router.ResolveRoute(Config(), message);
-        return gateway.RunStream(route.Context(), message.Messages(), route.OutboundAddress());
-    }
-}
-```
-
-通过 `GatewayBootstrap` 注册：
-
-```csharp
-var gw = GatewayBootstrap.Builder()
-    .Agent("main", agent)
-    .Channel(new MySlackChannel())
-    .Build();
-
-gw.Start();   // 调用所有 channel 的 Init() + Start()
-// ...
-gw.Stop();    // 调用所有 channel 的 Stop()
-```
-
-## 内置 Channel 适配器
-
-AgentScope 提供了多个开箱即用的 Channel 适配器作为扩展模块：
-
-- [钉钉](../../integration/channel/dingtalk.md) — Stream 协议（持久 WebSocket）
-- [飞书 / Lark](../../integration/channel/feishu.md) — 事件订阅回调
-- [GitHub](../../integration/channel/github.md) — Issue / PR 评论 webhook
-- [GitLab](../../integration/channel/gitlab.md) — Note hook
-- [企业微信](../../integration/channel/wecom.md) — 加密回调
-
-详见 [Channel 适配器](../../integration/channel/index.md)集成总览。
+详见 [渠道集成](../../integration/channel/index.md)。
 
 ## 相关文档
 
-- [子 Agent](./subagent.md) — 声明和 spawn 子 agent、后台任务、流式转发
-- [架构](./architecture.md) — 主/子 agent 如何协作
+- [Harness 架构](./architecture.md) —— Gateway 与消息总线
+- [消息与事件](../building-blocks/message-and-event.md)

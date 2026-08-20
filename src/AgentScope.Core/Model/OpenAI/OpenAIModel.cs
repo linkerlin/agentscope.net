@@ -256,12 +256,18 @@ public class OpenAIModel : ModelBase, IStreamingChatModel
     /// <returns>A ChatResponse ready for consumption / 准备消费的 ChatResponse。</returns>
     private ChatResponse ConvertToChatResponse(ParsedResponse parsed)
     {
+        // 推理模型可能仅返回 reasoning 字段而 content 为空，此时兜底使用推理内容
+        // Reasoning models may return only the reasoning field with empty content; fall back to it
+        var text = string.IsNullOrWhiteSpace(parsed.TextContent)
+            ? parsed.ReasoningContent
+            : parsed.TextContent;
+
         var chatResponse = new ChatResponse
         {
             Id = parsed.Id,
             Model = parsed.Model,
-            Content = parsed.TextContent,
-            Text = parsed.TextContent, // Also set Text for ModelResponse compatibility / 同时设置 Text 以兼容 ModelResponse
+            Content = text,
+            Text = text, // Also set Text for ModelResponse compatibility / 同时设置 Text 以兼容 ModelResponse
             StopReason = parsed.FinishReason,
             Success = true
         };

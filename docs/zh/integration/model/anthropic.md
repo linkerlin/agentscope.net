@@ -1,44 +1,61 @@
 # Anthropic 模型
 
-`AgentScope.Extensions.Model.Anthropic` 接入 Anthropic Claude Model，并提供 Anthropic 专属 formatter 和请求 DTO 支持。
+`AgentScope.Core.Model.Anthropic.AnthropicModel` 接入 Anthropic Claude 系列模型。
 
-## 添加依赖
-
-```xml
-<PackageReference Include="AgentScope.Extensions.Model.Anthropic" Version="*" />
-```
-
-## ModelRegistry
-
-设置 `ANTHROPIC_API_KEY` 后，使用 `anthropic:<model>` 字符串 id：
+## 构造函数
 
 ```csharp
-ReActAgent agent = ReActAgent.Builder()
-    .Name("assistant")
-    .Model("anthropic:claude-sonnet-4.5") // 底层由 ModelRegistry.Resolve(modelId) 解析
+AnthropicModel(string modelName, string? apiKey = null, string? baseUrl = null,
+    AnthropicChatFormatter? formatter = null, GenerateOptions? defaultOptions = null)
+```
+
+常量：`DefaultBaseUrl = "https://api.anthropic.com"`、`MessagesEndpoint = "/v1/messages"`。
+
+## 最小示例
+
+```csharp
+using AgentScope.Core.Model;
+using AgentScope.Core.Model.Anthropic;
+
+string key = System.Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+var model = new AnthropicModel("claude-sonnet-4-20250514", key);
+
+string response = await model.GenerateAsync(
+    new ModelRequest
+    {
+        Messages = new List<Msg>
+        {
+            Msg.Builder().Role("user").TextContent("What is AgentScope?").Build()
+        }
+    }).Result.Text;
+```
+
+## Agent 集成
+
+```csharp
+using AgentScope.Core.Model.Anthropic;
+using AgentScope.Core.Agent;
+
+var agent = new EnhancedReActAgentBuilder()
+    .Model(new AnthropicModel("claude-sonnet-4-20250514", key))
     .Build();
 ```
 
-## 显式 builder
+## 流式调用
 
-需要自定义 endpoint、formatter、transport、prompt caching、thinking 或生成参数时，使用 builder：
+`AnthropicModel` 实现了 `IStreamingChatModel`：
 
 ```csharp
-using AgentScope.Extensions.Model.Anthropic;
-
-AnthropicChatModel model = AnthropicChatModel.Builder()
-    .ApiKey(System.Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"))
-    .ModelName("claude-sonnet-4.5")
-    .Stream(true)
-    .Build();
+await foreach (ChatResponse chunk in model.GenerateStreamAsync(messages))
+{
+    Console.Write(chunk.Content);
+}
 ```
 
-## Spring Boot
+## 注意事项
 
-Spring Boot 应用可以使用 Anthropic starter：
+- `apiKey` 缺省时建议从 `ANTHROPIC_API_KEY` 环境变量读取。
+- 端点使用 Messages API（`/v1/messages`），与 OpenAI Chat Completions 格式不同。
+- 自定义 `AnthropicChatFormatter` 或 `GenerateOptions` 可通过构造函数传入。
 
-```xml
-<PackageReference Include="AgentScope.Anthropic" Version="*" />
-```
-
-完整 builder 选项、formatter、credential 和 registry context 细节见 [模型](../../docs/building-blocks/model.md)。
+完整接口说明见 [模型](../../docs/building-blocks/model.md)。

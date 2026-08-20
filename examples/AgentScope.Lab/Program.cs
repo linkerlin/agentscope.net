@@ -1,0 +1,78 @@
+using AgentScope.Core;
+using AgentScope.Core.Agent;
+using AgentScope.Core.Message;
+using AgentScope.Core.Model;
+using AgentScope.Harness;
+using AgentScope.Harness.Middleware;
+using DotNetEnv;
+
+// 加载 .env 中的 API Key（优先当前目录，其次仓库根目录）
+var localEnv = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+var rootEnv = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".env"));
+if (File.Exists(localEnv)) Env.Load(localEnv);
+else if (File.Exists(rootEnv)) Env.Load(rootEnv);
+
+Console.WriteLine("AgentScope.Lab — 框架用法实验工程");
+Console.WriteLine("====================================");
+
+// 模型：私有化部署的 OpenAI 兼容端点（无需真实 Key，填 "none"）
+IModel model = new AgentScope.Core.Model.OpenAI.OpenAIModel(
+    "DeepSeek-V4-Flash",
+    "none",
+    "http://10.193.41.51:8198/v1");
+
+// 构建 HarnessAgent
+HarnessAgent agent = new HarnessAgentBuilder()
+    .WithName("note-taker")
+    .WithSystemPrompt("你是一个帮助用户做笔记的助手。")
+    .WithModel(model)
+    .WithWorkspaceRoot(Path.GetFullPath(".agentscope/workspace"))
+    .WithMiddleware(new CompactionMiddleware(maxContextLength: 4096))
+    .Build();
+
+// 运行时上下文：同一 (userId, sessionId) 跨调用恢复状态
+RuntimeContext ctx = RuntimeContext.Empty
+    .WithUserId("alice")
+    .WithSessionId("demo-session");
+
+// 第一轮消息
+Msg first = Msg.Builder()
+    .Role("user")
+    .TextContent("我叫天宇，今天准备一个关于 ReAct 的技术分享。")
+    .Build();
+
+// ── 诊断：复刻推理提示词直调模型 ──
+Console.WriteLine("── 诊断：复刻推理提示词直调 ──");
+var reasonPrompt = @"你是一个帮助用户做笔记的助手。
+
+用户问题: 我叫天宇，今天准备一个关于 ReAct 的技术分享。
+
+你可以使用以下工具:
+    
+
+之前的思考:
+
+
+当前迭代: 1/10
+
+请以以下格式回答:
+Thought: [你的思考过程]
+Action: [finish 或 工具名称]
+Action Input: [如果是finish，输出最终答案；如果是工具，输出JSON格式的参数]";
+var reasonMsg = Msg.Builder().Role("system").TextContent(reasonPrompt).Build();
+var reasonResp = await model.GenerateAsync(new ModelRequest { Messages = new List<Msg> { reasonMsg } });
+Console.WriteLine($"RawResponse: [{reasonResp.Text}]");
+Console.WriteLine($"Reasoning:   [{reasonResp.ReasoningContent}]\n");
+
+
+// 第一轮：自我介绍 + 当天的事
+var reply1 = await agent.CallAsync(first, ctx);
+Console.WriteLine($"Assistant: [{reply1.GetTextContent()}]\n");
+
+// 第二轮：同 sessionId，自动恢复上一轮状态后回答
+Msg second = Msg.Builder()
+    .Role("user")
+    .TextContent("我叫什么？我今天要干什么？")
+    .Build();
+var reply2 = await agent.CallAsync(second, ctx);
+Console.WriteLine($"Assistant: {reply2.GetTextContent()}");

@@ -231,6 +231,13 @@ public static class OpenAIResponseParser
             return choice.Message.ReasoningContent;
         }
 
+        // 检查 vllm 的 reasoning 字段（DeepSeek-V4-Flash 等经 vllm 部署时返回）
+        // Check the vllm "reasoning" field (returned by vllm-deployed reasoning models)
+        if (!string.IsNullOrWhiteSpace(choice.Message.Reasoning))
+        {
+            return choice.Message.Reasoning;
+        }
+
         // 如果content是数组，查找reasoning类型的内容
         // If content is array, find reasoning type content
         if (choice.Message.Content is List<OpenAIMessageContent> contentParts)

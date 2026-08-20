@@ -34,15 +34,14 @@ hide-toc: true
           <div class="hs-tab active" data-panel="zh-harness">HarnessAgent</div>
         </div>
       </div>
-      <div class="hs-code-panel" id="zh-harness"><pre><span class="kw">var</span> agent = <span class="ty">HarnessAgent</span>.CreateBuilder()
-    .Name(<span class="str">"coder"</span>)
-    .Model(<span class="str">"dashscope:qwen-max"</span>)                                <span class="cm">// ModelRegistry 解析，读取 DASHSCOPE_API_KEY</span>
-    .Workspace(<span class="ty">Path</span>.GetFullPath(<span class="str">".agentscope/workspace"</span>))   <span class="cm">// AGENTS.md · MEMORY.md · skills · subagents</span>
-    .Filesystem(<span class="kw">new</span> <span class="ty">DockerFilesystemSpec</span>()           <span class="cm">// 沙箱执行：本地 · Docker · 远端 KV 一行切换</span>
-        .IsolationScope(<span class="ty">IsolationScope</span>.User))           <span class="cm">// 同一 user 跨 session 共享</span>
+      <div class="hs-code-panel" id="zh-harness"><pre><span class="kw">var</span> agent = <span class="kw">new</span> <span class="ty">HarnessAgentBuilder</span>()
+    .WithName(<span class="str">"coder"</span>)
+    .WithSystemPrompt(<span class="str">"你是一个编码助手。"</span>)
+    .WithModel(<span class="kw">new</span> <span class="ty">DashScopeModel</span>(<span class="str">"qwen-max"</span>, apiKey))      <span class="cm">// 模型内置在 Core 包，直接构造</span>
+    .WithWorkspaceRoot(<span class="ty">Path</span>.GetFullPath(<span class="str">".agentscope/workspace"</span>))   <span class="cm">// AGENTS.md · MEMORY.md · skills · subagents</span>
     .Build();
-agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.CreateBuilder()
-    .SessionId(<span class="str">"demo"</span>).UserId(<span class="str">"alice"</span>).Build()).GetAwaiter().GetResult();</pre></div>
+agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.Empty
+    .WithSessionId(<span class="str">"demo"</span>).WithUserId(<span class="str">"alice"</span>)).GetAwaiter().GetResult();</pre></div>
       <div class="hs-install">
         <code>AgentScope.Harness</code>
         <button class="hs-copy-btn"
@@ -218,11 +217,11 @@ agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.CreateBuilder()
   </div>
   <details class="hs-faq-item">
     <summary>需要哪个 .NET 版本？</summary>
-    <p>需要 <code>.NET 8.0 SDK</code> 及以上。框架基于现代 .NET 特性构建，采用 Task 异步执行模型。</p>
+    <p>需要 <code>.NET 10.0 SDK</code> 及以上。框架基于现代 .NET 特性构建，采用 Task 异步执行模型。</p>
   </details>
   <details class="hs-faq-item">
     <summary>支持哪些 LLM 提供商？</summary>
-    <p>通过模型扩展包支持：OpenAI（含兼容端点 vLLM、DeepSeek、Kimi、Moonshot）、Anthropic Claude、阿里云通义千问（DashScope）、Google Gemini、xAI Grok、本地 Ollama。每个都是统一 builder 后面一份独立的 <code>ChatModel</code> 实现，可在模型层配置重试与备用模型实现容错切换。</p>
+    <p>模型全部内置在 <code>AgentScope.Core</code>：OpenAI（含兼容端点）、Anthropic Claude、阿里云通义千问（DashScope）、Google Gemini、DeepSeek、本地 Ollama、Mock。统一 <code>IModel</code> 接口 + <code>IStreamingChatModel</code> 流式接口，接入即用。</p>
   </details>
   <details class="hs-faq-item">
     <summary>Harness 和裸的 ReActAgent 有什么区别？</summary>
@@ -238,7 +237,7 @@ agent.CallAsync(msg, <span class="ty">RuntimeContext</span>.CreateBuilder()
   </details>
   <details class="hs-faq-item">
     <summary>如何在生产环境中水平扩展？</summary>
-    <p>AgentScope .NET 天然支持无状态水平扩展：Agent 状态由 <code>IAgentStateStore</code> 自动持久化（默认本地 <code>JsonFileAgentStateStore</code>，多副本换成 <code>RedisAgentStateStore</code>），按 <code>(userId, sessionId)</code> 寻址，工作区可挂到远端 KV / 对象存储，沙箱模式下连可执行环境本身都能跨调用 resume。配合 Kubernetes 与 HPA，任意副本均可恢复同一用户的完整上下文。</p>
+    <p>AgentScope .NET 天然支持无状态水平扩展：Agent 状态由 <code>IMemory</code> 实现管理（本地 <code>SqliteMemory</code> / <code>StateBackedMemory</code> + <code>IAgentStateStore</code>，多副本换成 <code>AgentScope.Extensions.Store.Redis</code> 的 <code>RedisAgentStateStore</code>），会话经 <code>Session</code> + <code>IStateModule</code> 按 <code>(userId, sessionId)</code> 寻址；配合 Kubernetes 与 HPA，任意副本均可恢复同一用户的完整上下文。</p>
   </details>
 </div>
 

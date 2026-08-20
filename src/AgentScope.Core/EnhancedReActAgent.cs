@@ -807,9 +807,19 @@ public class EnhancedReActAgent : InterruptibleAgentBase, IStreamableAgent, ISta
             {
                 // 如果 Parameters 为空，尝试从响应文本中提取最终答复
                 var finalAnswer = actionIntent.Parameters?.ToString();
+                // Parameters 为 Dictionary（JSON 格式）时序列化为可读文本
+                if (actionIntent.Parameters is Dictionary<string, object> paramsDict)
+                {
+                    finalAnswer = JsonSerializer.Serialize(paramsDict);
+                }
                 if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
                 {
                     finalAnswer = ExtractFinalAnswerForFinish(responseText, actionIntent.HasActionLine);
+                }
+                // 仍为空时回退到原始响应文本，避免返回空答案
+                if (string.IsNullOrWhiteSpace(finalAnswer))
+                {
+                    finalAnswer = responseText;
                 }
                 result = ActionResult.Finish(finalAnswer ?? string.Empty);
             }
@@ -999,7 +1009,7 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
             // 此时将整个 thought 作为最终答案
             if (actionLine == null)
             {
-                return new ActionIntent { Action = "finish", Parameters = null, HasActionLine = false };
+                return new ActionIntent { Action = "finish", Parameters = thought.Trim(), HasActionLine = false };
             }
 
             var action = actionLine.Substring("Action:".Length).Trim().ToLower();

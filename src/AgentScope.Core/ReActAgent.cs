@@ -203,9 +203,19 @@ public class ReActAgent : AgentBase
             if (intent.Action == "finish")
             {
                 var finalAnswer = intent.Parameters?.ToString();
+                // Parameters 为 Dictionary（JSON 格式）时序列化为可读文本
+                if (intent.Parameters is Dictionary<string, object> paramsDict)
+                {
+                    finalAnswer = JsonSerializer.Serialize(paramsDict);
+                }
                 if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
                 {
                     finalAnswer = ExtractFinalAnswerForFinish(responseText, intent.HasActionLine);
+                }
+                // 仍为空时回退到原始响应文本，避免返回空答案
+                if (string.IsNullOrWhiteSpace(finalAnswer))
+                {
+                    finalAnswer = responseText;
                 }
 
                 return ActionResult.Finish(finalAnswer ?? string.Empty);
@@ -307,7 +317,14 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
             var inputLine = lines.FirstOrDefault(l => 
                 l.StartsWith("Action Input:", StringComparison.OrdinalIgnoreCase));
 
-            var action = actionLine?.Substring("Action:".Length).Trim().ToLower() ?? "finish";
+            // 如果没有找到 Action 行，说明模型没有按照 ReAct 格式回复
+            // 此时将整个回复作为最终答案
+            if (actionLine == null)
+            {
+                return new ActionIntent { Action = "finish", Parameters = thought.Trim(), HasActionLine = false };
+            }
+
+            var action = actionLine.Substring("Action:".Length).Trim().ToLower();
             var input = inputLine?.Substring("Action Input:".Length).Trim() ?? "";
 
             object? parameters = null;

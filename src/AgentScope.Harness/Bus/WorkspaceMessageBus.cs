@@ -49,11 +49,17 @@ public sealed class WorkspaceMessageBus : IMessageBus
     }
 
     /// <inheritdoc />
-    public IAsyncEnumerable<BusEntry> QueueDrainAsync(string queue, CancellationToken ct = default)
+    public async IAsyncEnumerable<BusEntry> QueueDrainAsync(string queue,
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // 获取或创建无界通道，异步读取所有条目
+        // 获取或创建无界通道
         var ch = _queues.GetOrAdd(queue, _ => Channel.CreateUnbounded<BusEntry>());
-        return ch.Reader.ReadAllAsync(ct);
+        // 排空当前已入队的消息后立即结束，避免空队列时 ReadAllAsync 永久挂起
+        while (ch.Reader.TryRead(out var entry))
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return entry;
+        }
     }
 
     /// <inheritdoc />

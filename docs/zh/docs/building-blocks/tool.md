@@ -1,592 +1,207 @@
 ---
-title: "Tool"
-description: "定义、注册并管理 agent 可调用的能力"
+title: "工具"
+description: "ITool / Toolkit / [Tool] 特性注册 / MCP 客户端"
 ---
 
 ## 概述
 
-Tool 是 agent 与外部世界交互的方式 —— 执行业务操作、调用 API、读写数据等。每个 tool 通过 JSON Schema 暴露给 LLM，agent 通过统一接口完成调用。
+工具（`AgentScope.Core.Tool`）是智能体在行动阶段可调用的能力。三种定义方式：
 
-AgentScope 把 tool 相关的构件组织成三个概念：
+1. **`[Tool]` 特性方法**（推荐）——框架自动生成 JSON Schema；
+2. **继承 `ToolBase`**——手工实现 `GetSchema()` 与 `ExecuteAsync()`；
+3. **直接实现 `ITool`**。
 
-- **Tool** —— 任意实现 `IAgentTool` 接口（通常通过继承 `ToolBase`）或在普通类的方法上标注 `[Tool]` 属性的对象。.NET 端把后者称为 *reflective function tool*，由 `Toolkit.RegisterTool(object)` 自动反射注册。
-- **Toolkit** —— 容器，负责注册 tool、MCP 客户端与 skill，向模型暴露它们的 JSON schema，并把每次工具调用分发到对应的 tool 对象。
-- **Tool Group** —— 一组带名称的 tool / MCP / skill 集合，可以作为整体激活或停用。Agent 在运行时通过内置 meta tool 切换 group，让上下文保持聚焦。
+```csharp
+public interface ITool
+{
+    string Name { get; }
+    string Description { get; }
+    Dictionary<string, object> GetSchema();
+    Task<ToolResult> ExecuteAsync(Dictionary<string, object> parameters);
+}
+
+// 可选接口：支持通过 CancellationToken 真正中止底层工作
+public interface ICancellableTool : ITool
+{
+    Task<ToolResult> ExecuteAsync(Dictionary<string, object> parameters, CancellationToken cancellationToken);
+}
+```
+
+`ToolResult` 提供 `ToolResult.Ok(object result)` / `ToolResult.Fail(string error)` 两个工厂。
+
+## 方式一：[Tool] 特性方法
 
 ```csharp
 using AgentScope.Core.Tool;
-using AgentScope.Core.Tool.BuiltIn;
 
-Toolkit toolkit = new Toolkit();
-toolkit.RegisterTool(new TodoTools());
-toolkit.RegisterTool(new MyCustomTools());
+public class WeatherService
+{
+    [Tool(Name = "get_weather", Description = "获取指定城市的天气")]
+    public string GetWeather(
+        [ToolParam(Name = "city", Description = "城市名")] string city,
+        [ToolParam(Description = "天数", Required = false)] int days = 3)
+        => $"{city} 未来 {days} 天晴。";
+}
 ```
 
-只调用 `RegisterTool(object)` 时，被注册对象上所有 `[Tool]` 方法都进入特殊的 `"basic"` 组 —— 该组始终激活。追加 MCP 客户端、tool group 或 skill 即可拓展 agent 的能力 —— 见下文各节。
+特性说明：
 
-## .NET Tool
+- `[Tool]`：`Name`（默认方法名）、`Description`（默认自动生成）、`Strict`、`ReadOnly`、`ExternalTool`（均默认 false）。
+- `[ToolParam]`：`Name`（默认参数名）、`Description`、`Required`（**默认 true**，可选参数要显式写 `Required = false`）。
 
-.NET tool 是任意满足 `IAgentTool` 契约的对象。AgentScope 同时提供了一个 `ToolBase` 抽象基类用于显式建模带参数 schema 的 tool，以及一个反射适配器用于把普通方法包装成 tool。
+注册到 `Toolkit`：
 
-### IAgentTool / ToolBase 接口
+```csharp
+var toolkit = new Toolkit();
+toolkit.RegisterTool(new WeatherService());   // 扫描实例上的 [Tool] 方法
+toolkit.RegisterTool<MathTools>();            // 扫描类型 T 的静态 [Tool] 方法
+```
 
-`ToolBase` 是 `IAgentTool` 的抽象实现，下表列出其属性与方法。
+> 注意方法名是 **`RegisterTool`**（单数）；注册现成的 `ITool` 实例用 **`AddTool`**。
 
-向 agent 与运行时描述 tool 的属性：
+## 方式二：继承 ToolBase
 
-| 属性 | 类型 | 说明 |
-|---|---|---|
-| `Name` | `string` | 暴露给 agent 的 tool 名称 |
-| `Description` | `string` | 面向 agent 的功能描述 |
-| `Parameters` | `Dictionary<string, object>` | 定义参数的 JSON Schema |
-| `IsConcurrencySafe` | `boolean` | 是否可并发调用 |
-| `IsReadOnly` | `boolean` | 是否只读、不产生副作用 |
-| `IsExternalTool` | `boolean` | 为 `true` 时执行委派给外部（见 [定义外部执行 Tool](#定义外部执行-tool)） |
-| `IsStateInjected` | `boolean` | 为 `true` 时框架注入 `AgentState` 参数 |
-| `IsMcp` | `boolean` | 是否来自 MCP 服务 |
-| `McpName` | `string` | `IsMcp` 为 `true` 时所属 MCP 服务名 |
+```csharp
+public class EchoTool : ToolBase
+{
+    public EchoTool() : base("echo", "回显输入内容") { }
 
-接入执行流程与权限系统的方法：
+    public override Dictionary<string, object> GetSchema() => new()
+    {
+        ["name"] = Name,
+        ["description"] = Description,
+        ["parameters"] = new Dictionary<string, object>
+        {
+            ["type"] = "object",
+            ["properties"] = new Dictionary<string, object>
+            {
+                ["message"] = new Dictionary<string, object> { ["type"] = "string" }
+            },
+            ["required"] = new List<string> { "message" }
+        }
+    };
 
-| 方法 | 必需 | 说明 |
-|---|---|---|
-| `CheckPermissions(toolInput, context)` | 是 | 执行前的运行时权限检查；返回 `Task<PermissionDecision>` |
-| `MatchRule(ruleContent, toolInput)` | 可选 | 权限系统中的自定义规则匹配；返回 `boolean` |
-| `GenerateSuggestions(toolInput)` | 可选 | 基于本次工具调用生成建议规则；返回 `List<PermissionRule>` |
-| `CallAsync(param)` | 可选 | tool 的执行逻辑；返回 `Task<ToolResultBlock>`。外部执行 tool 不需要实现。 |
+    public override Task<ToolResult> ExecuteAsync(Dictionary<string, object> parameters)
+        => Task.FromResult(parameters.TryGetValue("message", out var m)
+            ? ToolResult.Ok(m?.ToString() ?? "")
+            : ToolResult.Fail("缺少参数 message"));
+}
+```
 
-### 使用内置 Tool
+## Toolkit
 
-AgentScope 当前提供以下内置 tool：
+`Toolkit` 是工具注册中心门面：
 
-| Tool | 说明 | 只读 |
+| 成员 | 签名 | 说明 |
 |------|------|------|
-| `TodoTools.TodoWrite` | 维护当前会话的结构化任务列表（全列表替换语义） | 否 |
+| `AddTool` | `Toolkit AddTool(ITool tool, string? group = null)` | 注册单个工具，可指定组名 |
+| `AddGroup` | `Toolkit AddGroup(ToolGroup group)` | 注册工具组 |
+| `AddSkillGroup` | `Toolkit AddSkillGroup(SkillToolGroup skillGroup)` | 注册技能工具组 |
+| `ActivateGroup` / `DeactivateGroup` | `Toolkit ActivateGroup(string name)` | 激活 / 停用组 |
+| `GetActiveTools` | `IReadOnlyList<ITool>` | **无激活组时返回全部工具**；有激活组时只返回激活组内的 |
+| `GetActiveToolSchemas` | `List<Dictionary<string, object>>` | 当前激活工具的 Schema |
+| `Resolve` | `ITool? Resolve(string name)` | 按名称查找 |
+| `RegisterTool` | `Toolkit RegisterTool(object toolObject)` / `static Toolkit RegisterTool<T>()` | 扫描 `[Tool]` 特性 |
+| `CallToolsAsync` | `Task<List<ToolResultBlock>> CallToolsAsync(List<ToolUseBlock>, ExecutionConfig?)` | 批量执行 |
+| `AllTools` / `Groups` | 属性 | 全量工具 / 组 |
 
-使用方式：
-
-```csharp
-Toolkit toolkit = new Toolkit();
-toolkit.RegisterTool(new AgentScope.Core.Tool.BuiltIn.TodoTools());
-```
-
-:::{note}
-Toolkit 在出现额外 tool group 或 skill 时会自动注册 `reset_tools` meta tool 与 skill 查看器工具 `load_skill_through_path`，开发者无需手动实例化。详见 [自我管理 Tool](#自我管理-tool) 与 [Skill](#skill)。
-:::
-
-### 自定义 Tool（注解式）
-
-最轻量的写法：在普通类的方法上标注 `[Tool]` 与 `[ToolParam]`，然后通过 `Toolkit.RegisterTool(object)` 反射注册。框架自动从 .NET 类型推导 JSON schema，从 `Description` 取面向 agent 的说明。
+工具分组示例：
 
 ```csharp
-using AgentScope.Core.Tool;
-using System;
-
-public class SimpleTools
-{
-    [Tool(
-            Name = "get_current_time",
-            Description = "Returns the current time in a given IANA timezone.",
-            IsReadOnly = true,
-            IsConcurrencySafe = true)]
-    public string GetCurrentTime(
-            [ToolParam(Name = "timezone", Description = "IANA timezone, e.g. Asia/Shanghai")]
-                    string timezone)
-    {
-        return DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(8))
-                .ToString("yyyy-MM-ddTHH:mm:ss");
-    }
-}
-
-Toolkit toolkit = new Toolkit();
-toolkit.RegisterTool(new SimpleTools());
+var toolkit = new Toolkit()
+    .AddTool(new CalculatorTool(), group: "math")
+    .AddGroup(new ToolGroup("search", "联网搜索", isActive: true));
 ```
 
-`[Tool]` 常用属性：
+`ToolGroupManager`（Builder 的 `ToolGroupManager(...)` / `AddToolGroup(...)`）维护分组激活状态，且会随 `Session` 持久化（`ToolkitState`）。
 
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `Name` | `string` | tool 名（默认取方法名） |
-| `Description` | `string` | 面向 agent 的描述 |
-| `IsReadOnly` | `boolean` | 是否只读（默认 `false`） |
-| `IsConcurrencySafe` | `boolean` | 是否可并发调用（默认 `false`） |
-| `IsStateInjected` | `boolean` | 是否在调用时注入 `AgentState` 作为额外参数（默认 `false`） |
-| `DangerousFiles` / `DangerousDirectories` | `string[]` | 追加自定义危险路径列表 |
-| `Converter` | `Type` | 自定义返回值到 `ToolResultBlock` 的转换器类型 |
+## 内置工具
 
-### 自定义 Tool（继承 `ToolBase`）
-
-需要自定义权限策略、外部执行或更复杂的 schema 时，继承 `ToolBase`：
+| 工具 | 命名空间 | 名称 | 说明 |
+|------|----------|------|------|
+| `CalculatorTool` | `AgentScope.Core.Tool` | `calculator` | 两数求和（示例工具） |
+| `GetTimeTool` | `AgentScope.Core.Tool` | `get_time` | 当前时间 |
+| `WebSearchTool` / `MockWebSearchTool` | `AgentScope.Core.Tool` | `web_search` | 网页搜索（无 Key 时降级模拟） |
+| `CodeExecutionTool` / `SafeCodeExecutionTool` | `AgentScope.Core.Tool` | `code_execution` | 代码执行（带模块黑白名单） |
+| `ReadFileTool` / `WriteFileTool` | `AgentScope.Core.Tool.File` | `read_file` / `write_file` | 受 `FileToolUtils` 沙箱约束的文件读写 |
+| `ShellCommandTool` | `AgentScope.Core.Tool.Coding` | `shell_command` | Shell 命令执行（Windows/Unix 命令验证器） |
 
 ```csharp
-using AgentScope.Core.Message;
-using AgentScope.Core.Permission;
-using AgentScope.Core.Tool;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-public class WebSearchTool : ToolBase
-{
-    public WebSearchTool()
-        : base(
-                ToolBase.Builder()
-                        .WithName("WebSearch")
-                        .WithDescription("Search the web for information on a given query.")
-                        .WithInputSchema(new Dictionary<string, object>
-                        {
-                            ["type"] = "object",
-                            ["properties"] = new Dictionary<string, object>
-                            {
-                                ["query"] = new Dictionary<string, object>
-                                {
-                                    ["type"] = "string",
-                                    ["description"] = "The search query."
-                                }
-                            },
-                            ["required"] = new List<string> { "query" }
-                        })
-                        .WithReadOnly(true)
-                        .WithConcurrencySafe(true))
-    {
-    }
-
-    public override Task<PermissionDecision> CheckPermissions(
-            Dictionary<string, object> toolInput, ToolExecutionContext context)
-    {
-        return Task.FromResult(PermissionDecision.Allow("Web search is read-only."));
-    }
-
-    public override Task<ToolResultBlock> CallAsync(ToolCallParam param)
-    {
-        string query = (string)param.Input["query"];
-        return DoSearchAsync(query)
-                .ContinueWith(text =>
-                        ToolResultBlock.Builder()
-                                .WithId(param.Id)
-                                .WithName(Name)
-                                .WithOutput(new List<ContentBlock>
-                                {
-                                    TextBlock.Builder().WithText(text.Result).Build()
-                                })
-                                .Build());
-    }
-
-    private async Task<string> DoSearchAsync(string query)
-    {
-        // 实际的搜索实现
-        await Task.Delay(100);
-        return "search results for: " + query;
-    }
-}
+// 文件工具默认只允许 当前目录 + 临时目录，可全局调整：
+FileToolUtils.AllowedRoots = new[] { @"D:\data" };
 ```
 
-### 定义外部执行 Tool
-
-外部执行 tool 把实际执行委派给 agent 运行时之外 —— 通常是人工操作员或外部系统。Agent 调用此类 tool 时会发出 `RequireExternalExecutionEvent` 并暂停。下一次调用回传匹配的 `ToolResultBlock` 后，agent 会发出带有相同 `ReplyId` 的 `ExternalExecutionResultEvent`，然后继续执行。
-
-这种模式是 [human-in-the-loop](./agent.md) 工作流的基础 —— 某些动作需要人工确认或人工执行。
-
-创建外部执行 tool 只需把 `ExternalTool` 设为 `true`，不必实现 `CallAsync`：
+## ToolExecutor：重试与超时
 
 ```csharp
-using AgentScope.Core.Permission;
-using AgentScope.Core.Tool;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+var executor = new ToolExecutor(
+    maxAttempts: 3,
+    timeout: TimeSpan.FromSeconds(30),
+    retryDelay: TimeSpan.FromSeconds(1),
+    shouldRetry: (ex, attempt) => ex is HttpRequestException);
 
-public class HumanApprovalTool : ToolBase
-{
-    public HumanApprovalTool()
-        : base(
-                ToolBase.Builder()
-                        .WithName("HumanApproval")
-                        .WithDescription("Request human approval for a sensitive operation.")
-                        .WithInputSchema(new Dictionary<string, object>
-                        {
-                            ["type"] = "object",
-                            ["properties"] = new Dictionary<string, object>
-                            {
-                                ["action"] = new Dictionary<string, object> { ["type"] = "string" },
-                                ["reason"] = new Dictionary<string, object> { ["type"] = "string" }
-                            },
-                            ["required"] = new List<string> { "action", "reason" }
-                        })
-                        .WithReadOnly(false)
-                        .WithConcurrencySafe(true)
-                        .WithExternalTool(true))
-    {
-    }
-
-    public override Task<PermissionDecision> CheckPermissions(
-            Dictionary<string, object> toolInput, ToolExecutionContext context)
-    {
-        return Task.FromResult(PermissionDecision.Allow("External tool dispatch is always allowed."));
-    }
-}
+ToolResult result = await executor.ExecuteAsync(tool, parameters, ct);
 ```
 
-完整可运行示例：`agentscope-examples/documentation/.../tool/ToolBaseExample.java`、`tool/ToolExecutionContextExample.java`。
+若工具实现 `ICancellableTool`，超时会真正取消底层工作；否则仅停止等待。
 
-## 接收 Context
+## MCP 客户端
 
-每次 `agent.CallAsync(msgs, runtimeContext)` 传入的 [`RuntimeContext`](./agent.md#runtimecontext-per-call-上下文) 会自动透传到所在 reply 内每一次工具调用。Tool 可以用两种方式拿到它：注解式 tool 走自动注入，`ToolBase.CallAsync` 走 `ToolCallParam`。
-
-### 自动注入（`[Tool]` 方法）
-
-`[Tool]` 方法签名里，**没有标注 `[ToolParam]`** 的参数会被框架视为「需要从框架注入」，并按下表的优先级解析：
-
-| 参数类型 | 注入来源 |
-|---------|---------|
-| `ToolEmitter` | 流式中间产物 emitter（无配置时为 no-op） |
-| `Agent` | 当前 agent 实例 |
-| `AgentState` | 当前 call 的 per-session 状态（通过 `RuntimeContext.AgentState` 获取） |
-| `RuntimeContext` | 当前 per-call 上下文 |
-| `ToolExecutionContext` | `runtimeContext.AsToolExecutionContext()`（兼容层，已 deprecated） |
-| 其它用户自定义 POCO 类型 | `runtimeContext.Get<T>()` —— 即调用方在 `RuntimeContext.Builder().Put(value)` 注册的对象 |
-
-「用户自定义 POCO」的判定：参数没有 `[ToolParam]`、不是基本类型、不是 `ContentBlock` / `Msg`、不在 `System.*` 命名空间下。其余参数（带 `[ToolParam]` 或属于上述兜底类型）从 LLM 提供的 JSON 输入按名称取值。
+`AgentScope.Core.MCP` 内置 MCP（Model Context Protocol）客户端，支持三种传输：
 
 ```csharp
-using AgentScope.Core.Tool;
+using AgentScope.Core.MCP;
 
-public record UserContext(string Username, string Locale);
+// Stdio（本地进程）
+IMcpClient stdio = McpClientBuilder.Create()          // 注意：静态工厂，构造函数私有
+    .Named("fs-server")
+    .UseStdio("node", "mcp-server.js")
+    .WithWorkingDirectory(@"D:\mcp")
+    .Build();
 
-public class PersonalizedTools
-{
-    [Tool(Name = "greet", Description = "Greet the user with a custom greeting")]
-    public string Greet(
-            [ToolParam(Name = "greeting", Description = "Greeting word, e.g. 'Hello'")]
-                    string greeting,                  // ← 由模型提供
-            UserContext userCtx)                      // ← 由框架自动注入
-    {
-        return greeting + ", " + (userCtx == null ? "unknown" : userCtx.Username) + "!";
-    }
-}
+// Streamable HTTP / SSE（远程服务）
+IMcpClient http = McpClientBuilder.Create()
+    .Named("amap")
+    .UseStreamableHttp("https://mcp.amap.com/mcp")
+    .WithApiKey("YOUR_KEY")                           // Authorization: Bearer
+    .WithRequestTimeout(TimeSpan.FromSeconds(60))
+    .Build();
+
+IMcpClient sse = McpClientBuilder.Create()
+    .UseSse("https://example.com/mcp/sse")
+    .Build();
+
+// 注册到 McpManager 并发现工具
+var manager = new McpManager();
+manager.RegisterClient(http);
+IReadOnlyList<ITool> tools = await manager.CreateToolsAsync();   // 自动初始化并发现
+
+var toolkit = new Toolkit();
+foreach (var tool in tools)
+    toolkit.AddTool(tool);
 ```
 
-调用方按类型注册同款 POCO 后，每次 `CallAsync` 就会自动把对应实例分发到所有需要它的 tool：
+`McpClientBuilder` 链式方法：`Create()` → `Named(string)` → `UseStdio(command, args?)` / `UseStreamableHttp(url)` / `UseSse(url)`（三选一）→ 可选 `WithApiKey` / `WithWorkingDirectory`（仅 Stdio）/ `WithHttpClient`（仅 HTTP/SSE）/ `WithRequestTimeout` → `Build()`。
+
+`IMcpClient` 接口：`InitializeAsync()`、`ListToolsAsync()`、`CallToolAsync(name, args)`。
+
+## 与 Agent 集成
 
 ```csharp
-RuntimeContext ctx =
-        RuntimeContext.Builder()
-                .Put(new UserContext("alice", "en"))
-                .WithUserId("alice")
-                .Build();
+EnhancedReActAgent agent = new EnhancedReActAgentBuilder()
+    .Model(model)
+    .AddTool(new EchoTool())
+    .Build();
 
-await agent.CallAsync(new List<Msg> { new UserMessage("Greet me.") }, ctx);
+// HarnessAgent 侧：WithToolkit 一次性带入
+var toolkit = new Toolkit().AddTool(new EchoTool());
+HarnessAgent harness = new HarnessAgentBuilder()
+    .WithModel(model)
+    .WithToolkit(toolkit)
+    .Build();
 ```
 
-模型不需要把 `userCtx` 写进 JSON 参数——schema 里也不会出现它。完整示例：`agentscope-examples/documentation/.../tool/ToolExecutionContextExample.java`。
+## 相关文档
 
-### `ToolBase.CallAsync` 中访问
-
-继承 `ToolBase` 的 tool 通过 `ToolCallParam` 取 context：
-
-```csharp
-using AgentScope.Core.Agent;
-using AgentScope.Core.Tool;
-using System.Threading.Tasks;
-
-public class TenantAwareTool : ToolBase
-{
-    public TenantAwareTool()
-        : base(/* builder ... */)
-    {
-    }
-
-    public override Task<ToolResultBlock> CallAsync(ToolCallParam param)
-    {
-        RuntimeContext rc = param.RuntimeContext;
-        string tenantId = rc?.UserId;
-        TenantConfig cfg = rc?.Get<TenantConfig>();
-        // ... 用 tenantId / cfg 执行业务 ...
-    }
-}
-```
-
-`ToolCallParam` 同时暴露 `Agent`、`Input`、`Emitter`、`ToolUseBlock` 以及（已 deprecated 的）`Context`。新代码使用 `RuntimeContext`。
-
-### 协调 hook 与 tool
-
-`RuntimeContext` 的 string 层（`Put(string, object)` / `Get<T>(string)`）是同一次 `CallAsync` 内 middleware 与 tool 之间的临时通信通道——middleware 在 `OnActing`/`OnReasoning` 等位置写入，tool 通过注入 `RuntimeContext` 参数读取；调用结束后该实例与 hook 一并解绑。
-
-## MCP
-
-AgentScope 集成 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)，让 agent 可以接入任意 MCP 兼容的工具提供方。框架自动处理协议协商、工具发现与结果转换。
-
-支持三种连接方式：
-
-- **STDIO** —— 本地进程 stdin/stdout 通信
-- **SSE / Streamable HTTP** —— 远程 HTTP 长连接
-
-MCP tool 在 toolkit 中以 `mcp__{server_name}__{tool_name}` 命名，避免冲突；标注了 `ReadOnlyHint` 的 tool 会被权限系统自动放行。
-
-### 注册 MCP Tool
-
-通过 `McpClientBuilder` 构建 `McpClientWrapper`，再注册到 `Toolkit`：
-
-::::{tab-set}
-:::{tab-item} STDIO
-```csharp
-using AgentScope.Core.Tool;
-using AgentScope.Core.Tool.Mcp;
-
-McpClientWrapper filesystem = await McpClientBuilder.Stdio()
-        .WithName("filesystem")
-        .WithCommand("mcp-server-filesystem")
-        .WithArgs("--root", "/my/project")
-        .BuildAsync();
-
-Toolkit toolkit = new Toolkit();
-await toolkit.RegisterMcpClient(filesystem);
-```
-:::
-:::{tab-item} Streamable HTTP
-```csharp
-using AgentScope.Core.Tool;
-using AgentScope.Core.Tool.Mcp;
-
-McpClientWrapper weather = await McpClientBuilder.StreamableHttp()
-        .WithName("weather")
-        .WithUrl("https://api.weather.com/mcp")
-        .WithHeader("Authorization", "Bearer xxx")
-        .BuildAsync();
-
-Toolkit toolkit = new Toolkit();
-await toolkit.RegisterMcpClient(weather);
-```
-:::
-:::{tab-item} SSE
-```csharp
-using AgentScope.Core.Tool.Mcp;
-
-McpClientWrapper search = await McpClientBuilder.Sse()
-        .WithName("search")
-        .WithUrl("https://api.search.com/mcp/sse")
-        .BuildAsync();
-
-Toolkit toolkit = new Toolkit();
-await toolkit.RegisterMcpClient(search);
-```
-:::
-::::
-
-完整运行示例：`agentscope-examples/documentation/.../mcp/McpStdioExample.java`、`mcp/McpSseExample.java`、`mcp/McpStreamableHttpExample.java`。
-
-## Skill
-
-Skill 是基于 markdown 的指令集，无需写新工具代码即可拓展 agent 能力。每个 skill 是一个目录，包含一个带 frontmatter 元数据与详细指令的 `SKILL.md` 文件。
-
-与 tool 不同，skill 不能被直接调用。Agent 通过自动注册的查看器工具 `load_skill_through_path` 读取 skill 指令，再用现有的 tool 按指令执行。
-
-### 注册 Skill
-
-通过 `ReActAgent.Builder().WithSkillRepository(...)` 直接挂载一个或多个 `IAgentSkillRepository`。Builder 在 `Build()` 时自动装配 `DynamicSkillMiddleware`，每次 `CallAsync()` 都会按 skill 来源刷新 skill prompt 与 tool group：
-
-```csharp
-using AgentScope.Core;
-using AgentScope.Core.Skill.Repository;
-
-ReActAgent agent =
-        ReActAgent.Builder()
-                .WithName("SkillCreator")
-                .WithSysPrompt("...")
-                .WithModel(model)
-                .WithSkillRepository(new FileSystemSkillRepository("/path/to/skills", false))
-                .Build();
-```
-
-多次调用 `WithSkillRepository(...)` 按调用顺序追加（低 → 高优先级），同名 skill 后者覆盖前者；如需替换整批，调用 `WithSkillRepositories(List<IAgentSkillRepository>)`。
-
-参考实现：`agentscope-examples/documentation/.../skill/AgentSkillExample.java`、`skill/SkillWithToolGroupExample.java`。
-
-### Skill 的工作方式
-
-`Toolkit` 在含 skill 时，注册与查看分两阶段进行。
-
-初始化阶段：
-
-- Toolkit 扫描所有注册的 skill 来源，收集每个 skill 的名称、描述与目录。
-- 自动把内置查看器工具 `load_skill_through_path`（实现位于 `AgentScope.Core.Skill.SkillToolFactory`）注册到 `skill-build-in-tools` 这个 tool group。
-- 组装一段 system prompt 片段，列出可用 skill（仅名称与描述），并指示 agent 通过 `load_skill_through_path` 读取完整内容。
-
-运行时阶段，agent 用两个必填参数调用查看器：
-
-| 参数 | 类型 | 说明 |
-| --- | --- | --- |
-| `skillId` | `string`（枚举：已注册的 skill ID） | 要加载的 skill。 |
-| `path` | `string` | 传 `"SKILL.md"` 取该 skill 的 markdown 指令；或传 skill 声明过的精确资源路径，例如 `"references/guide.md"`、`"scripts/run.py"`。不要传 `"."`、`"./"`、目录或绝对路径。 |
-
-调用示例：
-
-```json
-{
-  "name": "load_skill_through_path",
-  "input": { "skillId": "pdf-extractor", "path": "SKILL.md" }
-}
-```
-
-每次成功调用产生两件事：
-
-1. 返回请求的内容（`SKILL.md` markdown，或指定的资源文件）。
-2. **激活该 skill** —— Toolkit 中与之绑定的 tool group 被启用，本轮对话余下时段都可调用 skill 自带的工具。如果 `path` 不存在，查看器会返回错误并列出可用资源路径（`SKILL.md` 始终排在第一位），便于 agent 重试。
-
-:::{note}
-Skill 不是 tool —— agent 不能直接调用 skill。它必须先用 `load_skill_through_path` 读取指令，再用其他 tool 按描述的步骤执行。
-:::
-
-### Skill 执行脚本：配置 Shell 工具
-
-Skill 只提供指令，真正的执行依赖 agent 已有的 tool。如果 skill 指令涉及脚本执行（例如 `scripts/run.py`），agent 需要拥有 shell 执行能力：
-
-- **`ReActAgent`** —— 注册 `ShellCommandTool` 到 toolkit：
-
-```csharp
-using AgentScope.Core.Tool;
-using AgentScope.Core.Tool.Coding;
-using AgentScope.Core.Tool.File;
-
-Toolkit toolkit = new Toolkit();
-toolkit.RegisterTool(new ShellCommandTool());
-toolkit.RegisterTool(new ReadFileTool("/path/to/base/dir"));
-toolkit.RegisterTool(new WriteFileTool("/path/to/base/dir"));
-
-ReActAgent agent =
-        ReActAgent.Builder()
-                .WithName("SkillAgent")
-                .WithSysPrompt("...")
-                .WithModel(model)
-                .WithToolkit(toolkit)
-                .WithSkillRepository(skillRepo)
-                .Build();
-```
-
-- **`HarnessAgent`** —— harness 模块自带 workspace 感知的 shell 与文件工具（`execute`、`read_file`、`write_file` 等），无需额外注册。
-
-### Skill + ToolGroup：按需披露工具
-
-`SkillToolGroup` 把一组 tool 绑定到某个 skill name —— agent 加载该 skill 时 tool group 自动激活，未加载时 tool 不出现在模型 schema 中，减少上下文噪音。
-
-```csharp
-using AgentScope.Core;
-using AgentScope.Core.Tool;
-
-Toolkit toolkit = new Toolkit();
-
-// 1. 创建与 skill 绑定的 tool group（初始不激活）
-toolkit.CreateSkillToolGroup(
-        "analysis-tools",                // group 名
-        "Data analysis tools",           // 描述
-        false,                           // 初始不激活
-        "data-analysis");                // 绑定的 skill name
-
-// 2. 把 tool 注册到该 group
-toolkit.Registration()
-        .WithTool(new AnalysisTools())
-        .WithGroup("analysis-tools")
-        .Apply();
-
-// 3. 构建 agent，启用 meta tool 支持模型主动切换 group
-ReActAgent agent =
-        ReActAgent.Builder()
-                .WithName("AnalysisAgent")
-                .WithSysPrompt("...")
-                .WithModel(model)
-                .WithToolkit(toolkit)
-                .WithSkillRepository(skillRepo)
-                .EnableMetaTool(true)
-                .Build();
-```
-
-当 agent 通过 `load_skill_through_path` 加载名为 `data-analysis` 的 skill 时，`analysis-tools` group 自动激活，其中的 tool 立即可用。配合 `EnableMetaTool(true)`，模型还可以通过 `reset_tools` 主动管理 tool group 的激活状态。
-
-参考实现：`agentscope-examples/documentation/.../skill/SkillWithToolGroupExample.java`。
-
-## 自我管理 Tool
-
-内置 **meta tool**（`reset_tools`）让 agent 在运行时自我管理哪些 tool group 处于激活状态，从而保持上下文聚焦 —— 只有与当前任务相关的 tool 暴露给模型。
-
-### 定义 Tool Group
-
-`ToolGroup` 是带名称的 tool / MCP / skill 集合。把 group 注册到 `Toolkit` 后再用 builder 启用 meta tool：
-
-```csharp
-using AgentScope.Core;
-using AgentScope.Core.Tool;
-
-Toolkit toolkit = new Toolkit();
-toolkit.RegisterTool(new BasicTools());
-
-ToolGroup database =
-        new ToolGroup(
-                "database",
-                "Tools for database operations.",
-                ToolGroupScope.Session,
-                /* active = */ false);
-database.AddTool("db_query");
-database.AddTool("db_migrate");
-toolkit.RegisterTool(new DatabaseTools());
-toolkit.RegisterToolGroup(database);
-
-ToolGroup deployment =
-        new ToolGroup(
-                "deployment",
-                "Tools for deploying services.",
-                ToolGroupScope.Session,
-                /* active = */ false);
-deployment.AddTool("deploy");
-deployment.AddTool("rollback");
-toolkit.RegisterTool(new DeploymentTools());
-toolkit.RegisterToolGroup(deployment);
-
-ReActAgent agent =
-        ReActAgent.Builder()
-                .WithName("router")
-                .WithToolkit(toolkit)
-                .EnableMetaTool(true)
-                .Build();
-```
-
-`ToolGroup` 接收名称、描述、作用域（`ToolGroupScope`）以及初始激活态。保留名 `"basic"` 由 `Toolkit.RegisterTool(object)` 自动构成，且始终激活。
-
-### 使用 Meta Tool
-
-只要存在至少一个非 basic 的 tool group，并通过 `EnableMetaTool(true)` 打开开关，`Toolkit` 就会自动注册 `reset_tools` 并把其 schema 暴露给 agent。每个非 basic group 在 schema 中表示为一个布尔字段，agent 调用 meta tool 时声明期望的最终状态。
-
-运行时行为：
-
-- `"basic"` 组中的 tool 始终暴露，meta tool 不会影响它们。
-- 每次调用 `reset_tools` 都会**整体覆盖**激活集合 —— 任何未显式置为 `true` 的非 basic group 都会被停用，无论之前的状态。
-- 对每个本次切换为激活的 group，其 description 与（若提供的）使用说明会被拼接进 meta tool 的返回值，告诉 agent 如何正确使用该组。
-- 未激活 group 中的 tool 不会出现在 agent 的工具 schema 中，从而把上下文留给当前激活的工具集。
-
-:::{warning}
-Meta tool 的输入表示所有 group 的**最终状态**而非增量。任何未显式置为 `true` 的 group 都会被停用，无论之前的状态如何。
-:::
-
-## 延伸阅读
-
-::::{grid} 2
-
-:::{grid-item-card} Agent
-:link: ./agent.html
-
-Agent 如何在 ReAct 循环中编排 tool 调用
-:::
-  :::{grid-item-card} Permission System
-:link: ./permission-system.html
-
-精细控制哪个 tool 可以执行、何时执行
-:::
-  :::{grid-item-card} Middleware
-:link: ./middleware.html
-
-用洋葱式 middleware 拦截并改写 tool 调用
-:::
-  :::{grid-item-card} Human-in-the-Loop
-:link: ./agent.html
-
-外部执行 tool 与人工审批工作流
-:::
-
-::::
+- [权限系统](./permission-system.md) —— 工具调用前的三态决策
+- [Harness 技能](../harness/skill.md) —— Markdown 技能生成的技能工具组

@@ -2,6 +2,7 @@
   <Folder Name="/examples/">
     <Project Path="examples/QuickStart/QuickStart.csproj" />
     <Project Path="examples/AgentScope.Client/AgentScope.Client.csproj" />
+    <Project Path="examples/AgentScope.Lab/AgentScope.Lab.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AgentScope.Core/AgentScope.Core.csproj" />

@@ -1,81 +1,106 @@
 ---
-title: "Harness 架构"
-description: "HarnessAgent 是什么、各能力如何协作、状态如何在一次 call() 中流转"
+title: "架构"
+description: "HarnessAgent 组成、HarnessAgentBuilder 全量配置与中间件装配"
 ---
 
-`HarnessAgent` 是 `ReActAgent` 的一层薄包装，把长期运行 agent 必备的工程能力打包进单一 builder：工作区驱动的人格、长期记忆、子 agent 编排、沙箱隔离、技能装配、计划模式、Channel 路由。
+## HarnessAgent 组成
 
-裸的 `ReActAgent` 只解决"一次请求 → 推理 → 工具 → 回复"。Harness 要回答的是另一组问题：下一轮怎么接着上一轮、上下文如何保持有界、多用户如何隔离、危险操作如何先 review 再执行、可复用能力如何沉淀。
+`HarnessAgent`（`AgentScope.Harness`）组合内层 `EnhancedReActAgent` 与各子系统，提供完整的智能体运行时：
 
-> 安装、依赖、跑通第一个 `HarnessAgent` 的端到端示例见 [快速开始](../quickstart.md)。本页只讲架构。
+```
+HarnessAgent
+├── EnhancedReActAgent        ← 推理-行动循环（AgentScope.Core）
+├── IMessageBus               ← 消息总线（默认 WorkspaceMessageBus）
+├── IFilesystem               ← 文件系统抽象（默认本地沙箱）
+├── IGateway                  ← 网关（HarnessGateway，委托给内层 Agent）
+└── List<IHarnessMiddleware>  ← 中间件管道（洋葱模型）
+```
 
-## 核心工作原理
+`HarnessAgent` 实现 `IAgent`：
 
-理解 Harness 只需要记住三件事：
+- `CallAsync(IReadOnlyList<Msg>, RuntimeContext?)` / `CallAsync(Msg, ...)` / `CallAsync(string, ...)`：经过中间件管道后调用内层 Agent；
+- `StreamEventsAsync(...)`：直接透传内层 Agent 的 `IAsyncEnumerable<Event>`；
+- `ObserveAsync`、`Interrupt()` / `Interrupt(Msg)`。
 
-**1. 能力是叠加在推理循环关键时机上的，不是改写循环。**
-工作区注入、压缩、子 agent、沙箱、Plan Mode —— 每个能力都钩在 ReAct 循环的关键时机。core 的算法本身没动，Harness 只往里加东西。
+`HarnessAgent` 构造函数是 internal，**只能通过 `HarnessAgentBuilder` 创建**。
 
-**2. 能力之间互不依赖，只通过共享对象通信。**
-每个能力只做自己的事，互相不感知。它们之间靠三个共享对象交流：
+## HarnessAgentBuilder
 
-- **`RuntimeContext`** —— 这次 `call()` 是谁在说话：`sessionId`、`userId`、自定义 extra。不持久化。
-- **工作区** —— 谁读写哪些文件。物理落到本机、沙箱还是 KV 存储是配置决定。
-- **`AgentStateStore`** —— 跨调用怎么恢复运行时状态。
+| 方法 | 签名 | 默认值 | 说明 |
+|------|------|--------|------|
+| `WithName` | `(string name)` | `"harness-agent"` | Agent 名称 |
+| `WithSystemPrompt` | `(string prompt)` | 内置英文提示词 | 系统提示词 |
+| `WithModel` | `(IModel model)` | **必填** | 未设置时 Build 抛异常 |
+| `WithToolkit` | `(Toolkit toolkit)` | null | 一次性注入全部工具 |
+| `WithPermission` | `(IPermissionEngine)` | null | 权限引擎 |
+| `WithMessageBus` | `(IMessageBus bus)` | `new WorkspaceMessageBus()` | 消息总线 |
+| `WithFilesystem` | `(IFilesystem fs)` | 本地当前目录文件系统 | 见[文件系统](./filesystem.md) |
+| `WithDefaultFilesystem` | `(string? workspaceRoot = null)` | 当前目录 | 便捷方法：本地沙箱模式 |
+| `WithTeamClient` | `(ITeamClient team)` | `new LocalTeamClient()` | 团队协作客户端 |
+| `WithSubagentManager` | `(ISubagentManager mgr)` | `new DefaultAgentManager()` | 子 Agent 管理器 |
+| `WithMiddleware` | `(IHarnessMiddleware mw)` | — | 追加自定义中间件，可多次 |
+| `WithMaxIterations` | `(int n)` | `10` | ReAct 最大迭代 |
+| `WithWorkspace` | `(WorkspaceManager mgr)` | null | 启用工作区三中间件 |
+| `WithWorkspaceRoot` | `(string root, bool sandboxed = true)` | — | 便捷重载：`new WorkspaceManager(root, sandboxed)` |
+| `WithToolResultEviction` | `(ToolResultEvictionConfig cfg)` | null | 启用大工具结果驱逐 |
+| `WithMemoryConsolidator` | `(MemoryConsolidator c)` | null | 记忆整合器（供维护中间件调用） |
+| `WithSkillUsageStore` | `(SkillUsageStore store)` | null | 启用技能使用统计中间件 |
+| `WithSkillCurator` | `(SkillCurator curator)` | null | 启用技能策展中间件 |
+| `Build` | `()` | — | 组装并返回 `HarnessAgent` |
 
-**3. 内置 middleware 注册顺序固定，你自己加的跑在最前面。**
-Harness 在构建期按固定顺序串起所有内置 middleware。你通过 `.middleware(...)` 加的会跑在 Harness 内置之前。
+### 典型装配
 
-## 核心组件
+```csharp
+using AgentScope.Harness;
+using AgentScope.Harness.Middleware;
 
-每个能力对应一个问题，按需在 builder 上打开。
+HarnessAgent agent = new HarnessAgentBuilder()
+    .WithName("coder")
+    .WithSystemPrompt("你是一个编码助手。")
+    .WithModel(model)
+    .WithWorkspaceRoot(Path.GetFullPath(".agentscope/workspace"))
+    .WithMaxIterations(20)
+    .WithMiddleware(new CompactionMiddleware(maxContextLength: 8192))
+    .Build();
+```
 
-| 能力 | 解决什么问题 | Builder 入口 | 详细文档 |
-|---|---|---|---|
-| 工作区驱动的人格 | 人格 / 知识 / 子 agent / 技能 / MCP 白名单都以文件形式存在 | `.workspace(path)` | [工作区](./workspace.md) |
-| 状态持久化 | 同 `(userId, sessionId)` 跨请求、跨进程、跨副本恢复 | 默认开启；`.stateStore(...)` 替换实现 | [上下文与 AgentState](../building-blocks/context.md) |
-| 双层长期记忆 | 长会话里有价值的事实自动沉淀到 `MEMORY.md` | 默认开启；`.memory(...)` 定制 prompt / 触发策略 | [记忆](./memory.md) |
-| 对话压缩 | 上下文有界；模型真的溢出时强制重试 | `.compaction(...)` | [上下文压缩](./compaction.md) |
-| 大工具结果卸载 | 超 80K 字符的结果落盘 + 占位符 | `.toolResultEviction(...)` | [上下文压缩](./compaction.md) |
-| 子 agent 编排 | 委派给子 agent，支持同步或后台，自动反向通知 | `.subagent(...)` 或 `workspace/subagents/` | [子 Agent](./subagent.md) |
-| 可插拔文件系统 | 本机 + shell / 共享存储 / 沙箱，不改代码切换 | `.filesystem(...)` | [文件系统](./filesystem.md) |
-| 沙箱隔离 | 文件与命令隔离，跨调用恢复，多副本部署 | `.filesystem(new DockerFilesystemSpec()...)` | [沙箱](./sandbox.md) |
-| 计划模式 | 只读思考阶段 + HITL 退出 | `.enablePlanMode()` | [计划模式](./plan-mode.md) |
-| 技能装配 | 来自 Git / Nacos / MySQL / classpath / 工作区 | `.skillRepository(...)` | [技能](./skill.md) |
-| MCP 集成与工具白名单 | 声明式 MCP server + 工具粒度允许 / 拒绝 | `workspace/tools.json` | [工作区](./workspace.md) |
-| Channel 路由 | 会话管理、per-session 并发控制、多 agent 路由、流式事件 | `agent.channel(...)` / `GatewayBootstrap` | [Channel](./channel.md) |
+## Build() 装配细节
 
-## 状态怎么流转
+`Build()` 做四件事：
 
-状态分三层，框架自动在层之间搬数据。
+1. **构建内层 `EnhancedReActAgent`**：应用 `Name` / `SysPrompt` / `Model` / 工具 / 权限 / `MaxIterations`；
+2. **创建 `HarnessGateway`** 包装内层 Agent；
+3. **装配中间件管道**：先加入用户通过 `WithMiddleware` 传入的中间件，再自动追加 `SandboxLifecycle` → `Subagents` → `Teams` → `Inbox` → `PlanMode` → `Compaction` → `MemoryFlush` → `AgentTrace` → `Transcript`；配置了工作区时再追加 `WorkspaceContext` / `AtPathExpansion` / `MemoryMaintenance`；显式配置了驱逐 / 技能统计 / 技能策展时追加对应中间件；
+4. **构造 `HarnessAgent`**。
 
-- **调用内状态** —— `AgentState`（对话上下文、权限规则、Plan Mode 状态、工具状态）加上 `RuntimeContext`（`sessionId`、`userId`、沙箱句柄、extra）。
-- **跨调用状态** —— 每次 `call()` 结束自动写盘、下次自动加载：存在 `AgentStateStore`（默认 `~/.agentscope/state/<agentId>/`，按 `(userId, sessionId)` 寻址）里的 `AgentState` 运行时快照、`sessions/<sessionId>.log.jsonl` 的永不压缩对话日志、子任务记录、沙箱元数据。
-- **长期记忆** —— 跨 session 累积：`memory/YYYY-MM-DD.md` 只追加；后台节流任务把它周期合并到 `MEMORY.md`；`MEMORY.md` 每轮推理被注入 system prompt。
+执行时中间件按 `Order` 升序组成洋葱链（见 [Middleware](../building-blocks/middleware.md)），系统提示词先经每层 `OnSystemPromptAsync` 依次改写后写回内层 Agent。
 
-三个值得记住的规律：
+## 网关（Gateway）
 
-- system prompt 每轮重新拼，所以你改 `AGENTS.md` 或 `MEMORY.md` 立刻生效，不需要重启。
-- 压缩、记忆提炼、后台维护都被节流闸门管着，不会每轮都跑。
-- `AgentState` 由 core 的 `ReActAgent` + `AgentStateStore` 自动持久化。Harness 不再额外做这件事。
+`IGateway` 把 Agent 暴露为统一入口：
 
-## 自己加 middleware 时要注意什么
+```csharp
+public interface IGateway
+{
+    Task<Msg> RunAsync(Msg input, RuntimeContext? context = null, CancellationToken ct = default);
+    IAsyncEnumerable<Event> RunStreamAsync(Msg input, RuntimeContext? context = null, CancellationToken ct = default);
+}
+```
 
-要在不绕过 Harness 内置链路的前提下插入自定义行为：
+`HarnessGateway(IAgent agent)` 是默认实现，直接委托给内层 Agent 的 `CallAsync` / `StreamEventsAsync`。Channel（见[Channel](./channel.md)）通过网关与 Agent 交互。
 
-- 用 `.middleware(...)`：你的 middleware 会跑在所有 Harness 内置之前。
-- 通过 agent 上的 `RuntimeContext` 读当前调用的身份（`userId` / `sessionId`）。
-- 读写工作区用 `harnessAgent.getWorkspaceManager()`，它会按当前文件系统模式（本机 / 沙箱 / 远端）正确路由。直接 `java.nio.Files` 在沙箱或远端模式下会写错地方。
+## 消息总线（IMessageBus）
+
+`WorkspaceMessageBus`（默认）基于 `System.Threading.Channels`，支持四种模式：
+
+- **队列（Drain queue）**：`QueuePushAsync(queue, entry)` / `QueueDrainAsync(queue)` / `QueueDeleteAsync`；
+- **回放日志（Replay log）**：`LogAppendAsync(log, entry)` / `LogReadAsync(log, startSeq)` / `LogTrimAsync`；
+- **发布订阅**：`PublishAsync(topic, entry)` / `Subscribe(topic, handler)`；
+- **收件箱领域助手**：`InboxPushAsync(agentId, entry)` / `InboxDrainAsync(agentId)`（`InboxMiddleware` 在每回合开始时消费）。
+
+条目类型 `BusEntry(Id, Key, Payload)`，带单调 `Sequence`。
 
 ## 相关文档
 
-- [工作区](./workspace.md) — 目录结构、注入到 system prompt 的内容、`tools.json`
-- [上下文与 AgentState](../building-blocks/context.md) — `AgentState`、`RuntimeContext`、`AgentStateStore` 持久化、多用户隔离
-- [记忆](./memory.md) — 两层记忆
-- [上下文压缩](./compaction.md) — 摘要压缩、大结果卸载、溢出兜底
-- [文件系统](./filesystem.md) — 本机 + shell / 共享存储 / 沙箱
-- [沙箱](./sandbox.md) — 隔离执行、跨调用恢复、分布式
-- [子 Agent](./subagent.md) — 声明、同步/后台、流式转发
-- [技能](./skill.md) — 四层合成、自学习闭环
-- [计划模式](./plan-mode.md) — 只读阶段 + HITL 退出
-- [Channel](./channel.md) — 会话管理、多 agent 路由、流式 SSE
+- [Middleware](../building-blocks/middleware.md) —— 中间件接口与 Order 表
+- [文件系统](./filesystem.md) · [工作区](./workspace.md) · [子 Agent](./subagent.md) · [Channel](./channel.md)
