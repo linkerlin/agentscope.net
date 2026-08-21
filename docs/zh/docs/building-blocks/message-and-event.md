@@ -57,8 +57,8 @@ string json = msg.ToString();          // JSON 序列化
 |--------|-----------|----------|------|
 | `TextBlock` | `"text"` | `Text` | 文本 |
 | `ImageBlock` | `"image"` | `Url`（或 `Data` 字节） | 图片 |
-| `AudioBlock` | `"audio"` | `Url`，可选 `DurationSec` | 音频 |
-| `VideoBlock` | `"video"` | `Url`，可选 `PosterUrl` | 视频 |
+| `AudioBlock` | `"audio"` | `Url`，可选 `DurationSec`、`MimeType`、`Data`（字节） | 音频 |
+| `VideoBlock` | `"video"` | `Url`，可选 `PosterUrl`、`MimeType`、`Data`（字节） | 视频 |
 | `ToolUseBlock` | `"tool_use"` | `Id`、`Name`，可选 `Input` | 模型发起的工具调用 |
 | `ToolResultBlock` | `"tool_result"` | `Id`，可选 `Output`、`IsError` | 工具执行结果，`ExtractText()` 提取文本 |
 | `ThinkingBlock` | `"thinking"` | `Thinking`，可选 `Signature` | 模型思考过程 |

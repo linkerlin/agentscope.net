@@ -113,8 +113,13 @@ public sealed class HarnessAgent : IAgent
     /// <param name="messages">Input messages. / 输入消息列表。</param>
     /// <param name="context">Optional runtime context. / 可选的运行时上下文。</param>
     /// <returns>An async sequence of events. / 事件的异步序列。</returns>
-    public IAsyncEnumerable<Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
-        => _inner.StreamEventsAsync(messages, context);
+    public async IAsyncEnumerable<Event> StreamEventsAsync(IReadOnlyList<Msg> messages,
+        RuntimeContext? context = null)
+    {
+        await EnhanceSystemPromptAsync(messages, context).ConfigureAwait(false);
+        await foreach (var evt in _inner.StreamEventsAsync(messages, context))
+            yield return evt;
+    }
 
     /// <summary>
     /// Streams events from a single message.
@@ -123,8 +128,13 @@ public sealed class HarnessAgent : IAgent
     /// <param name="message">The message. / 消息。</param>
     /// <param name="context">Optional runtime context. / 可选的运行时上下文。</param>
     /// <returns>An async sequence of events. / 事件的异步序列。</returns>
-    public IAsyncEnumerable<Event> StreamEventsAsync(Msg message, RuntimeContext? context = null)
-        => _inner.StreamEventsAsync(message, context);
+    public async IAsyncEnumerable<Event> StreamEventsAsync(Msg message,
+        RuntimeContext? context = null)
+    {
+        await EnhanceSystemPromptAsync(new[] { message }, context).ConfigureAwait(false);
+        await foreach (var evt in _inner.StreamEventsAsync(message, context))
+            yield return evt;
+    }
 
     /// <inheritdoc cref="CallAsync(Msg, RuntimeContext?)" />
     public Task ObserveAsync(Msg message, RuntimeContext? context = null) => CallAsync(message, context);
@@ -136,11 +146,9 @@ public sealed class HarnessAgent : IAgent
     public void Interrupt(Msg message) => _inner.Interrupt(message);
 
     /// <summary>
-    /// Executes the core agent call wrapped in the middleware pipeline (onion model).
-    /// 在中间件管道（洋葱模型）包裹下执行核心 Agent 调用。
+    /// 构建中间件上下文。对标 ExecuteWithMiddlewareAsync 中的上下文构造逻辑。
     /// </summary>
-    private async Task<Msg> ExecuteWithMiddlewareAsync(IReadOnlyList<Msg> messages,
-        Func<Task<Msg>> coreFn, RuntimeContext? context)
+    private MiddlewareContext BuildMiddlewareContext(IReadOnlyList<Msg> messages, RuntimeContext? context)
     {
         var mctx = new MiddlewareContext
         {
@@ -151,13 +159,19 @@ public sealed class HarnessAgent : IAgent
         mctx.Items["filesystem"] = _filesystem;
         mctx.Items["bus"] = _bus;
         mctx.Items["session_id"] = context?.SessionId ?? "default";
+        return mctx;
+    }
 
-        // 按 Order 排序执行中间件链 // Sort middlewares by Order for deterministic chain execution
+    /// <summary>
+    /// 按 Order 运行所有中间件的系统提示词改写链，将结果写回内层 Agent。
+    /// 供 CallAsync（通过 ExecuteWithMiddlewareAsync）和 StreamEventsAsync 共享。
+    /// </summary>
+    private async Task EnhanceSystemPromptAsync(IReadOnlyList<Msg> messages, RuntimeContext? context)
+    {
+        var mctx = BuildMiddlewareContext(messages, context);
         var sorted = _middlewares.OrderBy(m => m.Order).ToList();
-        if (sorted.Count == 0) return await coreFn().ConfigureAwait(false);
+        if (sorted.Count == 0) return;
 
-        // 系统提示词拦截链：依次让每个中间件改写提示词，最终写回内层 Agent。
-        // System prompt interception: let each middleware rewrite the prompt in order.
         var prompt = _inner.SystemPrompt;
         foreach (var mw in sorted)
         {
@@ -171,6 +185,21 @@ public sealed class HarnessAgent : IAgent
             }
         }
         _inner.SystemPrompt = prompt;
+    }
+
+    /// <summary>
+    /// Executes the core agent call wrapped in the middleware pipeline (onion model).
+    /// 在中间件管道（洋葱模型）包裹下执行核心 Agent 调用。
+    /// </summary>
+    private async Task<Msg> ExecuteWithMiddlewareAsync(IReadOnlyList<Msg> messages,
+        Func<Task<Msg>> coreFn, RuntimeContext? context)
+    {
+        await EnhanceSystemPromptAsync(messages, context).ConfigureAwait(false);
+
+        var sorted = _middlewares.OrderBy(m => m.Order).ToList();
+        if (sorted.Count == 0) return await coreFn().ConfigureAwait(false);
+
+        var mctx = BuildMiddlewareContext(messages, context);
 
         // 洋葱模型：每个中间件真正包裹核心调用，因此可以在 next() 前后做事，
         // 也可以选择不调用 next() 来短路整个回合。

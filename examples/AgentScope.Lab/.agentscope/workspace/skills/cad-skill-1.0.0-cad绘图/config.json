@@ -1,0 +1,53 @@
+{
+  "apps": {
+    "solidworks": {
+      "saved_paths": [
+        "E:\\Program Files\\SOLIDWORKS Corp\\SOLIDWORKS\\SLDWORKS.exe"
+      ],
+      "candidate_paths": [
+        "C:\\Program Files\\SOLIDWORKS Corp\\SOLIDWORKS\\SLDWORKS.exe",
+        "C:\\Program Files\\SOLIDWORKS Corp\\SOLIDWORKS 2022\\SLDWORKS.exe",
+        "C:\\Program Files\\SOLIDWORKS Corp\\SOLIDWORKS 2023\\SLDWORKS.exe",
+        "C:\\Program Files\\SOLIDWORKS Corp\\SOLIDWORKS 2024\\SLDWORKS.exe",
+        "D:\\Program Files\\SOLIDWORKS Corp\\SOLIDWORKS\\SLDWORKS.exe"
+      ],
+      "process_names": [
+        "SLDWORKS.exe"
+      ]
+    },
+    "catia": {
+      "saved_paths": [],
+      "candidate_paths": [
+        "C:\\Program Files\\Dassault Systemes\\B29\\win_b64\\code\\bin\\CNEXT.exe",
+        "C:\\Program Files\\Dassault Systemes\\B30\\win_b64\\code\\bin\\CNEXT.exe",
+        "C:\\Program Files\\Dassault Systemes\\B31\\win_b64\\code\\bin\\CNEXT.exe"
+      ],
+      "process_names": [
+        "CNEXT.exe"
+      ]
+    },
+    "creo": {
+      "saved_paths": [],
+      "candidate_paths": [
+        "C:\\Program Files\\PTC\\Creo 9.0.0.0\\Parametric\\bin\\parametric.exe",
+        "C:\\Program Files\\PTC\\Creo 10.0.0.0\\Parametric\\bin\\parametric.exe",
+        "C:\\Program Files\\PTC\\Creo 11.0.0.0\\Parametric\\bin\\parametric.exe",
+        "D:\\Program Files\\PTC\\Creo 11.0.0.0\\Parametric\\bin\\parametric.exe"
+      ],
+      "process_names": [
+        "parametric.exe"
+      ]
+    },
+    "ug": {
+      "saved_paths": [],
+      "candidate_paths": [
+        "C:\\Program Files\\Siemens\\NXBIN\\ugraf.exe",
+        "D:\\Program Files\\Siemens\\NXBIN\\ugraf.exe",
+        "D:\\Siemens\\NX\\NXBIN\\ugraf.exe"
+      ],
+      "process_names": [
+        "ugraf.exe"
+      ]
+    }
+  }
+}

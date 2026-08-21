@@ -35,5 +35,5 @@ public sealed class PathPolicy(IReadOnlySet<string> allowedRoots, IReadOnlySet<s
     }
 
     public static PathPolicy FromWorkspace(string workspaceRoot) =>
-        new(new HashSet<string>([workspaceRoot]));
+        new(new HashSet<string>([Path.GetFullPath(workspaceRoot)]));
 }

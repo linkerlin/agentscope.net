@@ -18,6 +18,7 @@ using System.Linq;
 using System.Reactive.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using AgentScope.Core.Agent;
@@ -1047,7 +1048,17 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
             {
                 try
                 {
-                    parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(input);
+                    var node = JsonNode.Parse(input);
+                    if (node is JsonObject jsonObj)
+                    {
+                        parameters = jsonObj.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => JsonValueToObject(kvp.Value));
+                    }
+                    else
+                    {
+                        parameters = input;
+                    }
                 }
                 catch
                 {
@@ -1061,6 +1072,31 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
         {
             return new ActionIntent { Action = "finish", Parameters = null, HasActionLine = false };
         }
+    }
+
+    /// <summary>
+    /// 将 JsonNode 递归转换为 .NET 原生类型，避免工具参数拿到 JsonElement。
+    /// </summary>
+    private static object? JsonValueToObject(JsonNode? node)
+    {
+        if (node == null) return null;
+        if (node is JsonValue jv)
+        {
+            if (jv.TryGetValue<string>(out var s)) return s;
+            if (jv.TryGetValue<long>(out var l)) return l;
+            if (jv.TryGetValue<double>(out var d)) return d;
+            if (jv.TryGetValue<bool>(out var b)) return b;
+            return jv.ToString();
+        }
+        if (node is JsonArray arr)
+        {
+            return arr.Select(JsonValueToObject).ToList();
+        }
+        if (node is JsonObject obj)
+        {
+            return obj.ToDictionary(kvp => kvp.Key, kvp => JsonValueToObject(kvp.Value));
+        }
+        return node.ToString();
     }
 
     private static bool IsCompletionMarker(string? value)

@@ -57,8 +57,8 @@ Multimodal content is represented by `ContentBlock` records (same namespace), pl
 |------------|-------------|-----------------|-------------|
 | `TextBlock` | `"text"` | `Text` | Text |
 | `ImageBlock` | `"image"` | `Url` (or `Data` bytes) | Image |
-| `AudioBlock` | `"audio"` | `Url`, optional `DurationSec` | Audio |
-| `VideoBlock` | `"video"` | `Url`, optional `PosterUrl` | Video |
+| `AudioBlock` | `"audio"` | `Url`, optional `DurationSec`, `MimeType`, `Data` (bytes) | Audio |
+| `VideoBlock` | `"video"` | `Url`, optional `PosterUrl`, `MimeType`, `Data` (bytes) | Video |
 | `ToolUseBlock` | `"tool_use"` | `Id`, `Name`, optional `Input` | Model-initiated tool call |
 | `ToolResultBlock` | `"tool_result"` | `Id`, optional `Output`, `IsError` | Tool execution result, `ExtractText()` extracts text |
 | `ThinkingBlock` | `"thinking"` | `Thinking`, optional `Signature` | Model thinking process |

@@ -1,0 +1,1 @@
+你是超人，用于测试agentscope net workspace功能

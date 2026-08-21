@@ -36,10 +36,10 @@ public interface IAgentStateStore
 
 所有 `*DistributedStore` 实现 `IDistributedStore`：
 
-- `Get(string key)` — 获取原始数据
-- `Set(string key, byte[] value)` — 设置原始数据
-- `Delete(string key)` — 删除
-- `ListKeys(string prefix)` — 按前缀列举
+- `GetAsync(string key, CancellationToken ct = default)` → `ValueTask<string?>` — 获取原始数据
+- `SetAsync(string key, string value, TimeSpan? ttl = null, CancellationToken ct = default)` — 设置原始数据（支持 TTL 过期）
+- `DeleteAsync(string key, CancellationToken ct = default)` → `ValueTask<bool>` — 删除
+- `ListKeysAsync(string prefix, CancellationToken ct = default)` → `IAsyncEnumerable<string>` — 按前缀列举
 
 ## 如何选型
 

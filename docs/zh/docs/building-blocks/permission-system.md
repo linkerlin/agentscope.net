@@ -46,7 +46,7 @@ PermissionDecision decision = permission.Evaluate(
 
 说明：
 
-- `CalculatorTool`（`calculator`）与 `GetTimeTool`（`get_time`）在状态机第 3 步**自动放行**；
+- `CalculatorTool` 与 `GetTimeTool` 在状态机第 3 步**自动放行**（代码中通过 C# 类名匹配）；
 - `PermissionMode.Bypass` 模式下未命中 deny/ask 规则的调用直接放行；
 - `AddRule` 返回自身，支持链式调用。
 

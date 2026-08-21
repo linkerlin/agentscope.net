@@ -18,7 +18,7 @@ description: "了解如何在 AgentScope .NET 2.0 中定义和配置智能体"
 | `IAgent` / `ICallableAgent` | `CallAsync(IReadOnlyList<Msg>, RuntimeContext?)` → `Task<Msg>` | 运行推理-行动循环并返回最终消息 |
 | `IStreamableAgent` | `StreamEventsAsync(Msg, RuntimeContext?)` → `IAsyncEnumerable<Event>` | 同 `CallAsync`，但流式产出 `Event`（见[消息与事件](./message-and-event.md)） |
 | `IAgent` | `ObserveAsync(Msg)` / `ObserveAsync(IReadOnlyList<Msg>)` | 触发一次回复（`EnhancedReActAgent` 中等价于 `CallAsync`） |
-| `IInterruptible` | `Interrupt()` / `Interrupt(Msg)` | 中断当前正在执行调用 |
+| `IAgent` | `Interrupt()` / `Interrupt(Msg)` | 中断当前正在执行调用 |
 | `IStructuredOutputCapableAgent` | `GenerateStructuredOutputAsync<T>(IEnumerable<Msg>)` → `Task<T>` | 按 C# 类型约束模型输出 JSON 并反序列化 |
 | `IStateModule` | `SaveTo / LoadFrom / LoadIfExists(Session, sessionKey)` | 把状态保存到 / 从 `Session` 恢复（见[上下文与 AgentState](./context.md)） |
 
@@ -162,7 +162,7 @@ EnhancedReActAgent agent = new EnhancedReActAgentBuilder()
     .Build();
 ```
 
-`IHook` 全部 11 个回调：`OnPreReasoningAsync` / `OnPostReasoningAsync` / `OnPreActingAsync` / `OnPostActingAsync` / `OnPreSummaryAsync` / `OnPostSummaryAsync` / `OnReasoningChunkAsync` / `OnActingChunkAsync` / `OnSummaryChunkAsync` / `OnErrorAsync`，以及 `Name` 属性。任何 Hook 把事件上的 `ShouldStop` 置为 `true` 会终止后续处理。
+`IHook` 提供 10 个回调方法 + `Name` 属性：`OnPreReasoningAsync` / `OnPostReasoningAsync` / `OnPreActingAsync` / `OnPostActingAsync` / `OnPreSummaryAsync` / `OnPostSummaryAsync` / `OnReasoningChunkAsync` / `OnActingChunkAsync` / `OnSummaryChunkAsync` / `OnErrorAsync`。任何 Hook 把事件上的 `ShouldStop` 置为 `true` 会终止后续处理。
 
 ## 人机交互（HITL）
 

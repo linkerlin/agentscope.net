@@ -107,7 +107,7 @@ var repo = new NacosSkillRepository(
     http: httpClient);
 ```
 
-`NacosSkillRepository` 从 Nacos 加载技能包，实现 `AgentScope.Extensions.Skill.ISkillRepository` 接口。
+`NacosSkillRepository` 从 Nacos 加载技能包，提供 `GetSkillContentAsync` 和 `PublishSkillAsync` 方法（独立 API，未实现 `ISkillRepository` 接口）。
 
 ## 与其他扩展配合
 

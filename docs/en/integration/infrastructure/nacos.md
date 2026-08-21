@@ -101,7 +101,7 @@ var repo = new NacosSkillRepository(
     http: httpClient);
 ```
 
-`NacosSkillRepository` loads skill packages from Nacos, implementing `AgentScope.Extensions.Skill.ISkillRepository`.
+`NacosSkillRepository` loads skill packages from Nacos, providing `GetSkillContentAsync` and `PublishSkillAsync` methods (standalone API, does not implement `ISkillRepository`).
 
 ## Pairs well with
 

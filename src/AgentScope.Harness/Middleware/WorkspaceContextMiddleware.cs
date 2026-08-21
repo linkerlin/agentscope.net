@@ -81,6 +81,7 @@ public sealed class WorkspaceContextMiddleware(
         var additionalText = string.Join("\n", additionalBlocks.Values);
 
         var sessionContext = BuildSessionContext(ctx);
+        var skillsBlock = BuildSkillsBlock();
 
         // Token 预算：约 4 字符 / token，记忆内容优先被截断
         memory = ApplyMemoryBudget(memory, sessionContext, agents, knowledgeBlock, additionalText);
@@ -89,6 +90,7 @@ public sealed class WorkspaceContextMiddleware(
         sb.Append(sessionContext).Append("\n\n");
         sb.Append(BuildGuidance()).Append('\n');
         sb.Append(BuildWorkspaceParagraph()).Append('\n');
+        sb.Append(skillsBlock);
         sb.Append(BuildLoadedContext(agents, memory, knowledgeBlock, additionalBlocks));
         return sb.ToString();
     }
@@ -245,5 +247,109 @@ public sealed class WorkspaceContextMiddleware(
         foreach (var line in content.Split('\n'))
             sb.Append("  ").Append(line.TrimEnd('\r')).Append('\n');
         sb.Append("  </").Append(tag).Append(">\n");
+    }
+
+    /// <summary>
+    /// 扫描工作区中的技能目录（skills/ .skills/ .skill/），
+    /// 以 <skill_list> 标签注入技能名称和描述，使 agent 知晓可用的技能。
+    /// </summary>
+    private string BuildSkillsBlock()
+    {
+        var wsRoot = workspaceManager.WorkspaceRoot;
+        var wsFull = Path.GetFullPath(wsRoot);
+        var cwd = Directory.GetCurrentDirectory();
+        var skillRoots = new[] { "skills", ".skills", ".skill" };
+        var entries = new List<(string ReadFilePath, string DisplayName, string Desc)>();
+
+        foreach (var subDir in skillRoots)
+        {
+            var dir = Path.Combine(wsFull, subDir);
+            if (!Directory.Exists(dir)) continue;
+            try
+            {
+                foreach (var file in Directory.GetFiles(dir, "SKILL.md",
+                    SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        var raw = File.ReadAllText(file);
+                        var name = ExtractSkillName(raw);
+                        var desc = ExtractSkillDescription(raw);
+                        // read_file 用 Path.GetFullPath 相对 CWD 解析路径，
+                        // 所以路径要相对于 CWD（如 .agentscope/workspace/skills/.../SKILL.md）
+                        var readPath = Path.GetRelativePath(cwd, file).Replace('\\', '/');
+                        entries.Add((readPath, name ?? Path.GetFileName(Path.GetDirectoryName(file) ?? ""), desc ?? ""));
+                    }
+                    catch
+                    {
+                        // 单个文件解析失败不影响其他
+                    }
+                }
+            }
+            catch
+            {
+                // 目录不可读不影响主流程
+            }
+        }
+
+        if (entries.Count == 0) return "";
+
+        var sb = new StringBuilder();
+        sb.Append("\n## Available Skills\n");
+        sb.Append("Below are skill definitions available in the workspace. ");
+        sb.Append("You can read their content using `read_file` with the path shown.\n\n");
+        foreach (var (readPath, displayName, desc) in entries)
+        {
+            sb.Append("- **").Append(displayName).Append("**");
+            if (!string.IsNullOrEmpty(desc))
+                sb.Append(": ").Append(desc);
+            sb.Append(" (`").Append(readPath).Append("`)\n");
+        }
+        sb.Append('\n');
+        return sb.ToString();
+    }
+
+    /// <summary>从 SKILL.md 前置元数据中提取 name 字段。</summary>
+    private static string? ExtractSkillName(string rawContent)
+    {
+        try
+        {
+            var lines = rawContent.Split('\n');
+            if (lines.Length < 2 || !lines[0].Trim().Equals("---")) return null;
+            int end = 1;
+            while (end < lines.Length && !lines[end].Trim().Equals("---")) end++;
+            if (end >= lines.Length) return null;
+
+            for (int i = 1; i < end; i++)
+            {
+                var line = lines[i].Trim();
+                if (line.StartsWith("name:", StringComparison.OrdinalIgnoreCase))
+                    return line["name:".Length..].Trim().Trim('"', '\'');
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>从 SKILL.md 前置元数据中提取 description 字段。</summary>
+    private static string? ExtractSkillDescription(string rawContent)
+    {
+        try
+        {
+            var lines = rawContent.Split('\n');
+            if (lines.Length < 2 || !lines[0].Trim().Equals("---")) return null;
+            int end = 1;
+            while (end < lines.Length && !lines[end].Trim().Equals("---")) end++;
+            if (end >= lines.Length) return null;
+
+            for (int i = 1; i < end; i++)
+            {
+                var line = lines[i].Trim();
+                if (line.StartsWith("description:", StringComparison.OrdinalIgnoreCase))
+                    return line["description:".Length..].Trim().Trim('"', '\'');
+            }
+        }
+        catch { }
+        return null;
     }
 }

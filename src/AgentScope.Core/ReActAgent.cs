@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Memory;
@@ -351,7 +352,23 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
             {
                 try
                 {
-                    parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(input);
+                    // 注意：JsonSerializer.Deserialize<Dictionary<string, object>>
+                    // 默认将字符串值反序列化为 JsonElement 而非 string，
+                    // 导致工具的参数类型检查失败。这里用 JsonNode 解析确保证值类型正确。
+                    // Note: JsonSerializer.Deserialize<Dictionary<string, object>>
+                    // produces JsonElement for string values by default, breaking
+                    // tool parameter type checks. Use JsonNode to get correct types.
+                    var node = JsonNode.Parse(input);
+                    if (node is JsonObject jsonObj)
+                    {
+                        parameters = jsonObj.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => JsonValueToObject(kvp.Value));
+                    }
+                    else
+                    {
+                        parameters = input;
+                    }
                 }
                 catch
                 {
@@ -416,6 +433,32 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
     public static ReActAgentBuilder Builder()
     {
         return new ReActAgentBuilder();
+    }
+
+    /// <summary>
+    /// 将 JsonNode 递归转换为对应的 .NET 原生类型（string/long/double/bool/null），
+    /// 避免工具参数中拿到 JsonElement 导致类型检查失败。
+    /// </summary>
+    private static object? JsonValueToObject(JsonNode? node)
+    {
+        if (node == null) return null;
+        if (node is JsonValue jv)
+        {
+            if (jv.TryGetValue<string>(out var s)) return s;
+            if (jv.TryGetValue<long>(out var l)) return l;
+            if (jv.TryGetValue<double>(out var d)) return d;
+            if (jv.TryGetValue<bool>(out var b)) return b;
+            return jv.ToString();
+        }
+        if (node is JsonArray arr)
+        {
+            return arr.Select(JsonValueToObject).ToList();
+        }
+        if (node is JsonObject obj)
+        {
+            return obj.ToDictionary(kvp => kvp.Key, kvp => JsonValueToObject(kvp.Value));
+        }
+        return node.ToString();
     }
 }
 

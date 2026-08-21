@@ -36,10 +36,10 @@ public interface IAgentStateStore
 
 All `*DistributedStore` types implement `IDistributedStore`:
 
-- `Get(string key)` — Fetches raw data
-- `Set(string key, byte[] value)` — Stores raw data
-- `Delete(string key)` — Deletes data
-- `ListKeys(string prefix)` — Lists keys by prefix
+- `GetAsync(string key, CancellationToken ct = default)` → `ValueTask<string?>` — Fetches raw data
+- `SetAsync(string key, string value, TimeSpan? ttl = null, CancellationToken ct = default)` — Stores raw data (supports TTL expiry)
+- `DeleteAsync(string key, CancellationToken ct = default)` → `ValueTask<bool>` — Deletes data
+- `ListKeysAsync(string prefix, CancellationToken ct = default)` → `IAsyncEnumerable<string>` — Lists keys by prefix
 
 ## How to Choose
 

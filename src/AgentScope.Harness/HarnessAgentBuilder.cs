@@ -18,6 +18,8 @@ using AgentScope.Core.Model;
 using AgentScope.Core.Permission;
 using AgentScope.Core.State;
 using AgentScope.Core.Tool;
+using AgentScope.Core.Skill;
+using AgentScope.Core.Tool.File;
 using AgentScope.Harness.Bus;
 using AgentScope.Harness.Filesystem;
 using AgentScope.Harness.Filesystem.Spec;
@@ -148,6 +150,71 @@ public sealed class HarnessAgentBuilder
             .Build();
         var teamClient = _teamClient ?? new LocalTeamClient();
         var subagentManager = _subagentManager ?? new DefaultAgentManager();
+
+        // 当配置了工作区时，自动注册默认工具集（文件工具、工作区工具等）。
+        // Auto-register default workspace tools when WorkspaceManager is provided.
+        if (_workspaceManager != null)
+        {
+            var wsRoot = Path.GetFullPath(_workspaceManager.WorkspaceRoot);
+
+            // 将工作区根目录加入文件工具沙箱（允许 read_file / write_file 操作工作区文件）
+            var currentRoots = new List<string>(FileToolUtils.AllowedRoots);
+            var wsRootNormalized = wsRoot.TrimEnd(Path.DirectorySeparatorChar);
+            if (!currentRoots.Any(r =>
+                {
+                    try { return Path.GetFullPath(r).TrimEnd(Path.DirectorySeparatorChar)
+                        .Equals(wsRootNormalized, StringComparison.OrdinalIgnoreCase); }
+                    catch { return false; }
+                }))
+            {
+                currentRoots.Add(wsRoot);
+                FileToolUtils.AllowedRoots = currentRoots.AsReadOnly();
+            }
+
+            // 如果没有显式提供 Toolkit，则创建一个默认 Toolkit
+            _toolkit ??= new Toolkit();
+
+            // 注册基础文件工具（幂等：已存在同名工具则跳过）
+            if (_toolkit.Resolve("read_file") == null)
+                _toolkit.AddTool(new ReadFileTool());
+            if (_toolkit.Resolve("write_file") == null)
+                _toolkit.AddTool(new WriteFileTool());
+
+            // 自动发现并注册 workspace 中的技能（从多个可能的技能目录扫描）
+            // Auto-discover and register skills from workspace (skills, .skills, .skill)
+            var skillRoots = new[] { "skills", ".skills", ".skill" };
+            var parser = new MarkdownSkillParser();
+            var allSkills = new List<ISkill>();
+            foreach (var subDir in skillRoots)
+            {
+                var dir = Path.Combine(wsRoot, subDir);
+                if (!Directory.Exists(dir)) continue;
+                try
+                {
+                    foreach (var file in Directory.GetFiles(dir, "SKILL.md",
+                        SearchOption.AllDirectories))
+                    {
+                        try
+                        {
+                            var registered = parser.ParseFile(file);
+                            allSkills.Add(new MarkdownSkill(registered, isActive: true));
+                        }
+                        catch
+                        {
+                            // 单个技能解析失败不影响其他技能
+                        }
+                    }
+                }
+                catch
+                {
+                    // 目录不可读等错误不影响主流程
+                }
+            }
+            if (allSkills.Count > 0)
+            {
+                SkillToolFactory.RegisterSkills(_toolkit, allSkills);
+            }
+        }
 
         // 构建 EnhancedReActAgent // Build the inner EnhancedReActAgent
         var innerBuilder = new EnhancedReActAgentBuilder()

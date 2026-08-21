@@ -1,18 +1,9 @@
-
-
-
-
-
-
-
-using AgentScope.Core;
+﻿using AgentScope.Core;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Events;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
 using AgentScope.Core.Model.OpenAI;
-using AgentScope.Core.Tool;
-using AgentScope.Core.MCP;
 using AgentScope.Harness;
 using AgentScope.Harness.Middleware;
 using DotNetEnv;
@@ -20,12 +11,11 @@ using DotNetEnv;
 
 namespace AgentScope.Lab;
 
-public class ToolDemo
+public class GetStartedDemo
 {
     private IModel? _model;
-    private Toolkit _toolkit = new Toolkit();
 
-    public ToolDemo()
+    public GetStartedDemo()
     {
         // 加载 .env 中的 API Key（优先当前目录，其次仓库根目录）
         var localEnv = Path.Combine(Directory.GetCurrentDirectory(), ".env");
@@ -45,34 +35,8 @@ public class ToolDemo
         // Console.WriteLine(model);
     }
 
-    public void RegisterTool()
-    {
 
-        _toolkit.RegisterTool(new WeatherService());   // 扫描实例上的 [Tool] 方法
-                                                       // _toolkit.RegisterTool<MathTools>();            // 扫描类型 T 的静态 [Tool] 方法
-
-    }
-    
-    public async Task RegisterMcp()
-    {
-        // Streamable HTTP / SSE（远程服务）
-        IMcpClient http = McpClientBuilder.Create()
-            .Named("excel-mcp-http")
-            .UseStreamableHttp("http://10.193.41.51:9151/mcp")
-            // .WithApiKey("YOUR_KEY") // Authorization: Bearer
-            .WithRequestTimeout(TimeSpan.FromSeconds(60))
-            .Build();
-
-        // 注册到 McpManager 并发现工具
-        var manager = new McpManager();
-        manager.RegisterClient(http);
-        IReadOnlyList<ITool> tools = await manager.CreateToolsAsync(); // 自动初始化并发现
- 
-        foreach (var tool in tools)
-            _toolkit.AddTool(tool);
-    }
-
-    public async Task Tool_chat()
+    public async Task Chat()
     {
         // 模型连通性自检
         var pingResp = await this._model!.GenerateAsync(new ModelRequest
@@ -113,7 +77,7 @@ public class ToolDemo
     }
 
 
-    public async Task Tool_chat_streaming()
+    public async Task ChatStream()
     {
         // 模型连通性自检
         var pingResp = await _model!.GenerateAsync(new ModelRequest
@@ -122,7 +86,6 @@ public class ToolDemo
         });
         Console.WriteLine($"模型连通性自检: [{pingResp.Text}]\n");
 
-        await RegisterMcp();
         // 构建 HarnessAgent（工作区 + 上下文压缩中间件）
         HarnessAgent agent = new HarnessAgentBuilder()
             .WithName("note-taker")
@@ -130,7 +93,6 @@ public class ToolDemo
             .WithModel(_model)
             .WithWorkspaceRoot(Path.GetFullPath(".agentscope/workspace"))
             .WithMiddleware(new CompactionMiddleware(maxContextLength: 4096))
-            .WithToolkit(_toolkit)  // 注册工具集
             .Build();
 
         // 运行时上下文：同一 (userId, sessionId) 跨调用恢复状态
@@ -141,7 +103,7 @@ public class ToolDemo
         // 第一轮：自我介绍 + 当天的事
         Msg first = Msg.Builder()
             .Role("user")
-            .TextContent("你有什么MCP工具")
+            .TextContent("我叫超级买卖无敌汉堡王，今天准备一个关于 铅基反应堆 的技术分享。")
             .Build();
 
         Console.WriteLine($"第一轮: \n");
@@ -170,7 +132,7 @@ public class ToolDemo
         Msg second = Msg.Builder()
             .Role("user")
             // .TextContent("我叫什么？我今天要干什么？")
-            .TextContent("列出你的MCP工具？")
+            .TextContent("你有什么工具可用？")
             .Build();
 
         // StreamEventsAsync：流式逐事件输出（SSE 风格）
@@ -184,15 +146,4 @@ public class ToolDemo
             }
         }
     }
-}
-
-
-
-public class WeatherService
-{
-    [Tool(Name = "get_weather", Description = "获取指定城市的天气")]
-    public string GetWeather(
-        [ToolParam(Name = "city", Description = "城市名")] string city,
-        [ToolParam(Description = "天数", Required = false)] int days = 3)
-        => $"{city} 未来 {days} 天晴。";
 }

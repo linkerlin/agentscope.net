@@ -46,7 +46,7 @@ PermissionDecision decision = permission.Evaluate(
 
 Notes:
 
-- `CalculatorTool` (`calculator`) and `GetTimeTool` (`get_time`) are **auto-allowed** at step 3 of the state machine;
+- `CalculatorTool` and `GetTimeTool` are **auto-allowed** at step 3 of the state machine (matched by C# class name);
 - In `PermissionMode.Bypass` mode, calls that do not match deny/ask rules are allowed directly;
 - `AddRule` returns itself, supporting chained calls.
 

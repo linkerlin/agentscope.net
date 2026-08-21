@@ -18,7 +18,7 @@ The old class `ReActAgent` is fully marked `[Obsolete]`. Use `EnhancedReActAgent
 | `IAgent` / `ICallableAgent` | `CallAsync(IReadOnlyList<Msg>, RuntimeContext?)` → `Task<Msg>` | Runs the reasoning-action loop and returns the final message |
 | `IStreamableAgent` | `StreamEventsAsync(Msg, RuntimeContext?)` → `IAsyncEnumerable<Event>` | Same as `CallAsync`, but streams `Event` output (see [Message and Event](./message-and-event.md)) |
 | `IAgent` | `ObserveAsync(Msg)` / `ObserveAsync(IReadOnlyList<Msg>)` | Triggers a reply (equivalent to `CallAsync` in `EnhancedReActAgent`) |
-| `IInterruptible` | `Interrupt()` / `Interrupt(Msg)` | Interrupts the currently executing call |
+| `IAgent` | `Interrupt()` / `Interrupt(Msg)` | Interrupts the currently executing call |
 | `IStructuredOutputCapableAgent` | `GenerateStructuredOutputAsync<T>(IEnumerable<Msg>)` → `Task<T>` | Constrains model output to a C# type as JSON and deserializes |
 | `IStateModule` | `SaveTo / LoadFrom / LoadIfExists(Session, sessionKey)` | Saves / restores state to/from a `Session` (see [Context and AgentState](./context.md)) |
 
@@ -162,7 +162,7 @@ EnhancedReActAgent agent = new EnhancedReActAgentBuilder()
     .Build();
 ```
 
-All 11 `IHook` callbacks: `OnPreReasoningAsync` / `OnPostReasoningAsync` / `OnPreActingAsync` / `OnPostActingAsync` / `OnPreSummaryAsync` / `OnPostSummaryAsync` / `OnReasoningChunkAsync` / `OnActingChunkAsync` / `OnSummaryChunkAsync` / `OnErrorAsync`, and the `Name` property. Any Hook that sets `ShouldStop` on the event to `true` will terminate subsequent processing.
+`IHook` provides 10 callback methods + the `Name` property: `OnPreReasoningAsync` / `OnPostReasoningAsync` / `OnPreActingAsync` / `OnPostActingAsync` / `OnPreSummaryAsync` / `OnPostSummaryAsync` / `OnReasoningChunkAsync` / `OnActingChunkAsync` / `OnSummaryChunkAsync` / `OnErrorAsync`. Any Hook that sets `ShouldStop` on the event to `true` will terminate subsequent processing.
 
 ## Human-in-the-Loop (HITL)
 
