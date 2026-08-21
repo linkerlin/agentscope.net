@@ -9,7 +9,7 @@ using DotNetEnv;
 
 async Task Executor()
 {
-    var demo = new WorkspaceDemo();
+    var demo = new SubagentDemo();
     await demo.ChatStream();
     Console.ReadKey();
 }
