@@ -89,7 +89,28 @@
       document.getElementById('sidebar').innerHTML = h;
     }
 
+    var currentFile = 'zh/home.md';
+
+    function getDir(p) {
+      var i = p.lastIndexOf('/');
+      return i >= 0 ? p.substring(0, i) : '';
+    }
+
+    function resolveLink(link, baseDir) {
+      if (link.indexOf('://') >= 0 || link.indexOf('//') === 0) return null;
+      if (link.indexOf('#') === 0) return null;
+      var parts = link.split('/');
+      var dir = baseDir ? baseDir.split('/') : [];
+      for (var k = 0; k < parts.length; k++) {
+        if (parts[k] === '.' || parts[k] === '') continue;
+        if (parts[k] === '..') { if (dir.length > 0) dir.pop(); }
+        else dir.push(parts[k]);
+      }
+      return dir.join('/');
+    }
+
     function load(path) {
+      currentFile = path;
       var el = document.getElementById('content');
       el.innerHTML = '<div class="loading">加载中...</div>';
       var xhr = new XMLHttpRequest();
@@ -105,6 +126,19 @@
       };
       xhr.send();
     }
+
+    document.addEventListener('click', function(e) {
+      var a = e.target.closest('a');
+      if (!a || a.closest('#sidebar')) return;
+      var href = a.getAttribute('href');
+      if (!href || href.indexOf('.md') < 0 || href.indexOf('://') >= 0) return;
+      e.preventDefault();
+      var resolved = resolveLink(href, getDir(currentFile));
+      if (resolved) {
+        load(resolved);
+        window.history.replaceState(null, '', '?f=' + encodeURIComponent(resolved));
+      }
+    });
 
     buildSidebar();
     var p = new URLSearchParams(window.location.search).get('f') || 'zh/home.md';
