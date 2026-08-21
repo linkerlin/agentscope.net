@@ -64,7 +64,7 @@ public class WorkspaceDemo
         // 第一轮：自我介绍 + 当天的事
         Msg first = Msg.Builder()
             .Role("user")
-            .TextContent("你有什么技能可用？请读一下 生物 技能的内容")
+            .TextContent("你有什么技能可用？")
             .Build();
 
         Console.WriteLine($"第一轮: \n");
@@ -98,7 +98,7 @@ public class WorkspaceDemo
         Msg second = Msg.Builder()
             .Role("user")
             // .TextContent("我叫什么？我今天要干什么？")
-            .TextContent("你刚才做了什么？")
+            .TextContent("请读一下 生物 技能的简介？")
             .Build();
 
         // StreamEventsAsync：流式逐事件输出（SSE 风格）
