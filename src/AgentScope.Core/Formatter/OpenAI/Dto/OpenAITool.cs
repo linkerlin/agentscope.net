@@ -1,3 +1,17 @@
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2024 AgentScope team.
 // Licensed under the Apache License, Version 2.0.
 
@@ -81,11 +95,20 @@ public record OpenAIToolFunction
 public record OpenAIToolCall
 {
     /// <summary>
+    /// 流式增量中的工具调用序号（用于跨块合并同一工具调用）
+    /// Tool call index for merging incremental deltas across stream chunks
+    /// </summary>
+    [JsonPropertyName("index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Index { get; init; }
+
+    /// <summary>
     /// 工具调用ID
     /// Tool call ID
     /// </summary>
     [JsonPropertyName("id")]
-    public required string Id { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Id { get; init; }
 
     /// <summary>
     /// 工具类型
@@ -99,7 +122,8 @@ public record OpenAIToolCall
     /// Function call information
     /// </summary>
     [JsonPropertyName("function")]
-    public required OpenAIFunctionCall Function { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OpenAIFunctionCall? Function { get; init; }
 }
 
 /// <summary>
@@ -113,14 +137,16 @@ public record OpenAIFunctionCall
     /// Function name
     /// </summary>
     [JsonPropertyName("name")]
-    public required string Name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Name { get; init; }
 
     /// <summary>
     /// 函数参数（JSON字符串）
     /// Function arguments (JSON string)
     /// </summary>
     [JsonPropertyName("arguments")]
-    public required string Arguments { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Arguments { get; init; }
 }
 
 /// <summary>

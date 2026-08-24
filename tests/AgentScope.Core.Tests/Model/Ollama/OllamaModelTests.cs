@@ -19,9 +19,17 @@ using Msg = AgentScope.Core.Message.Msg;
 
 namespace AgentScope.Core.Tests.Model.Ollama;
 
+/// <summary>
+/// Tests for <see cref="OllamaModel"/> and its builder.
+/// OllamaModel 及其构建器的测试。
+/// </summary>
 public class OllamaModelTests
 {
     [Fact]
+    /// <summary>
+    /// Tests that the default constructor uses the default model name.
+    /// 测试默认构造函数使用了默认模型名称。
+    /// </summary>
     public void OllamaModel_DefaultConstructor_ShouldUseDefaults()
     {
         // Arrange & Act
@@ -32,6 +40,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that a custom model name is used when provided.
+    /// 测试提供的自定义模型名称被正确使用。
+    /// </summary>
     public void OllamaModel_WithCustomModelName_ShouldUseCustomModel()
     {
         // Arrange & Act
@@ -42,6 +54,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that a custom base URL is used when provided.
+    /// 测试提供的自定义基础 URL 被正确使用。
+    /// </summary>
     public void OllamaModel_WithCustomBaseUrl_ShouldUseCustomUrl()
     {
         // Arrange & Act
@@ -53,6 +69,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that all model constant names are correctly defined.
+    /// 测试所有模型常量名称已被正确定义。
+    /// </summary>
     public void OllamaModel_ModelsConstants_ShouldBeDefined()
     {
         // Assert - Verify all model constants are defined
@@ -69,6 +89,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that the builder creates a model with the specified name.
+    /// 测试构建器使用指定名称创建模型。
+    /// </summary>
     public void OllamaModelBuilder_Build_ShouldCreateModel()
     {
         // Arrange & Act
@@ -81,6 +105,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that <see cref="OllamaModelBuilder.UseLlama2"/> sets the Llama2 model.
+    /// 测试 UseLlama2() 设置了 Llama2 模型。
+    /// </summary>
     public void OllamaModelBuilder_UseLlama2_ShouldSetLlama2Model()
     {
         // Arrange & Act
@@ -93,6 +121,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that <see cref="OllamaModelBuilder.UseLlama3"/> sets the Llama3 model.
+    /// 测试 UseLlama3() 设置了 Llama3 模型。
+    /// </summary>
     public void OllamaModelBuilder_UseLlama3_ShouldSetLlama3Model()
     {
         // Arrange & Act
@@ -105,6 +137,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that <see cref="OllamaModelBuilder.UseLlama31"/> sets the Llama3.1 model.
+    /// 测试 UseLlama31() 设置了 Llama3.1 模型。
+    /// </summary>
     public void OllamaModelBuilder_UseLlama31_ShouldSetLlama31Model()
     {
         // Arrange & Act
@@ -117,6 +153,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that <see cref="OllamaModelBuilder.UseMistral"/> sets the Mistral model.
+    /// 测试 UseMistral() 设置了 Mistral 模型。
+    /// </summary>
     public void OllamaModelBuilder_UseMistral_ShouldSetMistralModel()
     {
         // Arrange & Act
@@ -129,6 +169,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that <see cref="OllamaModelBuilder.UseCodeLlama"/> sets the CodeLlama model.
+    /// 测试 UseCodeLlama() 设置了 CodeLlama 模型。
+    /// </summary>
     public void OllamaModelBuilder_UseCodeLlama_ShouldSetCodeLlamaModel()
     {
         // Arrange & Act
@@ -141,6 +185,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that <see cref="OllamaModelBuilder.UseDeepSeekCoder"/> sets the DeepSeekCoder model.
+    /// 测试 UseDeepSeekCoder() 设置了 DeepSeekCoder 模型。
+    /// </summary>
     public void OllamaModelBuilder_UseDeepSeekCoder_ShouldSetDeepSeekCoderModel()
     {
         // Arrange & Act
@@ -153,6 +201,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that <see cref="OllamaModelBuilder.UsePhi3"/> sets the Phi-3 model.
+    /// 测试 UsePhi3() 设置了 Phi-3 模型。
+    /// </summary>
     public void OllamaModelBuilder_UsePhi3_ShouldSetPhi3Model()
     {
         // Arrange & Act
@@ -165,6 +217,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that the builder accepts a custom base URL.
+    /// 测试构建器接受自定义基础 URL。
+    /// </summary>
     public void OllamaModelBuilder_WithBaseUrl_ShouldSetCustomUrl()
     {
         // Arrange & Act
@@ -178,6 +234,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tests that the default model and base URL constants are correct.
+    /// 测试默认模型和基础 URL 常量的正确性。
+    /// </summary>
     public void OllamaModel_DefaultConstants_ShouldBeCorrect()
     {
         // Assert
@@ -186,6 +246,10 @@ public class OllamaModelTests
     }
 
     [Fact]
+    /// <summary>
+    /// Integration test: generates a response from a real Ollama server. Skips if the server is unavailable.
+    /// 集成测试：从真实的 Ollama 服务器生成响应。如果服务器不可用则跳过。
+    /// </summary>
     public async Task OllamaModel_GenerateAsync_WithRealOllama_ReturnsResponse()
     {
         // This test requires a running Ollama server with the specified model

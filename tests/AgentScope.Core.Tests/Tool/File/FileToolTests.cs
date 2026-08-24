@@ -7,10 +7,22 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.Tool.File;
 
+/// <summary>
+/// Tests for file operation tools (ReadFileTool, WriteFileTool)
+/// 文件操作工具（ReadFileTool、WriteFileTool）的测试
+/// </summary>
 public class FileToolTests
 {
+    /// <summary>
+    /// Temporary directory for test file operations
+    /// 用于测试文件操作的临时目录
+    /// </summary>
     private readonly string _tempDir;
 
+    /// <summary>
+    /// Initializes a new test instance with a temporary directory
+    /// 使用临时目录初始化测试实例
+    /// </summary>
     public FileToolTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), "AgentScope_FileTool_" + Guid.NewGuid().ToString("N"));
@@ -19,6 +31,10 @@ public class FileToolTests
     }
 
     [Fact]
+    /// <summary>
+    /// IsPathAllowed returns true for paths within the allowed root directory
+    /// 测试 IsPathAllowed 对允许根目录内的路径返回 true
+    /// </summary>
     public void FileToolUtils_IsPathAllowed_WithinRoot_ReturnsTrue()
     {
         var path = Path.Combine(_tempDir, "a.txt");
@@ -26,6 +42,10 @@ public class FileToolTests
     }
 
     [Fact]
+    /// <summary>
+    /// IsPathAllowed returns false for paths outside the allowed root directory
+    /// 测试 IsPathAllowed 对允许根目录外的路径返回 false
+    /// </summary>
     public void FileToolUtils_IsPathAllowed_OutsideRoot_ReturnsFalse()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -39,6 +59,10 @@ public class FileToolTests
     }
 
     [Fact]
+    /// <summary>
+    /// WriteFileTool and ReadFileTool round-trip: write then read back the same content
+    /// 测试 WriteFileTool 和 ReadFileTool 的读写往返：写入后读取相同内容
+    /// </summary>
     public async Task WriteFileTool_Then_ReadFileTool_RoundTrips()
     {
         var rel = "f1.txt";
@@ -53,6 +77,10 @@ public class FileToolTests
     }
 
     [Fact]
+    /// <summary>
+    /// ReadFileTool returns fail result when trying to read a disallowed path
+    /// 测试 ReadFileTool 在尝试读取不允许的路径时返回失败结果
+    /// </summary>
     public async Task ReadFileTool_DisallowedPath_ReturnsFail()
     {
         var read = new ReadFileTool();
@@ -62,6 +90,10 @@ public class FileToolTests
     }
 
     [Fact]
+    /// <summary>
+    /// ReadFileTool returns fail result when path parameter is missing
+    /// 测试 ReadFileTool 在缺少路径参数时返回失败结果
+    /// </summary>
     public async Task ReadFileTool_MissingPath_ReturnsFail()
     {
         var read = new ReadFileTool();

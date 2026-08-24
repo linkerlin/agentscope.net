@@ -15,8 +15,22 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.State;
 
+/// <summary>
+/// Unit tests for <see cref="EnhancedReActAgent"/> state persistence via <see cref="IStateModule"/>,
+/// verifying that SaveTo/LoadFrom round-trips agent identity, memory, and tool group configuration,
+/// and that LoadIfExists handles missing state gracefully.
+/// 对 <see cref="EnhancedReActAgent"/> 通过 <see cref="IStateModule"/> 进行状态持久化的单元测试，
+/// 验证 SaveTo/LoadFrom 能否正确保存和恢复 agent 标识、记忆以及工具组配置，
+/// 并验证 LoadIfExists 在状态缺失时能优雅处理。
+/// </summary>
 public class EnhancedReActAgentStateTests
 {
+    /// <summary>
+    /// Tests that SaveTo persists agent metadata, memory messages, and tool group activation state,
+    /// and that LoadFrom restores all of them — overwriting builder-supplied defaults.
+    /// 测试 SaveTo 持久化 agent 元数据、记忆消息和工具组激活状态，
+    /// 且 LoadFrom 能恢复所有状态——覆盖构造器提供的默认值。
+    /// </summary>
     [Fact]
     public async Task SaveTo_And_LoadFrom_RestoresMetaMemoryAndToolGroups()
     {

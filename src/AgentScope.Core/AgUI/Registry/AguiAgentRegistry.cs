@@ -1,0 +1,42 @@
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using System.Collections.Concurrent;
+using AgentScope.Core.Agent;
+
+namespace AgentScope.Core.AgUI.Registry;
+
+/// <summary>
+/// AG-UI Agent 注册表。对标 Java AguiAgentRegistry。
+/// 支持单例和工厂注册。
+/// </summary>
+public sealed class AguiAgentRegistry
+{
+    private readonly ConcurrentDictionary<string, IAgent> _singletons = new();
+    private readonly ConcurrentDictionary<string, Func<IAgent>> _factories = new();
+
+    public void Register(string agentId, IAgent agent) => _singletons[agentId] = agent;
+    public void RegisterFactory(string agentId, Func<IAgent> factory) => _factories[agentId] = factory;
+
+    public IAgent GetAgent(string agentId) =>
+        _singletons.TryGetValue(agentId, out var a) ? a :
+        _factories.TryGetValue(agentId, out var f) ? f() :
+        throw new KeyNotFoundException($"AG-UI Agent '{agentId}' 未注册");
+
+    public bool HasAgent(string agentId) =>
+        _singletons.ContainsKey(agentId) || _factories.ContainsKey(agentId);
+
+    public void Unregister(string agentId) { _singletons.TryRemove(agentId, out _); _factories.TryRemove(agentId, out _); }
+    public void Clear() { _singletons.Clear(); _factories.Clear(); }
+}

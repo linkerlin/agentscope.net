@@ -1,79 +1,46 @@
 # AgentScope.NET 项目状态总结
 
-> 最后更新: 2026-02-18  
-> 当前版本: v0.5.4  
-> 完成度: 53.7%
+> 最后更新: 2026-08-17 | 分支: develop/v2.0.1 | 版本: v2.0.1
 
 ## 📊 核心指标
 
 | 指标 | 数值 | 状态 |
 |-----|------|------|
-| 功能点完成度 | 29/54 (53.7%) | 🟢 良好 |
-| 代码规模 | ~7,750行 | 🟢 适中 |
-| 测试覆盖 | 75个测试 | 🟢 100%通过 |
-| 技术债务 | 0 | 🟢 优秀 |
-| 构建状态 | 成功 | 🟢 健康 |
+| 核心模块 | 22/22 全部完成 | ✅ |
+| 扩展项目 | 42 个 (对齐 Java) | ✅ |
+| C# 源文件 | 959 个 | 🟢 |
+| 代码行数 | ~65,941 行 (非空) | 🟢 |
+| 构建 (AgentScope.Core) | 0 错误 / 2 警告 | ✅ |
+| 构建 (AgentScope.Harness) | 0 错误 | ✅ |
+| 构建 (完整解决方案) | **118 错误 / 230 警告** | 🔴 |
+| 集成测试 | 22 通过 | ✅ |
 
-## ✅ 已完成模块（10个）
+## ✅ 已完成模块 (22/22)
 
-1. **Agent系统** - EnhancedReActAgent完整实现
-2. **Hook系统** - 4种事件，扩展机制
-3. **Session管理** - 线程安全，状态管理
-4. **Memory系统** - SQLite持久化
-5. **Message系统** - Builder模式
-6. **Model接口** - 抽象层
-7. **Tool系统** - 工具基础设施
-8. **Exception** - 异常层次
-9. **Configuration** - .env配置
-10. **OpenAI Formatter** - 完整API支持
+Agent/Hook/Session/State/Memory/Message/Model(7提供商)/Formatter(4种)/Tool/Pipeline/Plan/RAG/Workflow/MultiAgent/Service/Interruption/Tracing/Skill/MCP/A2A/AgUI/Event/Accumulator
 
-## ⏳ 进行中
+## ✅ 运行时框架 (AgentScope.Harness)
 
-**当前任务**: Step 1.2 - Anthropic Formatter  
-**预计完成**: 1天  
-**下一进度**: 30/54 (55.6%)
+Gateway/Middleware/Sandbox/Filesystem/Team/SubAgent/Skill 运行时/Tool
 
-## 🎯 里程碑
+## ✅ 扩展项目 (42 个)
 
-- [x] 40% - 基础架构
-- [x] 50% - OpenAI Formatter开始
-- [x] 53.7% - OpenAI Formatter完成（当前）
-- [ ] 60% - 所有Formatter完成
-- [ ] 70% - 真实LLM + Pipeline
-- [ ] 85% - Plan + RAG
-- [ ] 100% - 项目完成
+渠道(DingTalk/Feishu/GitHub/GitLab/WeCom) | 文档(PDF/Word) | 记忆(Bailian/Mem0/ReMe) | RAG(Bailian/Dify/Haystack/RagFlow) | Sandbox(AgentRun/Daytona/Docker/E2B/Kubernetes) | 调度(Quartz/XxlJob) | Skill(Git/MySql/PostgreSql) | 存储(Cos/MySql/Oss/PostgreSql/Redis) | 向量(ES/Milvus/PgVector/Qdrant) | 其他(Aistio/Higress/Nacos/Studio/Training)
 
-## 📅 时间线
+## 🔴 构建阻塞
 
-**已用**: ~4天  
-**预计剩余**: 16-22天  
-**总预计**: 20-26天
+| 问题 | 数量 | 说明 |
+|------|------|------|
+| 测试 Mock 类未同步接口 | **111 处** | AgentGroup/AgentCoordinator/AgentRouter/Pipeline/SubAgentTool 测试中的 TestAgent/FakeAgent |
+| Uno XAML 绑定 | **7 处** | InputBox/SendButton/ChatListView x:Name 未绑定 |
+| NU1903 SQLite 漏洞 | 重复出现 | SQLitePCLRaw.lib.e_sqlite3 2.1.11 |
+| CS0618 废弃 API | 多处 | GenerateOptions / ReActAgent |
 
-## 🔑 下一步
+## 🔑 下一步 (P0)
 
-1. 创建Anthropic Formatter（1天）
-2. 创建DashScope Formatter（1天）
-3. 实现真实LLM Models（3天）
-4. 实现Pipeline系统（2-3天）
-5. 高级功能开发（5-7天）
+1. **修复测试 Mock 类** - 5 个测试文件，实现 IAgent 新接口成员
+2. **修复 Uno XAML** - MainWindow.xaml 中的 x:Name 绑定
+3. 清理废弃 API
+4. 升级 SQLitePCLRaw
 
-## 📚 关键文档
-
-- 改进计划.md - 完整实施计划
-- .session-context.md - 当前上下文
-- FEATURE_COMPARISON.md - 功能对比
-- NEXT_STEPS.md - 详细指南
-
-## 🏆 质量评分
-
-- 代码质量: ⭐⭐⭐⭐⭐
-- 测试覆盖: ⭐⭐⭐⭐⭐
-- 文档完整: ⭐⭐⭐⭐⭐
-- 架构设计: ⭐⭐⭐⭐⭐
-- 项目管理: ⭐⭐⭐⭐⭐
-
----
-
-**项目状态**: 健康、稳定、就绪 ✅  
-**准备继续**: 是 🚀  
-**信心指数**: 非常高 💪
+**详细**: [TODO.md](./TODO.md) | [CURRENT_STATUS.md](./CURRENT_STATUS.md)

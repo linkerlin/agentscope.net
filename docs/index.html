@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentScope .NET 文档</title>
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; min-height: 100vh; }
+    .sidebar { width: 280px; background: #f6f8fa; padding: 20px; overflow-y: auto; border-right: 1px solid #ddd; font-size: 14px; flex-shrink: 0; }
+    .sidebar h3 { font-size: 16px; margin-bottom: 10px; color: #333; }
+    .sidebar a { display: block; padding: 3px 10px; color: #0366d6; text-decoration: none; border-radius: 3px; font-size: 13px; }
+    .sidebar a:hover { background: #e1e4e8; }
+    .sidebar .label { font-weight: 600; color: #586069; font-size: 12px; padding: 8px 10px 4px; }
+    .sidebar .sep { border-bottom: 1px solid #e1e4e8; margin: 4px 10px; }
+    .content { flex: 1; padding: 40px; overflow-y: auto; }
+    .markdown-body { max-width: 960px; margin: 0 auto; }
+    .markdown-body pre { background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    .markdown-body code { font-size: 85%; }
+    .loading { color: #888; text-align: center; margin-top: 80px; font-size: 16px; }
+    .error { color: #d73a49; text-align: center; margin-top: 80px; }
+    img { max-width: 100%; }
+  </style>
+</head>
+<body>
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="content">
+    <div class="markdown-body" id="content"><div class="loading">加载中...</div></div>
+  </main>
+
+  <script src="//cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <script>
+    const files = [
+      {g:'ENGLISH'}, {t:'Home',f:'en/home.md'},
+      {t:"What's AgentScope 2.0?",f:'en/docs/index.md'},
+      {t:'Quickstart',f:'en/docs/quickstart.md'},
+      {s:'─ Building Blocks'},
+      {t:'Agent',f:'en/docs/building-blocks/agent.md'},
+      {t:'Message & Event',f:'en/docs/building-blocks/message-and-event.md'},
+      {t:'Middleware',f:'en/docs/building-blocks/middleware.md'},
+      {t:'Model',f:'en/docs/building-blocks/model.md'},
+      {t:'Permission System',f:'en/docs/building-blocks/permission-system.md'},
+      {t:'Tool',f:'en/docs/building-blocks/tool.md'},
+      {t:'Context & AgentState',f:'en/docs/building-blocks/context.md'},
+      {s:'─ Harness'},
+      {t:'Architecture',f:'en/docs/harness/architecture.md'},
+      {t:'Workspace',f:'en/docs/harness/workspace.md'},
+      {t:'Memory',f:'en/docs/harness/memory.md'},
+      {t:'Filesystem',f:'en/docs/harness/filesystem.md'},
+      {t:'Sandbox',f:'en/docs/harness/sandbox.md'},
+      {t:'Subagent',f:'en/docs/harness/subagent.md'},
+      {t:'Skill',f:'en/docs/harness/skill.md'},
+      {t:'Plan Mode',f:'en/docs/harness/plan-mode.md'},
+      {t:'Channel',f:'en/docs/harness/channel.md'},
+      {t:'Compaction',f:'en/docs/harness/compaction.md'},
+      {g:'中文'}, {t:'首页',f:'zh/home.md'},
+      {t:'什么是 AgentScope 2.0？',f:'zh/docs/index.md'},
+      {t:'快速上手',f:'zh/docs/quickstart.md'},
+      {s:'─ 核心组件'},
+      {t:'智能体',f:'zh/docs/building-blocks/agent.md'},
+      {t:'消息与事件',f:'zh/docs/building-blocks/message-and-event.md'},
+      {t:'Middleware',f:'zh/docs/building-blocks/middleware.md'},
+      {t:'模型',f:'zh/docs/building-blocks/model.md'},
+      {t:'权限系统',f:'zh/docs/building-blocks/permission-system.md'},
+      {t:'工具',f:'zh/docs/building-blocks/tool.md'},
+      {t:'上下文与 AgentState',f:'zh/docs/building-blocks/context.md'},
+      {s:'─ Harness'},
+      {t:'架构',f:'zh/docs/harness/architecture.md'},
+      {t:'工作区',f:'zh/docs/harness/workspace.md'},
+      {t:'记忆',f:'zh/docs/harness/memory.md'},
+      {t:'文件系统',f:'zh/docs/harness/filesystem.md'},
+      {t:'沙箱',f:'zh/docs/harness/sandbox.md'},
+      {t:'子 Agent',f:'zh/docs/harness/subagent.md'},
+      {t:'技能',f:'zh/docs/harness/skill.md'},
+      {t:'计划模式',f:'zh/docs/harness/plan-mode.md'},
+      {t:'Channel',f:'zh/docs/harness/channel.md'},
+      {t:'上下文压缩',f:'zh/docs/harness/compaction.md'},
+    ];
+
+    function buildSidebar() {
+      var h = '<h3>📖 AgentScope .NET</h3>';
+      for (var i = 0; i < files.length; i++) {
+        var item = files[i];
+        if (item.g) { h += '<div class="label">' + item.g + '</div>'; }
+        else if (item.s) { h += '<div class="sep"></div>'; }
+        else if (item.f) { h += '<a href="?f=' + encodeURIComponent(item.f) + '" onclick="load(\'' + item.f + '\');return false">' + item.t + '</a>'; }
+      }
+      document.getElementById('sidebar').innerHTML = h;
+    }
+
+    var currentFile = 'zh/home.md';
+
+    function getDir(p) {
+      var i = p.lastIndexOf('/');
+      return i >= 0 ? p.substring(0, i) : '';
+    }
+
+    function resolveLink(link, baseDir) {
+      if (link.indexOf('://') >= 0 || link.indexOf('//') === 0) return null;
+      if (link.indexOf('#') === 0) return null;
+      var parts = link.split('/');
+      var dir = baseDir ? baseDir.split('/') : [];
+      for (var k = 0; k < parts.length; k++) {
+        if (parts[k] === '.' || parts[k] === '') continue;
+        if (parts[k] === '..') { if (dir.length > 0) dir.pop(); }
+        else dir.push(parts[k]);
+      }
+      return dir.join('/');
+    }
+
+    function load(path) {
+      currentFile = path;
+      var el = document.getElementById('content');
+      el.innerHTML = '<div class="loading">加载中...</div>';
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', path, true);
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            el.innerHTML = marked.parse(xhr.responseText);
+          } else {
+            el.innerHTML = '<div class="error">❌ 文件未找到: ' + path + ' (HTTP ' + xhr.status + ')</div>';
+          }
+        }
+      };
+      xhr.send();
+    }
+
+    document.addEventListener('click', function(e) {
+      var a = e.target.closest('a');
+      if (!a || a.closest('#sidebar')) return;
+      var href = a.getAttribute('href');
+      if (!href || href.indexOf('.md') < 0 || href.indexOf('://') >= 0) return;
+      e.preventDefault();
+      var resolved = resolveLink(href, getDir(currentFile));
+      if (resolved) {
+        load(resolved);
+        window.history.replaceState(null, '', '?f=' + encodeURIComponent(resolved));
+      }
+    });
+
+    buildSidebar();
+    var p = new URLSearchParams(window.location.search).get('f') || 'zh/home.md';
+    load(p);
+  </script>
+</body>
+</html>

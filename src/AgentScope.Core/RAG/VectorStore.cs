@@ -338,15 +338,26 @@ public class InMemoryVectorStore : IKnowledge
 }
 
 /// <summary>
-/// Simple embedding generator using a mock implementation.
-/// For production, use OpenAI, Azure, or other embedding services.
+/// 确定性伪随机 embedding 生成器，仅供单元测试 / 演示使用。
+/// 它不提供任何语义能力，仅保证同一文本产生稳定向量。
+/// 生产环境请使用 <see cref="OpenAIEmbeddingGenerator"/> 等真实 provider。
+/// 原 SimpleEmbeddingGenerator 已重命名，保留此别名以兼容旧调用。
 /// </summary>
-public class SimpleEmbeddingGenerator : IEmbeddingGenerator
+[Obsolete("Use FakeEmbeddingGenerator for tests, or a real provider such as OpenAIEmbeddingGenerator.")]
+public class SimpleEmbeddingGenerator : FakeEmbeddingGenerator
+{
+    public SimpleEmbeddingGenerator(int dimension = 1536) : base(dimension) { }
+}
+
+/// <summary>
+/// 确定性伪随机 embedding 生成器（测试 / 占位用）。
+/// 不提供语义能力；真实检索请使用 OpenAIEmbeddingGenerator 等实现 IEmbeddingGenerator 的 provider。
+/// </summary>
+public class FakeEmbeddingGenerator : IEmbeddingGenerator
 {
     private readonly int _dimension;
-    private readonly Random _random = new();
 
-    public SimpleEmbeddingGenerator(int dimension = 1536)
+    public FakeEmbeddingGenerator(int dimension = 1536)
     {
         _dimension = dimension;
     }
@@ -355,7 +366,7 @@ public class SimpleEmbeddingGenerator : IEmbeddingGenerator
 
     public Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken cancellationToken = default)
     {
-        // Generate deterministic pseudo-random embedding based on text hash
+        // 基于文本哈希的确定性伪随机向量（无语义，仅测试用）
         var hash = text.GetHashCode();
         var embedding = new float[_dimension];
         var rng = new Random(hash);
@@ -365,7 +376,7 @@ public class SimpleEmbeddingGenerator : IEmbeddingGenerator
             embedding[i] = (float)(rng.NextDouble() * 2 - 1); // Range: [-1, 1]
         }
 
-        // Normalize
+        // 归一化
         var norm = (float)Math.Sqrt(embedding.Sum(x => x * x));
         if (norm > 0)
         {
@@ -376,6 +387,66 @@ public class SimpleEmbeddingGenerator : IEmbeddingGenerator
         }
 
         return Task.FromResult(embedding);
+    }
+
+    public async Task<IReadOnlyList<float[]>> GenerateEmbeddingsAsync(IEnumerable<string> texts, CancellationToken cancellationToken = default)
+    {
+        var results = new List<float[]>();
+        foreach (var text in texts)
+        {
+            results.Add(await GenerateEmbeddingAsync(text, cancellationToken));
+        }
+        return results;
+    }
+}
+
+/// <summary>
+/// 真实 embedding provider：调用 OpenAI embeddings API。
+/// 对应 Java: io.agentscope.core.rag.model / extensions 中的 embedding 实现。
+/// 这里给出可编译的结构与 HTTP 调用骨架；正式接入时复用 Model/Transport 的 IHttpTransport。
+/// </summary>
+public class OpenAIEmbeddingGenerator : IEmbeddingGenerator
+{
+    private readonly string _apiKey;
+    private readonly string _model;
+    private readonly HttpClient _http;
+
+    public int EmbeddingDimension { get; }
+
+    public OpenAIEmbeddingGenerator(string apiKey, string model = "text-embedding-3-small", int dimension = 1536, HttpClient? http = null)
+    {
+        _apiKey = apiKey ?? throw new ArgumentNullException(nameof(apiKey));
+        _model = model;
+        EmbeddingDimension = dimension;
+        _http = http ?? new HttpClient();
+    }
+
+    public async Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/embeddings")
+        {
+            Content = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(new { input = text, model = _model }),
+                System.Text.Encoding.UTF8,
+                "application/json")
+        };
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+
+        var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        using var doc = System.Text.Json.JsonDocument.Parse(body);
+        var data = doc.RootElement.GetProperty("data")[0].GetProperty("embedding");
+
+        var vec = new float[data.GetArrayLength()];
+        var i = 0;
+        foreach (var item in data.EnumerateArray())
+        {
+            vec[i++] = item.GetSingle();
+        }
+
+        return vec;
     }
 
     public async Task<IReadOnlyList<float[]>> GenerateEmbeddingsAsync(IEnumerable<string> texts, CancellationToken cancellationToken = default)

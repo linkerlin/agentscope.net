@@ -1,7 +1,17 @@
-// Copyright 2024-2026 the original author or authors.
-// Licensed under the Apache License, Version 2.0
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-using System.Reactive.Linq;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Message;
 
@@ -153,23 +163,21 @@ public abstract class ServiceBase : AgentBase, IService
     }
 
     /// <summary>
-    /// Process a message (implements IAgent)
-    /// 处理消息（实现IAgent接口）
+    /// 实现 AgentBase.DoCallAsync
     /// </summary>
-    public override IObservable<Msg> Call(Msg message)
+    protected override async Task<Msg> DoCallAsync(IReadOnlyList<Msg> messages)
     {
-        return Observable.FromAsync(async ct =>
+        if (Status != ServiceStatus.Running)
         {
-            if (Status != ServiceStatus.Running)
-            {
-                return Msg.Builder()
-                    .Role("system")
-                    .Content($"服务 {Info.Name} 未运行。当前状态：{Status}")
-                    .Build();
-            }
+            return Msg.Builder()
+                .Role("system")
+                .Content($"服务 {Info.Name} 未运行。当前状态：{Status}")
+                .Build();
+        }
 
-            return await ProcessMessageAsync(message, ct);
-        });
+        var msg = messages.Count > 0 ? messages[messages.Count - 1]
+            : Msg.Builder().Role("user").TextContent("").Build();
+        return await ProcessMessageAsync(msg, CancellationToken.None);
     }
 
     /// <summary>

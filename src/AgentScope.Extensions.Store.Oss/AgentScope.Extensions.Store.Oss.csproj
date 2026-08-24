@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>AgentScope.Extensions.Store.Oss</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentScope.Extensions\AgentScope.Extensions.csproj" />    <PackageReference Include="Aliyun.OSS.SDK.NetCore">
+  <Version>2.14.1</Version>
+</PackageReference>  </ItemGroup>
+</Project>
+

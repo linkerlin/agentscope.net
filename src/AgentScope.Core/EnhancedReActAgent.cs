@@ -18,13 +18,17 @@ using System.Linq;
 using System.Reactive.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Threading;
 using System.Threading.Tasks;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Events;
 using AgentScope.Core.Hook;
+using AgentScope.Core.Interruption;
 using AgentScope.Core.Memory;
 using AgentScope.Core.Message;
 using AgentScope.Core.Model;
+using AgentScope.Core.Permission;
 using AgentScope.Core.State;
 using AgentScope.Core.Tool;
 using AgentEvent = AgentScope.Core.Events.Event;
@@ -41,8 +45,16 @@ namespace AgentScope.Core;
 /// 2. Acting（行动）：Agent 执行工具或返回最终答案
 /// 3. Observation（观察）：获取行动结果，继续循环或结束
 /// </summary>
-public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
+public class EnhancedReActAgent : InterruptibleAgentBase, IStreamableAgent, IStateModule, IStructuredOutputCapableAgent
 {
+    /// <summary>
+    /// JSON 序列化选项：不转义非 ASCII 字符，保证中文等原文可见。
+    /// </summary>
+    private static readonly JsonSerializerOptions NonEscapingJsonOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     private const string AgentMetaStateKeyPrefix = "state::enhanced_react::agent_meta::";
     private const string MemoryStateKeyPrefix = "state::enhanced_react::memory::";
     private const string ToolkitStateKeyPrefix = "state::enhanced_react::toolkit::";
@@ -55,6 +67,7 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
     private readonly StatePersistence _statePersistence;
     private readonly int _maxIterations;
     private readonly HookManager _hookManager;
+    private readonly IPermissionEngine? _permission;
     private readonly bool _verbose;
 
     internal EnhancedReActAgent(
@@ -67,8 +80,9 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
         StatePersistence? statePersistence = null,
         int maxIterations = 10,
         HookManager? hookManager = null,
+        IPermissionEngine? permission = null,
         bool verbose = false)
-        : base(name)
+        : base(name, $"EnhancedReActAgent: {systemPrompt}")
     {
         _model = model;
         _systemPrompt = systemPrompt;
@@ -78,20 +92,89 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
         _statePersistence = statePersistence ?? StatePersistence.All;
         _maxIterations = maxIterations;
         _hookManager = hookManager ?? new HookManager();
+        _permission = permission;
         _verbose = verbose;
     }
 
-    public override IObservable<Msg> Call(Msg message)
+    /// <summary>
+    /// 系统提示词。开放读写以支持中间件在回合开始前注入上下文
+    /// （对标 Java <c>Middleware.onSystemPrompt</c> 的可改写语义）。
+    /// </summary>
+    public string SystemPrompt
     {
-        return Observable.FromAsync(async () =>
-        {
-            _memory.Add(message);
-            var response = await ProcessWithReActLoopAsync(message);
-            _memory.Add(response);
-            return response;
-        });
+        get => _systemPrompt;
+        set => _systemPrompt = value ?? string.Empty;
     }
 
+    /// <summary>
+    /// HITL 确认回调。当 <see cref="IPermissionEngine"/> 判定为
+    /// <see cref="PermissionBehavior.Ask"/> 时被调用，返回用户决策。
+    /// <para>
+    /// 为 null 时行为取决于 <see cref="AutoApproveOnAsk"/>：
+    /// 默认（false）走内置控制台交互；宿主为非交互进程时可设为 true 直接放行。
+    /// </para>
+    /// </summary>
+    public Func<RequireUserConfirmEvent, Task<ConfirmResult>>? ConfirmCallback { get; set; }
+
+    /// <summary>
+    /// 未配置 <see cref="ConfirmCallback"/> 且无可用控制台输入时，是否自动批准。
+    /// 默认 false（更安全：无法确认则拒绝）。
+    /// </summary>
+    public bool AutoApproveOnAsk { get; set; }
+
+    /// <summary>
+    /// 发起一次用户确认。优先使用注入的 <see cref="ConfirmCallback"/>，
+    /// 否则回退到控制台交互；两者都不可用时按 <see cref="AutoApproveOnAsk"/> 决定。
+    /// </summary>
+    private async Task<ConfirmResult> RequestUserConfirmAsync(
+        string toolName, Dictionary<string, object>? arguments, string? reason)
+    {
+        var evt = new RequireUserConfirmEvent(Guid.NewGuid().ToString("N"), toolName, arguments);
+
+        if (ConfirmCallback != null)
+        {
+            try
+            {
+                return await ConfirmCallback(evt).ConfigureAwait(false);
+            }
+            catch (System.Exception ex)
+            {
+                return ConfirmResult.Deny($"确认回调异常: {ex.Message}");
+            }
+        }
+
+        return ConsoleConfirm(toolName, arguments, reason);
+    }
+
+    /// <summary>内置控制台确认。重定向输入（无交互终端）时按 AutoApproveOnAsk 处理。</summary>
+    private ConfirmResult ConsoleConfirm(
+        string toolName, Dictionary<string, object>? arguments, string? reason)
+    {
+        if (Console.IsInputRedirected)
+        {
+            return AutoApproveOnAsk
+                ? ConfirmResult.Approve()
+                : ConfirmResult.Deny("无交互终端且未配置确认回调");
+        }
+
+        var argText = arguments is { Count: > 0 }
+            ? string.Join(", ", arguments.Select(kv => $"{kv.Key}={kv.Value}"))
+            : "(无参数)";
+
+        Console.WriteLine();
+        Console.WriteLine($"[需要确认] 工具 '{toolName}' 请求执行");
+        Console.WriteLine($"  参数: {argText}");
+        if (!string.IsNullOrWhiteSpace(reason)) Console.WriteLine($"  原因: {reason}");
+        Console.Write("  批准执行？(y/N): ");
+
+        var answer = Console.ReadLine()?.Trim();
+        var approved = string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase)
+                       || string.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase);
+
+        return approved ? ConfirmResult.Approve() : ConfirmResult.Deny("用户在控制台拒绝");
+    }
+
+    [Obsolete("使用 StreamEventsAsync 替代")]
     public async IAsyncEnumerable<AgentEvent> StreamAsync(IEnumerable<Msg> messages, StreamOptions options)
     {
         options ??= new StreamOptions();
@@ -124,6 +207,7 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
         }
     }
 
+    [Obsolete("使用 StreamEventsAsync 替代")]
     public async IAsyncEnumerable<AgentEvent> StreamAsync(Msg message, StreamOptions? options = null)
     {
         options ??= new StreamOptions();
@@ -131,6 +215,100 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
         {
             yield return ev;
         }
+    }
+
+    /// <summary>
+    /// 实现 AgentBase.DoCallAsync
+    /// </summary>
+    protected override async Task<Msg> DoCallAsync(IReadOnlyList<Msg> messages)
+    {
+        var msg = messages.Count > 0 ? messages[messages.Count - 1]
+            : Msg.Builder().Role("user").TextContent("").Build();
+        return await ProcessWithReActLoopAsync(msg);
+    }
+
+    /// <summary>
+    /// IStreamableAgent.StreamEventsAsync 实现
+    /// </summary>
+#pragma warning disable CS0618
+    public override async IAsyncEnumerable<Event> StreamEventsAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
+    {
+        var options = new StreamOptions();
+        await foreach (var ev in StreamAsync(messages, options))
+        {
+            yield return ev;
+        }
+    }
+#pragma warning restore CS0618
+
+    public override async IAsyncEnumerable<Event> StreamEventsAsync(Msg message, RuntimeContext? context = null)
+    {
+        await foreach (var ev in StreamEventsAsync(new[] { message }, context))
+        {
+            yield return ev;
+        }
+    }
+
+    /// <summary>
+    /// 实现 InterruptibleAgentBase.ExecuteAsync，通过 CancellationToken 支持中断
+    /// </summary>
+    protected override async Task<Msg> ExecuteAsync(IReadOnlyList<Msg> messages, CancellationToken ct)
+    {
+        var msg = messages.Count > 0 ? messages[messages.Count - 1] : Msg.Builder().Role("user").TextContent("").Build();
+        _memory.Add(msg);
+        var response = await ProcessWithReActLoopAsync(msg);
+        _memory.Add(response);
+        return response;
+    }
+
+    /// <summary>
+    /// 实现 IStructuredOutputCapableAgent：使用系统提示约束模型输出为 JSON 格式并反序列化
+    /// </summary>
+    public async Task<T> GenerateStructuredOutputAsync<T>(IEnumerable<Msg> messages)
+    {
+        var msgList = messages.ToList();
+        var jsonPrompt = Msg.Builder()
+            .Role("system")
+            .TextContent($"你必须输出合法的 JSON，且仅输出 JSON，可直接被 System.Text.Json 反序列化为 {typeof(T).Name}。不要包含 markdown 代码块标记。")
+            .Build();
+
+        var allMessages = new List<Msg> { jsonPrompt };
+        allMessages.AddRange(msgList);
+
+        var request = new ModelRequest { Messages = allMessages };
+        var response = await _model.GenerateAsync(request);
+
+        if (!response.Success)
+        {
+            throw new ModelException($"结构化输出生成失败: {response.Error}");
+        }
+
+        var text = response.Text ?? throw new ModelException("模型返回空响应");
+
+        // 尝试提取 JSON（移除可能的 markdown 标记）
+        var jsonStart = text.IndexOf('{');
+        var jsonEnd = text.LastIndexOf('}');
+        if (jsonStart >= 0 && jsonEnd > jsonStart)
+        {
+            text = text[jsonStart..(jsonEnd + 1)];
+        }
+
+        return System.Text.Json.JsonSerializer.Deserialize<T>(text)
+            ?? throw new ModelException($"无法反序列化为 {typeof(T).Name}");
+    }
+
+    /// <summary>
+    /// 实现 IStructuredOutputCapableAgent：流式版本
+    /// </summary>
+    public async IAsyncEnumerable<AgentEvent> StreamStructuredOutputAsync<T>(
+        IEnumerable<Msg> messages, StreamOptions options)
+    {
+        var result = await GenerateStructuredOutputAsync<T>(messages);
+        yield return new AgentEvent(
+            AgentEventType.ReasoningFinish,
+            Msg.Builder().Role("assistant").TextContent(
+                System.Text.Json.JsonSerializer.Serialize(result)).Build(),
+            true);
     }
 
     /// <summary>
@@ -146,6 +324,7 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
 
         while (continueLoop && iteration < _maxIterations)
         {
+            CheckCancellation();
             iteration++;
             
             if (_verbose)
@@ -202,6 +381,7 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
 
         while (iteration < _maxIterations)
         {
+            CheckCancellation();
             options.CancellationToken.ThrowIfCancellationRequested();
             iteration++;
 
@@ -435,6 +615,13 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
                     finalAnswer = ExtractFinalAnswerForFinish(responseText, actionIntent.HasActionLine);
                 }
 
+                // 与非流式 ActingPhaseAsync 一致：仍为空时回退到原始响应文本
+                // Consistent with non-streaming ActingPhaseAsync: fall back to the raw response text when still empty
+                if (string.IsNullOrWhiteSpace(finalAnswer))
+                {
+                    finalAnswer = responseText;
+                }
+
                 var actionResult = ActionResult.Finish(finalAnswer ?? string.Empty);
                 var postActingEvent = new PostActingEvent
                 {
@@ -447,7 +634,7 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
 
                 events.Add(new AgentEvent(
                     AgentEventType.ActingFinish,
-                    null,
+                    BuildAssistantChunkMessage(finalAnswer ?? string.Empty),
                     false,
                     CreatePhaseMetadata(iteration, "acting_finish")));
 
@@ -636,14 +823,52 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
             {
                 // 如果 Parameters 为空，尝试从响应文本中提取最终答复
                 var finalAnswer = actionIntent.Parameters?.ToString();
+                // Parameters 为 Dictionary（JSON 格式）时序列化为可读文本
+                if (actionIntent.Parameters is Dictionary<string, object> paramsDict)
+                {
+                    finalAnswer = JsonSerializer.Serialize(paramsDict, NonEscapingJsonOptions);
+                }
                 if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
                 {
                     finalAnswer = ExtractFinalAnswerForFinish(responseText, actionIntent.HasActionLine);
+                }
+                // 仍为空时回退到原始响应文本，避免返回空答案
+                if (string.IsNullOrWhiteSpace(finalAnswer))
+                {
+                    finalAnswer = responseText;
                 }
                 result = ActionResult.Finish(finalAnswer ?? string.Empty);
             }
             else if (GetAvailableTools().TryGetValue(actionIntent.Action, out var tool))
             {
+                // Permission 检查
+                if (_permission != null)
+                {
+                    var decision = _permission.Evaluate(new ToolCallRequest
+                    {
+                        ToolName = actionIntent.Action,
+                        Arguments = actionIntent.Parameters as Dictionary<string, object>
+                    });
+                    if (decision.Behavior == PermissionBehavior.Deny)
+                    {
+                        return ActionResult.ToolCall(actionIntent.Action, false, $"权限拒绝: {decision.Reason}");
+                    }
+                    if (decision.Behavior == PermissionBehavior.Ask)
+                    {
+                        // HITL：真正阻塞等待用户决策，未获批准则不执行工具。
+                        var confirmArgs = actionIntent.Parameters as Dictionary<string, object>;
+                        var confirm = await RequestUserConfirmAsync(
+                            actionIntent.Action, confirmArgs, decision.Reason).ConfigureAwait(false);
+
+                        if (!confirm.Approved)
+                        {
+                            var denyReason = confirm.Reason ?? decision.Reason ?? "用户拒绝执行";
+                            return ActionResult.ToolCall(
+                                actionIntent.Action, false, $"用户拒绝: {denyReason}");
+                        }
+                    }
+                }
+
                 // 执行工具
                 var parameters = actionIntent.Parameters as Dictionary<string, object> 
                     ?? new Dictionary<string, object>();
@@ -716,9 +941,21 @@ public class EnhancedReActAgent : AgentBase, IStreamableAgent, IStateModule
     private Msg BuildReasoningPrompt(Msg userMessage, List<string> thoughtHistory, int iteration)
     {
         var toolDescriptions = BuildAvailableToolDescriptions();
+
+        // 构建对话历史（排除当前消息，当前消息单独作为"用户问题"传入）
+        var history = _memory.GetAll();
+        var priorMessages = history.Count > 0 && ReferenceEquals(history[^1], userMessage)
+            ? history.Take(history.Count - 1).ToList()
+            : history;
+        var historyText = string.Join("\n",
+            priorMessages.Select(m => $"{m.Role}: {m.GetTextContent()}"));
+
         var promptText = $@"{_systemPrompt}
 
 用户问题: {userMessage.GetTextContent()}
+
+对话历史:
+{historyText}
 
 你可以使用以下工具:
     {toolDescriptions}
@@ -734,7 +971,7 @@ Action: [finish 或 工具名称]
 Action Input: [如果是finish，输出最终答案；如果是工具，输出JSON格式的参数]";
 
         return Msg.Builder()
-            .Role("system")
+            .Role("user")
             .TextContent(promptText)
             .Build();
     }
@@ -800,7 +1037,7 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
             // 此时将整个 thought 作为最终答案
             if (actionLine == null)
             {
-                return new ActionIntent { Action = "finish", Parameters = null, HasActionLine = false };
+                return new ActionIntent { Action = "finish", Parameters = thought.Trim(), HasActionLine = false };
             }
 
             var action = actionLine.Substring("Action:".Length).Trim().ToLower();
@@ -811,7 +1048,17 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
             {
                 try
                 {
-                    parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(input);
+                    var node = JsonNode.Parse(input);
+                    if (node is JsonObject jsonObj)
+                    {
+                        parameters = jsonObj.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => JsonValueToObject(kvp.Value));
+                    }
+                    else
+                    {
+                        parameters = input;
+                    }
                 }
                 catch
                 {
@@ -825,6 +1072,31 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
         {
             return new ActionIntent { Action = "finish", Parameters = null, HasActionLine = false };
         }
+    }
+
+    /// <summary>
+    /// 将 JsonNode 递归转换为 .NET 原生类型，避免工具参数拿到 JsonElement。
+    /// </summary>
+    private static object? JsonValueToObject(JsonNode? node)
+    {
+        if (node == null) return null;
+        if (node is JsonValue jv)
+        {
+            if (jv.TryGetValue<string>(out var s)) return s;
+            if (jv.TryGetValue<long>(out var l)) return l;
+            if (jv.TryGetValue<double>(out var d)) return d;
+            if (jv.TryGetValue<bool>(out var b)) return b;
+            return jv.ToString();
+        }
+        if (node is JsonArray arr)
+        {
+            return arr.Select(JsonValueToObject).ToList();
+        }
+        if (node is JsonObject obj)
+        {
+            return obj.ToDictionary(kvp => kvp.Key, kvp => JsonValueToObject(kvp.Value));
+        }
+        return node.ToString();
     }
 
     private static bool IsCompletionMarker(string? value)
@@ -970,7 +1242,7 @@ Action Input: [如果是finish，输出最终答案；如果是工具，输出JS
         {
             new(
                 AgentEventType.SummaryStart,
-                null,
+                currentMessage,
                 false,
                 CreatePhaseMetadata(iteration, "summary_start"))
         };
@@ -1216,7 +1488,10 @@ public class EnhancedReActAgentBuilder
     private StatePersistence _statePersistence = AgentScope.Core.State.StatePersistence.All;
     private int _maxIterations = 10;
     private HookManager? _hookManager;
+    private IPermissionEngine? _permission;
     private bool _verbose = false;
+    private Func<RequireUserConfirmEvent, Task<ConfirmResult>>? _confirmCallback;
+    private bool _autoApproveOnAsk;
 
     public EnhancedReActAgentBuilder Name(string name)
     {
@@ -1279,9 +1554,33 @@ public class EnhancedReActAgentBuilder
         return this;
     }
 
+    public EnhancedReActAgentBuilder PermissionEngine(IPermissionEngine permission)
+    {
+        _permission = permission;
+        return this;
+    }
+
     public EnhancedReActAgentBuilder Verbose(bool verbose = true)
     {
         _verbose = verbose;
+        return this;
+    }
+
+    /// <summary>
+    /// 配置 HITL 确认回调。权限判定为 Ask 时调用，返回批准/拒绝。
+    /// 不配置则回退到内置控制台交互。
+    /// </summary>
+    public EnhancedReActAgentBuilder ConfirmCallback(
+        Func<RequireUserConfirmEvent, Task<ConfirmResult>> callback)
+    {
+        _confirmCallback = callback;
+        return this;
+    }
+
+    /// <summary>无交互终端且未配置确认回调时是否自动放行（默认 false）。</summary>
+    public EnhancedReActAgentBuilder AutoApproveOnAsk(bool autoApprove = true)
+    {
+        _autoApproveOnAsk = autoApprove;
         return this;
     }
 
@@ -1292,8 +1591,13 @@ public class EnhancedReActAgentBuilder
             throw new InvalidOperationException("Model is required");
         }
 
-        return new EnhancedReActAgent(
+        var agent = new EnhancedReActAgent(
             _name, _model, _sysPrompt, _memory, _tools, _toolGroupManager, _statePersistence,
-            _maxIterations, _hookManager, _verbose);
+            _maxIterations, _hookManager, _permission, _verbose);
+
+        if (_confirmCallback != null) agent.ConfirmCallback = _confirmCallback;
+        agent.AutoApproveOnAsk = _autoApproveOnAsk;
+
+        return agent;
     }
 }

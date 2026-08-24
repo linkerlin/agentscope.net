@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.2.0</Version>
+    <Version>2.0.1</Version>
     <PackageId>AgentScope.Core</PackageId>
     <Authors>AgentScope Team</Authors>
     <Company>AgentScope</Company>
@@ -15,7 +15,7 @@
     <RepositoryUrl>https://github.com/agentscope-ai/agentscope.net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <Tags>ai,llm,agent,agentscope,openai,anthropic,gemini</Tags>
-    <ReleaseNotes>v1.2.0: 按改进方案与计划实施 - Event/流式/State/Hook扩展/ExecutionConfig; WebSearchTool可配置Provider与优雅降级; 文件与命令工具(路径沙箱/校验器); ToolGroup/Skill/结构化输出; SubAgent/Accumulator; WebSocket/MCP/TTS/多模态骨架; 能力扫描脚本与报告</ReleaseNotes>
+    <ReleaseNotes>v2.0.1: develop/v2.0.1 分支版本 - 22/22 核心模块完成, 42 扩展项目, Harness 运行时框架</ReleaseNotes>
     <PublishSingleFile>false</PublishSingleFile>
     <IncludeAllContentForPack>false</IncludeAllContentForPack>
   </PropertyGroup>
@@ -26,7 +26,7 @@
 
   <ItemGroup>
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
     <PackageReference Include="System.Reactive" Version="6.1.0" />
   </ItemGroup>
 

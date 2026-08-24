@@ -1,3 +1,17 @@
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -217,6 +231,13 @@ public static class OpenAIResponseParser
             return choice.Message.ReasoningContent;
         }
 
+        // 检查 vllm 的 reasoning 字段（DeepSeek-V4-Flash 等经 vllm 部署时返回）
+        // Check the vllm "reasoning" field (returned by vllm-deployed reasoning models)
+        if (!string.IsNullOrWhiteSpace(choice.Message.Reasoning))
+        {
+            return choice.Message.Reasoning;
+        }
+
         // 如果content是数组，查找reasoning类型的内容
         // If content is array, find reasoning type content
         if (choice.Message.Content is List<OpenAIMessageContent> contentParts)
@@ -241,6 +262,7 @@ public static class OpenAIResponseParser
     /// </summary>
     /// <param name="chunk">响应块 / Response chunk</param>
     /// <returns>解析后的块信息 / Parsed chunk information</returns>
+    [Obsolete("流式解析已改由 OpenAIModel.ConvertStreamingChunk 直接处理 SSE 块，此方法不再被框架内部调用，保留仅用于外部兼容")]
     public static StreamChunkInfo? ParseStreamChunk(string chunk)
     {
         if (string.IsNullOrWhiteSpace(chunk))
@@ -289,6 +311,19 @@ public static class OpenAIResponseParser
             if (delta.Content is string deltaText && !string.IsNullOrEmpty(deltaText))
             {
                 chunkInfo.Content = deltaText;
+            }
+
+            // 提取增量推理内容（vllm 推理模型在 SSE 流中把推理放在 reasoning 字段）
+            // Extract delta reasoning content (vllm reasoning models put thinking in reasoning field)
+            if (string.IsNullOrEmpty(chunkInfo.Content))
+            {
+                var reasoning = !string.IsNullOrEmpty(delta.Reasoning)
+                    ? delta.Reasoning
+                    : delta.ReasoningContent;
+                if (!string.IsNullOrEmpty(reasoning))
+                {
+                    chunkInfo.Content = reasoning;
+                }
             }
 
             // 提取增量工具调用

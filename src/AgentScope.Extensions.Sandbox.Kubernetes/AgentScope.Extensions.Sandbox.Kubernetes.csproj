@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>AgentScope.Extensions.Sandbox.Kubernetes</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentScope.Extensions\AgentScope.Extensions.csproj" />    <PackageReference Include="KubernetesClient">
+  <Version>19.0.2</Version>
+</PackageReference>  </ItemGroup>
+</Project>
+

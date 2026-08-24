@@ -19,8 +19,16 @@ using System.IO;
 
 namespace AgentScope.Core.Tests.Configuration;
 
+/// <summary>
+/// Tests for ConfigurationManager static configuration access methods
+/// ConfigurationManager 静态配置访问方法测试
+/// </summary>
 public class ConfigurationManagerTests
 {
+    /// <summary>
+    /// Tests that ConfigurationManager.Get returns the default value for a non-existent key.
+    /// 测试 ConfigurationManager.Get 对不存在的键返回默认值。
+    /// </summary>
     [Fact]
     public void ConfigurationManager_Get_WithDefaultValue_ShouldReturnDefault()
     {
@@ -34,6 +42,10 @@ public class ConfigurationManagerTests
         Assert.Equal("default_value", value);
     }
 
+    /// <summary>
+    /// Tests that ConfigurationManager.GetDatabasePath returns a non-null path containing 'agentscope'.
+    /// 测试 ConfigurationManager.GetDatabasePath 返回包含 'agentscope' 的非空路径。
+    /// </summary>
     [Fact]
     public void ConfigurationManager_GetDatabasePath_ShouldReturnDefaultPath()
     {
@@ -45,6 +57,10 @@ public class ConfigurationManagerTests
         Assert.Contains("agentscope", path);
     }
 
+    /// <summary>
+    /// Tests that ConfigurationManager.GetMaxIterations returns a positive default value.
+    /// 测试 ConfigurationManager.GetMaxIterations 返回正数的默认值。
+    /// </summary>
     [Fact]
     public void ConfigurationManager_GetMaxIterations_ShouldReturnDefaultValue()
     {
@@ -55,6 +71,10 @@ public class ConfigurationManagerTests
         Assert.True(maxIterations > 0);
     }
 
+    /// <summary>
+    /// Tests that ConfigurationManager.GetDefaultModel returns a non-empty model name.
+    /// 测试 ConfigurationManager.GetDefaultModel 返回非空的模型名称。
+    /// </summary>
     [Fact]
     public void ConfigurationManager_GetDefaultModel_ShouldReturnModelName()
     {
@@ -66,6 +86,10 @@ public class ConfigurationManagerTests
         Assert.NotEmpty(model);
     }
 
+    /// <summary>
+    /// Tests that ConfigurationManager.GetLogLevel returns a non-empty log level string.
+    /// 测试 ConfigurationManager.GetLogLevel 返回非空的日志级别字符串。
+    /// </summary>
     [Fact]
     public void ConfigurationManager_GetLogLevel_ShouldReturnValidLevel()
     {
@@ -77,6 +101,10 @@ public class ConfigurationManagerTests
         Assert.NotEmpty(logLevel);
     }
 
+    /// <summary>
+    /// Tests that ConfigurationManager.Load does not throw when loading a non-existent file.
+    /// 测试 ConfigurationManager.Load 加载不存在的文件时不会抛出异常。
+    /// </summary>
     [Fact]
     public void ConfigurationManager_Load_WithNonExistentFile_ShouldNotThrow()
     {

@@ -1,7 +1,21 @@
-// Copyright 2024-2026 the original author or authors.
-// Licensed under the Apache License, Version 2.0
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-using System.Reactive.Linq;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Message;
 
@@ -48,53 +62,44 @@ public abstract class InterruptibleAgentBase : AgentBase, IInterruptible, IResum
     /// <inheritdoc />
     public bool CanResume => _savedState != null;
 
-    /// <summary>
-    /// Progress reporter for long-running operations
-    /// 长时间运行操作的进度报告器
-    /// </summary>
-    public IProgress<OperationProgress>? ProgressReporter { get; set; }
-
     /// <inheritdoc />
     public event EventHandler<InterruptionContext>? InterruptionRequested;
 
     /// <inheritdoc />
     public event EventHandler<InterruptionContext>? Interrupted;
 
-    /// <summary>
-    /// Creates a new interruptible agent
-    /// 创建新的可中断 Agent
-    /// </summary>
-    protected InterruptibleAgentBase(string name) : base(name)
+    protected InterruptibleAgentBase(string name, string? description = null) : base(name, description)
     {
     }
 
-    /// <inheritdoc />
-    public override IObservable<Msg> Call(Msg message)
+    /// <summary>
+    /// 重写 CallAsync 以支持中断
+    /// </summary>
+    public override async Task<Msg> CallAsync(IReadOnlyList<Msg> messages, RuntimeContext? context = null)
     {
-        return Observable.FromAsync(async ct =>
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+        try
         {
-            // Link external cancellation token with internal one
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, ct);
-            
-            try
-            {
-                IsRunning = true;
-                return await ExecuteAsync(message, linkedCts.Token);
-            }
-            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
-            {
-                // Handle our cancellation
-                return Msg.Builder()
-                    .Role("system")
-                    .Content("Operation was interrupted")
-                    .Build();
-            }
-            finally
-            {
-                IsRunning = false;
-            }
-        });
+            IsRunning = true;
+            return await ExecuteAsync(messages, linkedCts.Token);
+        }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+            return Msg.Builder()
+                .Role("system")
+                .Content("操作已被中断 Operation was interrupted")
+                .Build();
+        }
+        finally
+        {
+            IsRunning = false;
+        }
     }
+
+    /// <summary>
+    /// 执行 Agent 核心逻辑（带 CancellationToken）
+    /// </summary>
+    protected abstract Task<Msg> ExecuteAsync(IReadOnlyList<Msg> messages, CancellationToken ct);
 
     /// <inheritdoc />
     public virtual async Task InterruptAsync(InterruptionContext context)
@@ -103,19 +108,16 @@ public abstract class InterruptibleAgentBase : AgentBase, IInterruptible, IResum
 
         InterruptionRequested?.Invoke(this, context);
 
-        // Request cancellation
         _cts.Cancel();
 
-        // Wait for operation to complete gracefully
         var timeout = TimeSpan.FromSeconds(5);
         var startTime = DateTime.UtcNow;
-        
+
         while (IsRunning && DateTime.UtcNow - startTime < timeout)
         {
             await Task.Delay(50);
         }
 
-        // Capture state if requested
         if (context.PreserveState)
         {
             _savedState = await CaptureStateAsync();
@@ -135,10 +137,7 @@ public abstract class InterruptibleAgentBase : AgentBase, IInterruptible, IResum
             Progress = GetCurrentProgress(),
             Data = new Dictionary<string, object>()
         };
-
-        // Add custom state data
         CaptureCustomState(state.Data);
-
         _savedState = state;
         return Task.FromResult(state);
     }
@@ -148,73 +147,34 @@ public abstract class InterruptibleAgentBase : AgentBase, IInterruptible, IResum
     {
         if (!CanResume)
         {
-            throw new InvalidOperationException("No saved state to resume from");
+            throw new InvalidOperationException("没有可恢复的保存状态 No saved state to resume from");
         }
-
-        // Reset cancellation token
         _cts.TryReset();
-
-        // Restore custom state
         RestoreCustomState(state.Data);
-
-        // Resume operation
         await ResumeOperationAsync(state);
     }
 
     /// <summary>
-    /// Execute the agent logic
-    /// 执行 Agent 逻辑
-    /// </summary>
-    protected abstract Task<Msg> ExecuteAsync(Msg message, CancellationToken ct);
-
-    /// <summary>
-    /// Get current progress (0-100)
     /// 获取当前进度 (0-100)
     /// </summary>
-    protected virtual double GetCurrentProgress()
-    {
-        return 0;
-    }
+    protected virtual double GetCurrentProgress() => 0;
 
     /// <summary>
-    /// Capture custom state data
     /// 捕获自定义状态数据
     /// </summary>
-    protected virtual void CaptureCustomState(Dictionary<string, object> stateData)
-    {
-        // Override in derived classes to add custom state
-    }
+    protected virtual void CaptureCustomState(Dictionary<string, object> stateData) { }
 
     /// <summary>
-    /// Restore custom state data
     /// 恢复自定义状态数据
     /// </summary>
-    protected virtual void RestoreCustomState(Dictionary<string, object> stateData)
-    {
-        // Override in derived classes to restore custom state
-    }
+    protected virtual void RestoreCustomState(Dictionary<string, object> stateData) { }
 
     /// <summary>
-    /// Resume operation from saved state
     /// 从保存的状态恢复操作
     /// </summary>
-    protected virtual Task ResumeOperationAsync(InterruptionState state)
-    {
-        // Override in derived classes to implement resume logic
-        return Task.CompletedTask;
-    }
+    protected virtual Task ResumeOperationAsync(InterruptionState state) => Task.CompletedTask;
 
     /// <summary>
-    /// Report progress
-    /// 报告进度
-    /// </summary>
-    protected void ReportProgress(OperationProgress progress)
-    {
-        ProgressReporter?.Report(progress);
-    }
-
-    /// <summary>
-    /// Check cancellation and throw if requested
     /// 检查取消并在请求时抛出
     /// </summary>
     protected void CheckCancellation()
@@ -223,7 +183,6 @@ public abstract class InterruptibleAgentBase : AgentBase, IInterruptible, IResum
     }
 
     /// <summary>
-    /// Safe delay that checks for cancellation
     /// 带取消检查的安全延迟
     /// </summary>
     protected async Task DelayAsync(TimeSpan delay, CancellationToken? ct = null)
@@ -233,7 +192,6 @@ public abstract class InterruptibleAgentBase : AgentBase, IInterruptible, IResum
     }
 
     /// <summary>
-    /// Reset cancellation token for reuse
     /// 重置取消令牌以便重用
     /// </summary>
     protected void ResetCancellation()
@@ -242,7 +200,6 @@ public abstract class InterruptibleAgentBase : AgentBase, IInterruptible, IResum
     }
 
     /// <summary>
-    /// Dispose resources
     /// 释放资源
     /// </summary>
     public virtual void Dispose()
@@ -250,35 +207,4 @@ public abstract class InterruptibleAgentBase : AgentBase, IInterruptible, IResum
         _cts.Cancel();
         _cts.Dispose();
     }
-}
-
-/// <summary>
-/// Options for interruptible agent execution
-/// 可中断 Agent 执行选项
-/// </summary>
-public class InterruptibleExecutionOptions
-{
-    /// <summary>
-    /// Timeout for operation
-    /// 操作超时
-    /// </summary>
-    public TimeSpan? Timeout { get; init; }
-
-    /// <summary>
-    /// Whether to auto-save state on interruption
-    /// 中断时是否自动保存状态
-    /// </summary>
-    public bool AutoSaveState { get; init; } = true;
-
-    /// <summary>
-    /// Progress reporting interval
-    /// 进度报告间隔
-    /// </summary>
-    public TimeSpan ProgressInterval { get; init; } = TimeSpan.FromSeconds(1);
-
-    /// <summary>
-    /// Maximum number of retries on interruption
-    /// 中断时最大重试次数
-    /// </summary>
-    public int MaxRetries { get; init; } = 0;
 }

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>AgentScope.Extensions.Vector.Milvus</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentScope.Extensions\AgentScope.Extensions.csproj" />
+    <PackageReference Include="Milvus.Client" Version="2.3.0-preview.1" />
+  </ItemGroup>
+</Project>

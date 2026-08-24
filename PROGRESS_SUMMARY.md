@@ -1,276 +1,57 @@
 # AgentScope.NET 实施进度总结
 
-## 最后更新时间
-2026-02-17 17:47 UTC
+**最后更新**: 2026-08-17 | **版本**: v2.0.1 | **分支**: develop/v2.0.1
 
-## 总体进度概览
+## ✅ 已完成 (22/22 核心 + Harness + 42 扩展)
 
-### ✅ 已完成功能（生产就绪）
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| Agent | ✅ | EnhancedReActAgent + 完整接口体系 |
+| Hook | ✅ | 6+ 种事件 + HookManager |
+| Session/State | ✅ | 线程安全 + 状态持久化 |
+| Memory | ✅ | SQLite + 长期记忆 |
+| Message | ✅ | Msg + ContentBlock |
+| Model | ✅ | 7 种提供商 |
+| Formatter | ✅ | 4 种格式化器 |
+| Tool | ✅ | 多工具 + ToolGroup |
+| Pipeline | ✅ | 7 种节点 |
+| Plan | ✅ | PlanNotebook |
+| RAG | ✅ | 向量存储 + 检索 |
+| Workflow | ✅ | DAG 引擎 |
+| MultiAgent | ✅ | 组/路由/协调器 |
+| Service | ✅ | 服务发现 |
+| Interruption | ✅ | 可中断 Agent |
+| Tracing | ✅ | 追踪 + Jsonl |
+| Skill | ✅ | SkillBox + 注册表 |
+| MCP | ✅ | 3 种客户端 |
+| A2A | ✅ | 客户端/服务端 |
+| AgUI | ✅ | 适配层 |
+| Event | ✅ | 事件模型 |
+| Accumulator | ✅ | 内容累加器 |
+| Harness 运行时 | ✅ | Gateway/Middleware/Sandbox |
+| OTel Tracing | ✅ | 完整集成 |
+| 扩展项目 | ✅ | 42 个 |
 
-#### 1. GUI 框架 - Uno Platform ✅
-- **状态**: 基础实现完成，需要修复 XAML 绑定
-- **文件**: `src/AgentScope.Uno/`
-- **功能**:
-  - 跨平台支持（Windows/Linux/macOS）
-  - XAML 界面定义
-  - Agent 集成
-  - 消息列表和输入框
-  - 中英文双语界面
-- **待修复**: XAML 代码后台绑定问题
+## 🔴 构建问题
 
-#### 2. Hook 系统 ✅
-- **状态**: 完整实现并测试通过
-- **文件**: `src/AgentScope.Core/Hook/IHook.cs`
-- **功能**:
-  - 4 种 Hook 事件类型
-  - HookManager 管理器
-  - 链式执行
-  - 中断支持（ShouldStop）
-  - 完全异步
+| 类别 | 数量 | 影响范围 |
+|------|------|---------|
+| 测试 Mock 未实现接口 | 111 错误 | AgentGroup/Coordinator/Router/Pipeline/SubAgentTool |
+| Uno XAML 绑定 | 7 错误 | MainWindow.xaml.cs |
+| SQLite NU1903 | 反复警告 | 几乎所有项目 |
+| 废弃 API CS0618 | 多处警告 | GenerateOptions/ReActAgent |
+| **总计** | **118 错误 / 230 警告** | **仅测试+Uno, Core/Harness 正常** |
 
-#### 3. EnhancedReActAgent ✅
-- **状态**: 完整实现，生产就绪
-- **文件**: `src/AgentScope.Core/EnhancedReActAgent.cs`
-- **功能**:
-  - 完整的 ReAct 循环（Reasoning → Acting → Observation）
-  - 工具动态注册和执行
-  - JSON 参数解析
-  - 最大迭代处理
-  - Hook 系统集成
-  - 详细日志（Verbose 模式）
-  - 思考历史追踪
+## 📊 代码统计
 
-#### 4. Session 和 State 管理 ✅
-- **状态**: 完整实现，测试通过
-- **文件**: 
-  - `src/AgentScope.Core/Session/Session.cs`
-  - `src/AgentScope.Core/Session/SessionManager.cs`
-- **功能**:
-  - Session 创建和管理
-  - 多 Session 并发支持
-  - Context 和 Metadata 存储
-  - Session 状态管理（Active/Paused/Closed）
-  - 线程安全实现
-  - 25 个单元测试全部通过
+- C# 源文件: 959
+- 非空代码行: ~65,941
+- 核心库 (Core): 307 个 .cs
+- 项目数: 51 (含扩展)
+- 集成测试: 22 通过
 
-#### 5. 基础设施 ✅
-- **消息系统**: 完整 Msg 类和 Builder
-- **内存管理**: SQLite 持久化 + 内存缓存
-- **模型接口**: IModel 抽象
-- **工具系统**: ITool 接口和示例工具
-- **配置管理**: .env 文件支持
-- **测试**: 68+ 测试（43 单元 + 25 Session + 7 集成）
+## 🎯 行动项
 
-### 🚧 进行中的功能
-
-#### 1. Uno Platform GUI 修复
-- **问题**: XAML 代码后台绑定错误
-- **需要**: 修复 MainWindow.xaml.cs 中的 x:Name 绑定
-- **优先级**: 中
-
-#### 2. 真实 LLM 集成（下一步）
-- **计划**: OpenAI SDK 集成
-- **功能**: GPT-3.5/4 支持
-- **优先级**: 高
-
-### ❌ 待实现功能
-
-#### 高优先级
-1. **OpenAI 集成**
-   - OpenAI SDK 集成
-   - 流式响应
-   - 函数调用
-   - API 密钥管理
-
-2. **Azure OpenAI 集成**
-   - 端点配置
-   - API 版本支持
-
-3. **EnhancedReActAgent 测试**
-   - ReAct 循环测试
-   - 工具执行测试
-   - Hook 集成测试
-
-4. **Hook 系统测试**
-   - Hook 执行测试
-   - 中断测试
-
-#### 中优先级
-5. **Pipeline 编排**
-   - Pipeline 接口
-   - 顺序/并行/条件执行
-
-6. **Plan 管理（PlanNotebook）**
-   - 任务分解
-   - Plan 执行和恢复
-
-7. **Session 持久化**
-   - SQLite 存储
-   - Session 恢复
-
-#### 低优先级
-8. **RAG 支持**
-   - 文档检索
-   - Embedding 支持
-   - 向量搜索
-
-9. **OpenTelemetry 集成**
-   - 分布式追踪
-   - 指标收集
-
-10. **MCP 和 A2A 协议**
-    - MCP 客户端/服务器
-    - A2A 服务注册
-
-## 代码统计
-
-### 总体统计
-- **总代码行数**: ~5,200 行
-- **C# 文件数**: 30+
-- **项目数**: 5（Core, TUI, Uno, 2x Tests, QuickStart）
-- **测试数**: 68+ 测试
-
-### 本次会话新增
-- **Session 系统**: ~250 行
-- **Session 测试**: ~350 行
-- **Bug 修复**: ~30 行
-- **文档**: ~100 行
-
-## 测试覆盖
-
-### 已测试模块 ✅
-- **Message 系统**: 13/13 ✅
-- **Agent 基础**: 5/5 ✅
-- **Memory 系统**: 11/11 ✅
-- **Model 系统**: 5/5 ✅
-- **Tool 系统**: 7/7 ✅
-- **Configuration**: 6/6 ✅
-- **Session 系统**: 25/25 ✅
-- **Integration**: 7/7 ✅
-
-**总计**: 79/79 测试通过 ✅
-
-### 待测试模块 ⬜
-- EnhancedReActAgent（需要添加）
-- Hook 系统（需要添加）
-- Uno GUI（需要修复后测试）
-- Pipeline（待实现）
-- Plan 管理（待实现）
-
-## 架构特点
-
-### 设计模式
-- **Builder 模式**: Agent 构建器
-- **Manager 模式**: SessionManager, HookManager
-- **Observer 模式**: Hook 系统
-- **Strategy 模式**: 工具系统
-
-### 技术特点
-- **完全异步**: async/await 全面使用
-- **线程安全**: ConcurrentDictionary, ReaderWriterLockSlim
-- **响应式编程**: System.Reactive
-- **强类型**: 泛型方法和接口
-- **中文注释**: 完整的双语文档
-
-### 跨平台支持
-- **.NET 9.0**: 现代 C# 特性
-- **Uno Platform**: Windows/Linux/macOS
-- **SQLite**: 跨平台数据库
-- **Terminal.Gui**: 跨平台 TUI
-
-## 下一步行动计划
-
-### 立即行动（高优先级）
-1. **修复 Uno GUI** - 解决 XAML 绑定问题
-2. **OpenAI 集成** - 添加真实 LLM 支持
-3. **EnhancedReActAgent 测试** - 确保工具执行循环正常
-
-### 短期计划（1-2周）
-4. **Azure OpenAI 集成** - 企业级 LLM 支持
-5. **Hook 系统测试** - 完善测试覆盖
-6. **Pipeline 基础** - 开始编排系统
-
-### 中期计划（3-4周）
-7. **Plan 管理系统** - 任务分解和追踪
-8. **Session 持久化** - SQLite 存储
-9. **RAG 基础支持** - 文档检索
-
-### 长期计划（1-2月）
-10. **OpenTelemetry 集成** - 完整的可观测性
-11. **MCP 协议** - 跨平台通信
-12. **A2A 协议** - 多 Agent 协作
-
-## 使用示例
-
-### Session 管理
-```csharp
-var manager = new SessionManager();
-var session = manager.CreateSession("Chat Session", "MyAgent");
-session.SetContext("preference", "dark_mode");
-```
-
-### EnhancedReActAgent
-```csharp
-var agent = EnhancedReActAgent.Builder()
-    .Name("智能助手")
-    .Model(model)
-    .AddTool(new CalculatorTool())
-    .MaxIterations(10)
-    .Verbose(true)
-    .Build();
-```
-
-### Hook 系统
-```csharp
-var hookManager = new HookManager();
-hookManager.RegisterHook(new MyCustomHook());
-var agent = EnhancedReActAgent.Builder()
-    .HookManager(hookManager)
-    .Build();
-```
-
-## 构建和测试
-
-```bash
-# 构建整个解决方案
-dotnet build
-
-# 运行所有测试
-dotnet test
-
-# 运行特定测试
-dotnet test --filter "FullyQualifiedName~Session"
-
-# 运行 TUI 应用
-cd src/AgentScope.TUI && dotnet run
-
-# 运行 QuickStart 示例
-cd examples/QuickStart && dotnet run
-```
-
-## 技术债务和改进建议
-
-### 当前技术债务
-1. **Uno GUI**: XAML 绑定需要修复
-2. **Mock Model**: 需要替换为真实 LLM
-3. **测试覆盖**: EnhancedReActAgent 和 Hook 缺少测试
-4. **文档**: API 文档生成
-
-### 改进建议
-1. **性能优化**: ReAct 循环可以缓存某些计算
-2. **错误处理**: 统一的错误处理策略
-3. **日志系统**: 集成 Microsoft.Extensions.Logging
-4. **配置验证**: .env 配置验证
-5. **国际化**: 完整的 i18n 支持
-
-## 结论
-
-AgentScope.NET 已经建立了坚实的基础架构：
-
-- ✅ **Hook 系统** - 完整的扩展性支持
-- ✅ **ReAct Agent** - 完整的推理和行动循环
-- ✅ **Session 管理** - 多会话并发支持
-- ✅ **79+ 测试** - 高质量代码保证
-- ✅ **跨平台支持** - 真正的 Windows/Linux/macOS
-
-下一步重点是添加真实的 LLM 集成（OpenAI），完善测试覆盖，以及修复 Uno GUI 的小问题。整个项目架构清晰，代码质量高，文档完善，随时可以继续扩展新功能。
+1. **P0**: 修复 5 个测试文件 (111 处) + Uno (7 处)
+2. **P1**: 升级 SQLitePCLRaw + 清理废弃 API
+3. **P2**: 示例 + 文档站点 + CI

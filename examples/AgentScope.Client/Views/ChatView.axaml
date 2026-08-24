@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:AgentScope.Client.ViewModels"
+             xmlns:conv="clr-namespace:AgentScope.Client.Converters"
+             x:Class="AgentScope.Client.Views.ChatView"
+             x:DataType="vm:ChatViewModel">
+  <UserControl.Resources>
+    <conv:RoleToColorConverter x:Key="RoleToColor" />
+    <conv:RoleToAlignmentConverter x:Key="RoleToAlignment" />
+    <conv:RoleToLabelConverter x:Key="RoleToLabel" />
+    <conv:BoolToOpacityConverter x:Key="BoolToOpacity" />
+  </UserControl.Resources>
+
+  <DockPanel LastChildFill="True">
+    <!-- 消息列表 -->
+    <ScrollViewer DockPanel.Dock="Top"
+                  Background="White"
+                  Opacity="{Binding IsBusy, Converter={StaticResource BoolToOpacity}}">
+      <ItemsControl ItemsSource="{Binding Messages}" Margin="16">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Margin="0,4"
+                    HorizontalAlignment="{Binding Role, Converter={StaticResource RoleToAlignment}}"
+                    Background="{Binding Role, Converter={StaticResource RoleToColor}}"
+                    CornerRadius="12"
+                    MaxWidth="600"
+                    Padding="12,8">
+              <StackPanel>
+                <!-- 顶部行：角色标签（左）+ 复制按钮（右） -->
+                <Grid Margin="0,0,0,4">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding Role, Converter={StaticResource RoleToLabel}}"
+                             FontSize="11" Foreground="#888"
+                             Grid.Column="0" />
+                  <Button Content="📋"
+                          FontSize="12"
+                          Height="20" Width="24"
+                          Padding="0"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Cursor="Hand"
+                          Grid.Column="1"
+                          Click="OnCopyClick"
+                          Tag="{Binding Content}" />
+                </Grid>
+                <!-- 消息正文 -->
+                <TextBlock Text="{Binding Content}"
+                           TextWrapping="Wrap" FontSize="14" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- 输入区 -->
+    <Border DockPanel.Dock="Bottom"
+            Background="White"
+            BorderBrush="#E0E0E0"
+            BorderThickness="0,1,0,0"
+            Padding="16,12">
+      <Grid ColumnDefinitions="*,80">
+        <TextBox Text="{Binding InputText}"
+                 Watermark="输入消息..."
+                 AcceptsReturn="False"
+                 Height="36"
+                 VerticalAlignment="Center"
+                 Grid.Column="0"
+                 Margin="0,0,8,0" />
+        <Button Content="发送"
+                Command="{Binding SendMessageCommand}"
+                Background="#7C3AED"
+                Foreground="White"
+                Height="36"
+                Grid.Column="1" />
+      </Grid>
+    </Border>
+  </DockPanel>
+</UserControl>

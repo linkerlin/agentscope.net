@@ -1,321 +1,41 @@
 # AgentScope.NET 1:1 复刻实施总结
 
-## 实施日期
-2026-02-17
+> **最后更新**: 2026-08-17 | **版本**: v2.0.1 (develop/v2.0.1) | 核心模块 22/22 全部完成
 
-## 执行概述
+## 复刻状态
 
-本文档总结了 AgentScope.NET 项目针对 agentscope-java 的 1:1 复刻工作，包括已完成的功能、详细的功能对比分析，以及完整的后续实施路线图。
-
-## 已完成的主要工作
-
-### 1. 系统性功能对比分析
-
-**创建文档**: `FEATURE_COMPARISON.md`
-
-**分析内容**:
-- 深入分析 agentscope-java 的 17 个核心模块
-- 逐模块对比 agentscope.net 的实现状态
-- 识别功能差距（~60% 缺失）
-- 制定详细的实施计划（28-40天工作量）
-
-**关键发现**:
-
-#### ✅ 已实现模块（~40%）
-1. **Agent 基础** - IAgent, AgentBase, ReActAgent
-2. **Hook 系统** - 完整实现（IHook, HookManager）
-3. **Session 管理** - Session, SessionManager（25个测试）
-4. **Memory 系统** - IMemory, SqliteMemory
-5. **Message 系统** - Msg, MsgBuilder
-6. **Model 接口** - IModel, ModelBase, MockModel
-7. **Tool 基础** - ITool, ToolBase, ToolResult
-8. **Exception 处理** - AgentScopeException 及派生类
-9. **Configuration** - .env 文件支持
-
-#### ❌ 完全缺失模块（~60%）
-1. **Formatter 系统** - 多 LLM 格式转换
-2. **Pipeline 编排** - SequentialPipeline, FanoutPipeline, MsgHub
-3. **Plan 管理** - PlanNotebook（核心类1150行）
-4. **RAG 系统** - Knowledge, GenericRAGHook
-5. **Interruption** - 中断处理机制
-6. **Tracing** - OpenTelemetry 集成
-7. **Skill 系统** - Skill 管理和仓库
-8. **Agent 变体** - StreamableAgent, CallableAgent 等
-9. **专业 Tool** - 文件、代码、MCP、多模态工具
-10. **真实 LLM** - OpenAI, Anthropic, DashScope 等实现
-
-### 2. Formatter 系统基础实现
-
-**创建文件**: `src/AgentScope.Core/Formatter/IFormatter.cs`
-
-**实现内容**:
-```csharp
-// 泛型 Formatter 接口
-public interface IFormatter<TRequest, TResponse, TParams>
-{
-    List<TRequest> Format(List<Msg> messages);
-    ModelResponse ParseResponse(TResponse response, DateTime startTime);
-    void ApplyOptions(TParams paramsBuilder, GenerateOptions? options, GenerateOptions? defaultOptions);
-    void ApplyTools(TParams paramsBuilder, List<ToolSchema>? tools);
-}
-
-// 支持类
-public class GenerateOptions { /* Temperature, MaxTokens, etc. */ }
-public class ToolSchema { /* Name, Description, Parameters */ }
-public class ResponseFormat { /* Text, JsonObject, JsonSchema */ }
-public class JsonSchema { /* Name, Schema, Strict */ }
-public class FormatterException : AgentScopeException { }
-```
-
-**设计特点**:
-- 泛型接口支持不同 LLM 提供商
-- 类型安全的参数传递
-- 与 Java 版本保持一致的 API 设计
-- 完整的中英文注释
-
-### 3. 详细的实施路线图
-
-**分阶段计划**:
-
-#### 阶段 1：核心基础设施（7-10天）
-- Formatter 系统完整实现
-- Pipeline 编排系统
-- 真实 LLM 集成（OpenAI）
-
-#### 阶段 2：高级功能（10-13天）
-- Plan 管理系统
-- RAG 系统基础
-- Agent 变体实现
-
-#### 阶段 3：增强和扩展（11-17天）
-- Interruption 处理
-- Tracing 系统
-- Skill 系统
-- 专业工具
-- State 管理增强
-- Util 工具类
-
-**总工作量**: 28-40 天
-
-## 详细功能对比矩阵
-
-### Agent 系统
-
-| 功能 | Java | .NET | 状态 |
+| 模块 | Java | .NET | 状态 |
 |------|------|------|------|
-| Agent 接口 | ✅ | ✅ | 完成 |
-| AgentBase | ✅ | ✅ | 完成 |
-| ReActAgent | ✅ | ✅ | 完成 |
-| CallableAgent | ✅ | ❌ | 缺失 |
-| ObservableAgent | ✅ | ❌ | 缺失 |
-| StreamableAgent | ✅ | ❌ | 缺失 |
-| StructuredOutputCapableAgent | ✅ | ❌ | 缺失 |
-| UserAgent | ✅ | ❌ | 缺失 |
-| StreamingHook | ✅ | ❌ | 缺失 |
-| StructuredOutputHook | ✅ | ❌ | 缺失 |
-| Event 系统 | ✅ | ❌ | 缺失 |
-| Accumulator | ✅ | ❌ | 缺失 |
+| 22 个核心模块 | ✅ | ✅ | 全部完成 |
+| Workflow 引擎 | ❌ | ✅ | .NET 独有 |
+| 42 个扩展 | ✅ | ✅ | 全部对齐 |
+| Harness 运行时 | ✅ | ✅ | 完成 |
+| 集成测试 | ✅ | ✅ (22 通过) | 通过 |
 
-### Formatter 系统
+## 构建状态
 
-| 功能 | Java | .NET | 状态 |
-|------|------|------|------|
-| Formatter 接口 | ✅ | ✅ | 完成 |
-| AbstractBaseFormatter | ✅ | ❌ | 待实现 |
-| OpenAI Formatter | ✅ | ❌ | 待实现 |
-| Anthropic Formatter | ✅ | ❌ | 待实现 |
-| DashScope Formatter | ✅ | ❌ | 待实现 |
-| Gemini Formatter | ✅ | ❌ | 待实现 |
-| Ollama Formatter | ✅ | ❌ | 待实现 |
-| ResponseFormat | ✅ | ✅ | 完成 |
-| MediaUtils | ✅ | ❌ | 待实现 |
+| 目标 | 状态 |
+|------|------|
+| AgentScope.Core | ✅ 0 错误 |
+| AgentScope.Harness | ✅ 0 错误 |
+| **完整方案** | **🔴 118 错误 / 230 警告** |
+| 集成测试 | ✅ 22 通过 |
 
-### Pipeline 系统
+## 🔴 阻塞原因
 
-| 功能 | Java | .NET | 状态 |
-|------|------|------|------|
-| Pipeline 接口 | ✅ | ❌ | 缺失 |
-| SequentialPipeline | ✅ | ❌ | 缺失 |
-| FanoutPipeline | ✅ | ❌ | 缺失 |
-| MsgHub | ✅ | ❌ | 缺失 |
-| Pipelines 工具类 | ✅ | ❌ | 缺失 |
+- 测试 Mock 类未实现 IAgent 新接口: **111 处**
+- Uno XAML x:Name 绑定缺失: **7 处**
+- SQLite 安全漏洞 (NU1903): 重复
+- 废弃 API (CS0618): 多处
 
-### Plan 管理
+## 差距项
 
-| 功能 | Java | .NET | 状态 |
-|------|------|------|------|
-| PlanNotebook | ✅ | ❌ | 缺失 |
-| Plan 模型 | ✅ | ❌ | 缺失 |
-| Plan 存储 | ✅ | ❌ | 缺失 |
-| Plan Hint | ✅ | ❌ | 缺失 |
+| 差距 | 优先级 |
+|------|--------|
+| TTS 真实 Provider | P3 |
+| 多模态工具真实调用 | P3 |
+| 示例项目不足 | P2 |
+| 文档站点 | P2 |
+| CI gate | P2 |
 
-### RAG 系统
-
-| 功能 | Java | .NET | 状态 |
-|------|------|------|------|
-| Knowledge 接口 | ✅ | ❌ | 缺失 |
-| GenericRAGHook | ✅ | ❌ | 缺失 |
-| KnowledgeRetrievalTools | ✅ | ❌ | 缺失 |
-| RAG 模式 | ✅ | ❌ | 缺失 |
-
-### Model 系统
-
-| 功能 | Java | .NET | 状态 |
-|------|------|------|------|
-| Model 接口 | ✅ | ✅ | 完成 |
-| ModelBase | ✅ | ✅ | 完成 |
-| OpenAI 实现 | ✅ | ❌ | 待实现 |
-| Anthropic 实现 | ✅ | ❌ | 待实现 |
-| DashScope 实现 | ✅ | ❌ | 待实现 |
-| Ollama 实现 | ✅ | ❌ | 待实现 |
-| Transport 层 | ✅ | ❌ | 缺失 |
-| WebSocket 支持 | ✅ | ❌ | 缺失 |
-| TTS 支持 | ✅ | ❌ | 缺失 |
-
-### 其他系统
-
-| 系统 | Java | .NET | 状态 |
-|------|------|------|------|
-| Hook | ✅ | ✅ | 完成 |
-| Session | ✅ | ✅ | 完成 |
-| Memory | ✅ | ✅ | 完成 |
-| Message | ✅ | ✅ | 完成 |
-| Tool 基础 | ✅ | ✅ | 完成 |
-| Exception | ✅ | ✅ | 完成 |
-| Interruption | ✅ | ❌ | 缺失 |
-| Tracing | ✅ | ❌ | 缺失 |
-| Skill | ✅ | ❌ | 缺失 |
-| State | ✅ | ⚠️ | 部分 |
-| Util | ✅ | ❌ | 缺失 |
-
-## 实施策略
-
-### 优先级排序原则
-
-1. **核心功能优先**: Formatter, Pipeline, LLM 实现
-2. **高频使用功能**: Plan 管理, RAG
-3. **增强功能**: Tracing, Interruption
-4. **扩展功能**: 专业工具, Util 类
-
-### 实施方法
-
-1. **1:1 对应**: 保持与 Java 版本的 API 一致性
-2. **C# 惯例**: 遵循 .NET 命名和编码规范
-3. **类型安全**: 利用 C# 的强类型系统
-4. **异步优先**: 所有 I/O 操作使用 async/await
-5. **测试驱动**: 每个功能都配备完整测试
-6. **中英文文档**: 所有代码包含双语注释
-
-### 质量标准
-
-- **代码覆盖率**: 目标 80%+
-- **文档完整性**: 100% API 文档
-- **性能基准**: 与 Java 版本相当
-- **兼容性**: 与 Java 版本数据格式兼容
-
-## 后续工作建议
-
-### 立即行动（本周）
-1. 完成 OpenAI Formatter 实现
-2. 集成 OpenAI SDK
-3. 实现基础的 Pipeline 接口
-
-### 短期目标（2周内）
-4. 完成 SequentialPipeline 和 FanoutPipeline
-5. 实现 PlanNotebook 核心类
-6. 添加 RAG 基础接口
-
-### 中期目标（1个月内）
-7. 完成所有 LLM Formatter
-8. 实现完整的 Plan 管理系统
-9. 添加 RAG 功能实现
-10. 实现 Agent 变体（Streamable, Callable 等）
-
-### 长期目标（2-3个月）
-11. Tracing 和 Interruption 系统
-12. Skill 系统完整实现
-13. 专业工具库（文件、代码、MCP）
-14. Util 工具类库
-15. 扩展模块（ReMe, AGUI 适配器）
-
-## 技术债务和风险
-
-### 当前技术债务
-1. Uno GUI 的 XAML 绑定问题（待修复）
-2. 缺少真实 LLM 实现（影响实际使用）
-3. 测试覆盖不完整（需要针对新功能）
-
-### 风险和挑战
-1. **工作量巨大**: 28-40天估算可能不足
-2. **API 兼容性**: .NET 和 Java 的差异
-3. **依赖管理**: 某些 Java 库在 .NET 中无对应
-4. **性能优化**: 需要逐步优化关键路径
-
-### 缓解策略
-1. **分阶段实施**: 按优先级逐步完成
-2. **持续集成**: 每个功能独立测试和集成
-3. **社区参与**: 鼓励开源贡献
-4. **文档先行**: 先写规范再写代码
-
-## 测试策略
-
-### 单元测试
-- 每个类至少 80% 覆盖率
-- 使用 xUnit 框架
-- Mock 外部依赖
-- 快速执行（<5秒）
-
-### 集成测试
-- 真实数据库测试
-- 真实 API 调用（使用测试账号）
-- 端到端场景
-- 中等执行时间（<30秒）
-
-### 系统测试
-- 完整工作流验证
-- 性能基准测试
-- 压力测试
-- 兼容性测试
-
-## 文档策略
-
-### API 文档
-- XML 注释覆盖所有公共 API
-- 中英文双语
-- 包含使用示例
-- 自动生成文档站点
-
-### 教程和指南
-- 快速开始指南
-- 核心概念教程
-- 高级用法示例
-- 最佳实践
-
-### 迁移指南
-- Java 到 C# 迁移指南
-- API 映射表
-- 常见问题解答
-- 代码对比示例
-
-## 总结
-
-AgentScope.NET 项目当前状态：
-
-**✅ 优势**:
-- 坚实的基础架构（40% 完成）
-- 高质量的代码和测试
-- 完整的中文文档
-- 清晰的实施路线图
-
-**❌ 差距**:
-- 缺少关键高级功能（60%）
-- 无真实 LLM 集成
-- Pipeline 和 Plan 管理缺失
-- RAG 功能未实现
-
-**🎯 目标**:
-通过系统性的 1:1 复刻，在 2-3 个月内达到与 agentscope-java 功能对等的状态，同时保持 .NET 平台的优势和特性。
-
-**📊 当前进度**: 40% → **目标进度**: 100%
-
-本文档为 AgentScope.NET 的 1:1 复刻工作提供了完整的路线图和实施指南。
+详细: [FEATURE_COMPARISON.md](./FEATURE_COMPARISON.md) | `docs/Java对齐差距分析及改造建议.md`

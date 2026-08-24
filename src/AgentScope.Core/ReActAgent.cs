@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Memory;
@@ -30,19 +31,19 @@ namespace AgentScope.Core;
 /// ReAct (Reasoning and Acting) Agent implementation.
 /// ReAct Agent 实现 - 结合推理和行动的迭代循环
 /// 
-/// Features:
-/// - Reasoning: Agent 分析当前情况，决定下一步行动
-/// - Acting: 执行工具调用或返回最终答案
-/// - Observation: 获取行动结果，继续循环或结束
-/// 
-/// ReAct Loop:
-/// 1. Thought: Agent 思考下一步
-/// 2. Action: 选择工具或返回答案
-/// 3. Observation: 观察执行结果
-/// 4. 重复直到完成或达到最大迭代次数
+/// 注意：建议升级到 EnhancedReActAgent，此类仅作向后兼容保留
 /// </summary>
+[Obsolete("请使用 EnhancedReActAgent 替代")]
 public class ReActAgent : AgentBase
 {
+    /// <summary>
+    /// JSON 序列化选项：不转义非 ASCII 字符，保证中文等原文可见。
+    /// </summary>
+    private static readonly JsonSerializerOptions NonEscapingJsonOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
     private readonly IModel _model;
     private readonly IMemory _memory;
     private readonly Dictionary<string, ITool> _tools;
@@ -54,7 +55,7 @@ public class ReActAgent : AgentBase
                         IMemory? memory = null, List<ITool>? tools = null,
                         ToolGroupManager? toolGroupManager = null,
                         int maxIterations = 10)
-        : base(name)
+        : base(name, $"ReActAgent: {systemPrompt}")
     {
         _model = model ?? throw new ArgumentNullException(nameof(model));
         _systemPrompt = systemPrompt ?? "You are a helpful AI assistant.";
@@ -64,27 +65,26 @@ public class ReActAgent : AgentBase
         _maxIterations = maxIterations > 0 ? maxIterations : 10;
     }
 
-    public override IObservable<Msg> Call(Msg message)
+    /// <summary>
+    /// 实现 DoCallAsync（新 AgentBase 的抽象方法）
+    /// </summary>
+    protected override async Task<Msg> DoCallAsync(IReadOnlyList<Msg> messages)
     {
-        return Observable.FromAsync(async () =>
-        {
-            _memory.Add(message);
+        var msg = messages.Count > 0 ? messages[messages.Count - 1]
+            : Msg.Builder().Role("user").TextContent("").Build();
 
-            // 如果有工具，执行完整的 ReAct 循环
-            Msg response;
-            if (GetAvailableTools().Count > 0)
-            {
-                response = await ProcessWithReActLoopAsync(message);
-            }
-            else
-            {
-                // 没有工具时，简单调用模型
-                response = await ProcessSimpleAsync(message);
-            }
-            
-            _memory.Add(response);
-            return response;
-        });
+        _memory.Add(msg);
+        Msg response;
+        if (GetAvailableTools().Count > 0)
+        {
+            response = await ProcessWithReActLoopAsync(msg);
+        }
+        else
+        {
+            response = await ProcessSimpleAsync(msg);
+        }
+        _memory.Add(response);
+        return response;
     }
 
     /// <summary>
@@ -212,9 +212,19 @@ public class ReActAgent : AgentBase
             if (intent.Action == "finish")
             {
                 var finalAnswer = intent.Parameters?.ToString();
+                // Parameters 为 Dictionary（JSON 格式）时序列化为可读文本
+                if (intent.Parameters is Dictionary<string, object> paramsDict)
+                {
+                    finalAnswer = JsonSerializer.Serialize(paramsDict, NonEscapingJsonOptions);
+                }
                 if (string.IsNullOrWhiteSpace(finalAnswer) || IsCompletionMarker(finalAnswer))
                 {
                     finalAnswer = ExtractFinalAnswerForFinish(responseText, intent.HasActionLine);
+                }
+                // 仍为空时回退到原始响应文本，避免返回空答案
+                if (string.IsNullOrWhiteSpace(finalAnswer))
+                {
+                    finalAnswer = responseText;
                 }
 
                 return ActionResult.Finish(finalAnswer ?? string.Empty);
@@ -246,9 +256,20 @@ public class ReActAgent : AgentBase
     {
         var toolDescriptions = BuildAvailableToolDescriptions();
 
+        // 构建对话历史（排除当前消息，当前消息单独作为 User Question 传入）
+        var history = _memory.GetAll();
+        var priorMessages = history.Count > 0 && ReferenceEquals(history[^1], userMessage)
+            ? history.Take(history.Count - 1).ToList()
+            : history;
+        var historyText = string.Join("\n",
+            priorMessages.Select(m => $"{m.Role}: {m.GetTextContent()}"));
+
         var promptText = $@"{_systemPrompt}
 
 User Question: {userMessage.GetTextContent()}
+
+Conversation History:
+{historyText}
 
 Available Tools:
 {toolDescriptions}
@@ -316,7 +337,14 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
             var inputLine = lines.FirstOrDefault(l => 
                 l.StartsWith("Action Input:", StringComparison.OrdinalIgnoreCase));
 
-            var action = actionLine?.Substring("Action:".Length).Trim().ToLower() ?? "finish";
+            // 如果没有找到 Action 行，说明模型没有按照 ReAct 格式回复
+            // 此时将整个回复作为最终答案
+            if (actionLine == null)
+            {
+                return new ActionIntent { Action = "finish", Parameters = thought.Trim(), HasActionLine = false };
+            }
+
+            var action = actionLine.Substring("Action:".Length).Trim().ToLower();
             var input = inputLine?.Substring("Action Input:".Length).Trim() ?? "";
 
             object? parameters = null;
@@ -324,7 +352,23 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
             {
                 try
                 {
-                    parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(input);
+                    // 注意：JsonSerializer.Deserialize<Dictionary<string, object>>
+                    // 默认将字符串值反序列化为 JsonElement 而非 string，
+                    // 导致工具的参数类型检查失败。这里用 JsonNode 解析确保证值类型正确。
+                    // Note: JsonSerializer.Deserialize<Dictionary<string, object>>
+                    // produces JsonElement for string values by default, breaking
+                    // tool parameter type checks. Use JsonNode to get correct types.
+                    var node = JsonNode.Parse(input);
+                    if (node is JsonObject jsonObj)
+                    {
+                        parameters = jsonObj.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => JsonValueToObject(kvp.Value));
+                    }
+                    else
+                    {
+                        parameters = input;
+                    }
                 }
                 catch
                 {
@@ -389,6 +433,32 @@ Action Input: [Final answer if finish, or JSON parameters if tool]";
     public static ReActAgentBuilder Builder()
     {
         return new ReActAgentBuilder();
+    }
+
+    /// <summary>
+    /// 将 JsonNode 递归转换为对应的 .NET 原生类型（string/long/double/bool/null），
+    /// 避免工具参数中拿到 JsonElement 导致类型检查失败。
+    /// </summary>
+    private static object? JsonValueToObject(JsonNode? node)
+    {
+        if (node == null) return null;
+        if (node is JsonValue jv)
+        {
+            if (jv.TryGetValue<string>(out var s)) return s;
+            if (jv.TryGetValue<long>(out var l)) return l;
+            if (jv.TryGetValue<double>(out var d)) return d;
+            if (jv.TryGetValue<bool>(out var b)) return b;
+            return jv.ToString();
+        }
+        if (node is JsonArray arr)
+        {
+            return arr.Select(JsonValueToObject).ToList();
+        }
+        if (node is JsonObject obj)
+        {
+            return obj.ToDictionary(kvp => kvp.Key, kvp => JsonValueToObject(kvp.Value));
+        }
+        return node.ToString();
     }
 }
 
@@ -460,6 +530,7 @@ public class ReActAgentBuilder
         return this;
     }
 
+#pragma warning disable CS0618
     public ReActAgent Build()
     {
         if (_model == null)
@@ -469,4 +540,5 @@ public class ReActAgentBuilder
 
         return new ReActAgent(_name, _model, _sysPrompt, _memory, _tools, _toolGroupManager, _maxIterations);
     }
+#pragma warning restore CS0618
 }

@@ -24,8 +24,16 @@ using System.Threading.Tasks;
 
 namespace AgentScope.Core.Tests.Agent;
 
+/// <summary>
+/// Tests for ReActAgent builder and execution
+/// ReActAgent 构建器和执行测试
+/// </summary>
 public class ReActAgentTests
 {
+    /// <summary>
+    /// Tests that ReActAgent.CallAsync processes a user message and stores it in memory.
+    /// 测试 ReActAgent.CallAsync 处理用户消息并将其存入记忆。
+    /// </summary>
     [Fact]
     public async Task ReActAgent_CallAsync_ShouldProcessMessage()
     {
@@ -53,6 +61,10 @@ public class ReActAgentTests
         Assert.Equal(2, memory.Count()); // User message + agent response
     }
 
+    /// <summary>
+    /// Tests that building ReActAgent without a model throws InvalidOperationException.
+    /// 测试构建 ReActAgent 时不提供模型会抛出 InvalidOperationException。
+    /// </summary>
     [Fact]
     public void ReActAgent_Builder_ShouldRequireModel()
     {
@@ -65,6 +77,10 @@ public class ReActAgentTests
         });
     }
 
+    /// <summary>
+    /// Tests that building ReActAgent with all properties succeeds and sets the agent name.
+    /// 测试使用全部属性构建 ReActAgent 成功并设置代理名称。
+    /// </summary>
     [Fact]
     public void ReActAgent_Builder_WithAllProperties_ShouldBuildSuccessfully()
     {
@@ -86,6 +102,10 @@ public class ReActAgentTests
         Assert.Equal("TestAgent", agent.Name);
     }
 
+    /// <summary>
+    /// Tests that ReActAgent uses the provided custom memory for storing conversation history.
+    /// 测试 ReActAgent 使用提供的自定义记忆来存储对话历史。
+    /// </summary>
     [Fact]
     public async Task ReActAgent_WithCustomMemory_ShouldUseProvidedMemory()
     {
@@ -107,6 +127,10 @@ public class ReActAgentTests
         Assert.Equal(2, memory.Count());
     }
 
+    /// <summary>
+    /// Tests that ReActAgent.Call works as an observable sequence and returns a response.
+    /// 测试 ReActAgent.Call 作为可观察序列工作并返回响应。
+    /// </summary>
     [Fact]
     public async Task ReActAgent_Call_ShouldWorkAsObservable()
     {
@@ -120,13 +144,17 @@ public class ReActAgentTests
         var userMsg = Msg.Builder().TextContent("Test").Build();
 
         // Act
-        var response = await agent.Call(userMsg).FirstOrDefaultAsync();
+        var response = await agent.CallAsync(userMsg);
 
         // Assert
         Assert.NotNull(response);
         Assert.NotNull(response.GetTextContent());
     }
 
+    /// <summary>
+    /// Tests that ReActAgent uses Action Input as the final answer when the ReAct format is used with tools.
+    /// 测试 ReActAgent 在使用工具和 ReAct 格式时将 Action Input 作为最终回答。
+    /// </summary>
     [Fact]
     public async Task ReActAgent_WithToolAndReActFormat_ShouldUseActionInputAsFinalAnswer()
     {
@@ -149,6 +177,10 @@ public class ReActAgentTests
         Assert.Equal("你好！", response.GetTextContent());
     }
 
+    /// <summary>
+    /// Tests that when Action Input is empty/missing, the response text is empty (no completion marker).
+    /// 测试当 Action Input 为空/缺失时，响应文本为空（无完成标记）。
+    /// </summary>
     [Fact]
     public async Task ReActAgent_WithToolAndMissingActionInput_ShouldNotReturnCompletionMarker()
     {
@@ -172,6 +204,10 @@ public class ReActAgentTests
         Assert.True(string.IsNullOrEmpty(text));
     }
 
+    /// <summary>
+    /// A tool that performs no operation, used for testing tool integration.
+    /// 不执行任何操作的测试工具，用于测试工具集成。
+    /// </summary>
     private sealed class NoOpTool : ToolBase
     {
         public NoOpTool() : base("noop", "No operation tool")
@@ -186,6 +222,10 @@ public class ReActAgentTests
         }
     }
 
+    /// <summary>
+    /// A scripted model that returns predefined responses in order, used for deterministic testing.
+    /// 按顺序返回预定义响应的脚本化模型，用于确定性测试。
+    /// </summary>
     private sealed class ScriptedModel : IModel
     {
         private readonly Queue<string> _responses;

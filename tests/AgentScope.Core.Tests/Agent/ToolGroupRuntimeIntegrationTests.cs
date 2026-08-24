@@ -13,8 +13,16 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.Agent;
 
+/// <summary>
+/// Integration tests for runtime tool group management in ReActAgent and EnhancedReActAgent
+/// ReActAgent 和 EnhancedReActAgent 运行时工具组管理集成测试
+/// </summary>
 public class ToolGroupRuntimeIntegrationTests
 {
+    /// <summary>
+    /// Tests that ReActAgent updates the system prompt based on which tool groups are active at runtime.
+    /// 测试 ReActAgent 根据运行时激活的工具组动态更新系统提示。
+    /// </summary>
     [Fact]
     public async Task ReActAgent_RuntimeToolGroups_UpdatePromptFromActiveTools()
     {
@@ -50,6 +58,10 @@ public class ToolGroupRuntimeIntegrationTests
         Assert.Contains("blocked_tool", model.CapturedPrompts[1], StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Tests that ReActAgent does not execute tools belonging to inactive groups.
+    /// 测试 ReActAgent 不会执行属于非活跃组的工具。
+    /// </summary>
     [Fact]
     public async Task ReActAgent_DoesNotExecuteInactiveGroupedTool()
     {
@@ -76,6 +88,10 @@ public class ToolGroupRuntimeIntegrationTests
         Assert.Equal(string.Empty, response.GetTextContent());
     }
 
+    /// <summary>
+    /// Tests that EnhancedReActAgent does not execute tools belonging to inactive groups and reports unknown action.
+    /// 测试 EnhancedReActAgent 不会执行非活跃组的工具并报告未知操作。
+    /// </summary>
     [Fact]
     public async Task EnhancedReActAgent_DoesNotExecuteInactiveGroupedTool()
     {
@@ -104,6 +120,10 @@ public class ToolGroupRuntimeIntegrationTests
         Assert.Contains("Unknown action", text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A test tool that tracks how many times it was executed.
+    /// 跟踪执行次数的测试工具。
+    /// </summary>
     private sealed class TrackingTool : ToolBase
     {
         public int ExecutionCount { get; private set; }
@@ -130,6 +150,10 @@ public class ToolGroupRuntimeIntegrationTests
         }
     }
 
+    /// <summary>
+    /// A scripted model that captures all prompts sent to it for verification.
+    /// 捕获所有发送给它的提示以进行验证的脚本化模型。
+    /// </summary>
     private sealed class CapturingScriptedModel : IModel
     {
         private readonly Queue<string> _responses;

@@ -1,5 +1,16 @@
-// Copyright 2024-2026 the original author or authors.
-// Licensed under the Apache License, Version 2.0
+﻿// Copyright 2024-2026 the original author or authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 using AgentScope.Core.Agent;
 using AgentScope.Core.Message;
@@ -7,96 +18,121 @@ using AgentScope.Core.Message;
 namespace AgentScope.Core.MultiAgent;
 
 /// <summary>
-/// Coordination strategy for multi-agent collaboration
-/// 多Agent协作的协调策略
+/// Defines the coordination strategy for multi-agent collaboration.
+/// Corresponds to Java: io.agentscope.core.multiagent.CoordinationStrategy
+/// 定义多 Agent 协作的协调策略。
+/// 对应 Java: io.agentscope.core.multiagent.CoordinationStrategy
 /// </summary>
 public enum CoordinationStrategy
 {
     /// <summary>
-    /// Sequential execution (one after another)
-    /// 顺序执行（一个接一个）
+    /// Sequential execution: agents process one after another in a chain.
+    /// 顺序执行：Agent 依次链式处理。
     /// </summary>
     Sequential,
 
     /// <summary>
-    /// Parallel execution (all at once)
-    /// 并行执行（同时进行）
+    /// Parallel execution: all agents process the same input simultaneously.
+    /// 并行执行：所有 Agent 同时处理相同输入。
     /// </summary>
     Parallel,
 
     /// <summary>
-    /// Consensus-based (agents vote/discuss)
-    /// 基于共识（Agent投票/讨论）
+    /// Consensus-based: agents discuss iteratively until reaching agreement.
+    /// 基于共识：Agent 迭代讨论直到达成一致。
     /// </summary>
     Consensus,
 
     /// <summary>
-    /// Hierarchical (leader delegates to workers)
-    /// 层级式（领导者委派给工作者）
+    /// Hierarchical: a leader/coordinator agent delegates tasks to worker agents.
+    /// 层级式：领导者/协调者 Agent 将任务委派给工作者 Agent。
     /// </summary>
     Hierarchical,
 
     /// <summary>
-    /// Competitive (agents compete, best result wins)
-    /// 竞争式（Agent竞争，最佳结果获胜）
+    /// Competitive: agents compete and the best result is selected.
+    /// 竞争式：Agent 竞争，选择最佳结果。
     /// </summary>
     Competitive
 }
 
 /// <summary>
-/// Result from coordinated agent execution
-/// 协调Agent执行的结果
+/// Represents the result from coordinated agent execution.
+/// Corresponds to Java: io.agentscope.core.multiagent.CoordinatedResult
+/// 表示协调 Agent 执行的结果。
+/// 对应 Java: io.agentscope.core.multiagent.CoordinatedResult
 /// </summary>
 public class CoordinatedResult
 {
     /// <summary>
-    /// Whether the coordination was successful
-    /// 协调是否成功
+    /// Gets whether the coordination was successful.
+    /// 获取协调是否成功。
     /// </summary>
     public bool Success { get; init; }
 
     /// <summary>
-    /// Final aggregated response
-    /// 最终聚合响应
+    /// Gets the final aggregated response from all agents.
+    /// 获取所有 Agent 的最终聚合响应。
     /// </summary>
     public required Msg FinalResponse { get; init; }
 
     /// <summary>
-    /// Individual responses from each agent
-    /// 每个Agent的单独响应
+    /// Gets the individual responses from each agent, keyed by agent name.
+    /// 获取每个 Agent 的单独响应，以 Agent 名称为键。
     /// </summary>
     public Dictionary<string, Msg> AgentResponses { get; init; } = new();
 
     /// <summary>
-    /// Coordination metadata
-    /// 协调元数据
+    /// Gets the coordination metadata (rounds, strategy, etc.).
+    /// 获取协调元数据（轮次、策略等）。
     /// </summary>
     public Dictionary<string, object> Metadata { get; init; } = new();
 
     /// <summary>
-    /// Execution time
-    /// 执行时间
+    /// Gets the total execution time of the coordination.
+    /// 获取协调的总执行时间。
     /// </summary>
     public TimeSpan ExecutionTime { get; init; }
 }
 
 /// <summary>
-/// Coordinates multiple agents to work together
-/// 协调多个Agent协同工作
-/// 
-/// 参考: agentscope-java 的多Agent协调概念
+/// Coordinates multiple agents to work together on a task using various strategies.
+/// Corresponds to Java: io.agentscope.core.multiagent.AgentCoordinator
+/// 协调多个 Agent 使用各种策略协同工作。
+/// 对应 Java: io.agentscope.core.multiagent.AgentCoordinator
 /// </summary>
 public class AgentCoordinator : IDisposable
 {
+    /// <summary>
+    /// Registered agents, keyed by agent name.
+    /// 已注册的 Agent 集合，以 Agent 名称为键。
+    /// </summary>
     private readonly Dictionary<string, IAgent> _agents = new();
+
+    /// <summary>
+    /// The coordination strategy to use.
+    /// 使用的协调策略。
+    /// </summary>
     private readonly CoordinationStrategy _strategy;
+
+    /// <summary>
+    /// Optional name of the coordinator agent (used in Hierarchical strategy).
+    /// 可选的协调者 Agent 名称（用于层级策略）。
+    /// </summary>
     private readonly string? _coordinatorAgentName;
+
+    /// <summary>
+    /// Whether this coordinator has been disposed.
+    /// 此协调器是否已被释放。
+    /// </summary>
     private bool _disposed;
 
     /// <summary>
-    /// Creates a new agent coordinator
-    /// 创建新的Agent协调器
+    /// Creates a new agent coordinator with the specified strategy.
+    /// 使用指定的策略创建新的Agent协调器。
     /// </summary>
+    /// <param name="strategy">Coordination strategy / 协调策略</param>
+    /// <param name="coordinatorAgentName">Optional name of the coordinator agent for hierarchical strategy / 可选，层级策略中协调者Agent的名称</param>
     public AgentCoordinator(
         CoordinationStrategy strategy = CoordinationStrategy.Sequential,
         string? coordinatorAgentName = null)
@@ -106,9 +142,13 @@ public class AgentCoordinator : IDisposable
     }
 
     /// <summary>
-    /// Registers an agent for coordination
-    /// 注册Agent用于协调
+    /// Registers an agent for coordination.
+    /// 注册Agent用于协调。
     /// </summary>
+    /// <param name="name">Unique agent name / 唯一的Agent名称</param>
+    /// <param name="agent">The agent instance / Agent实例</param>
+    /// <exception cref="ArgumentException">Thrown when name is empty / 名称为空时抛出</exception>
+    /// <exception cref="ArgumentNullException">Thrown when agent is null / Agent为null时抛出</exception>
     public void RegisterAgent(string name, IAgent agent)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -123,9 +163,11 @@ public class AgentCoordinator : IDisposable
     }
 
     /// <summary>
-    /// Coordinates agents to process a message
-    /// 协调Agent处理消息
+    /// Coordinates agents to process a message using the configured strategy.
+    /// 使用配置的策略协调Agent处理消息。
     /// </summary>
+    /// <param name="message">The message to process / 要处理的消息</param>
+    /// <returns>Coordination result containing responses / 包含响应的协调结果</returns>
     public async Task<CoordinatedResult> CoordinateAsync(Msg message)
     {
         var startTime = DateTime.UtcNow;
@@ -156,11 +198,11 @@ public class AgentCoordinator : IDisposable
         }
     }
 
-    /// <summary>
-    /// Sequential execution: each agent processes the output of the previous
-    /// 顺序执行：每个Agent处理前一个的输出
-    /// </summary>
-    private async Task<CoordinatedResult> ExecuteSequentialAsync(Msg message)
+        /// <summary>
+        /// Sequential execution: each agent processes the output of the previous one in chain.
+        /// 顺序执行：每个Agent依次处理前一个Agent的输出。
+        /// </summary>
+        private async Task<CoordinatedResult> ExecuteSequentialAsync(Msg message)
     {
         var responses = new Dictionary<string, Msg>();
         var currentMessage = message;
@@ -185,11 +227,11 @@ public class AgentCoordinator : IDisposable
         };
     }
 
-    /// <summary>
-    /// Parallel execution: all agents process the same message simultaneously
-    /// 并行执行：所有Agent同时处理相同消息
-    /// </summary>
-    private async Task<CoordinatedResult> ExecuteParallelAsync(Msg message)
+        /// <summary>
+        /// Parallel execution: all agents process the same message simultaneously.
+        /// 并行执行：所有Agent同时处理相同消息。
+        /// </summary>
+        private async Task<CoordinatedResult> ExecuteParallelAsync(Msg message)
     {
         var responses = new Dictionary<string, Msg>();
         var tasks = _agents.Select(async kvp =>
@@ -231,11 +273,11 @@ public class AgentCoordinator : IDisposable
         };
     }
 
-    /// <summary>
-    /// Consensus execution: agents discuss until reaching agreement
-    /// 共识执行：Agent讨论直到达成一致
-    /// </summary>
-    private async Task<CoordinatedResult> ExecuteConsensusAsync(Msg message)
+        /// <summary>
+        /// Consensus execution: agents discuss iteratively until reaching agreement or max rounds.
+        /// 共识执行：Agent迭代讨论直到达成一致或达到最大轮次。
+        /// </summary>
+        private async Task<CoordinatedResult> ExecuteConsensusAsync(Msg message)
     {
         var responses = new Dictionary<string, Msg>();
         var round = 0;
@@ -298,11 +340,11 @@ public class AgentCoordinator : IDisposable
         };
     }
 
-    /// <summary>
-    /// Hierarchical execution: coordinator delegates to workers and synthesizes results
-    /// 层级执行：协调者委派给工作者并综合结果
-    /// </summary>
-    private async Task<CoordinatedResult> ExecuteHierarchicalAsync(Msg message)
+        /// <summary>
+        /// Hierarchical execution: a coordinator agent delegates work to worker agents and synthesizes results.
+        /// 层级执行：协调者Agent委派给工作者Agent并综合结果。
+        /// </summary>
+        private async Task<CoordinatedResult> ExecuteHierarchicalAsync(Msg message)
     {
         // If there's a coordinator agent, use it to delegate
         IAgent? coordinator = null;
@@ -377,11 +419,11 @@ public class AgentCoordinator : IDisposable
         };
     }
 
-    /// <summary>
-    /// Competitive execution: agents compete, best result selected
-    /// 竞争执行：Agent竞争，选择最佳结果
-    /// </summary>
-    private async Task<CoordinatedResult> ExecuteCompetitiveAsync(Msg message)
+        /// <summary>
+        /// Competitive execution: all agents respond, then the best result is selected.
+        /// 竞争执行：所有Agent响应，然后选择最佳结果。
+        /// </summary>
+        private async Task<CoordinatedResult> ExecuteCompetitiveAsync(Msg message)
     {
         // Execute all agents in parallel
         var results = await ExecuteParallelAsync(message);
@@ -405,15 +447,20 @@ public class AgentCoordinator : IDisposable
         };
     }
 
-    /// <summary>
-    /// Creates a builder for fluent configuration
-    /// 创建用于流畅配置的构建器
-    /// </summary>
-    public static AgentCoordinatorBuilder Builder()
+        /// <summary>
+        /// Creates a builder for fluent configuration of AgentCoordinator.
+        /// 创建用于流畅配置 AgentCoordinator 的构建器。
+        /// </summary>
+        /// <returns>A new AgentCoordinatorBuilder / 新的 AgentCoordinatorBuilder</returns>
+        public static AgentCoordinatorBuilder Builder()
     {
         return new AgentCoordinatorBuilder();
     }
 
+    /// <summary>
+    /// Releases all resources used by the coordinator.
+    /// 释放协调器使用的所有资源。
+    /// </summary>
     public void Dispose()
     {
         if (!_disposed)
@@ -428,24 +475,46 @@ public class AgentCoordinator : IDisposable
 }
 
 /// <summary>
-/// Builder for AgentCoordinator
-/// AgentCoordinator 的构建器
+/// Fluent builder for configuring and creating an AgentCoordinator.
+/// Corresponds to Java: io.agentscope.core.multiagent.AgentCoordinatorBuilder
+/// 用于流畅配置和创建 AgentCoordinator 的构建器。
+/// 对应 Java: io.agentscope.core.multiagent.AgentCoordinatorBuilder
 /// </summary>
 public class AgentCoordinatorBuilder
 {
+    /// <summary>
+    /// The coordinator being built.
+    /// 正在构建的协调器。
+    /// </summary>
     private AgentCoordinator _coordinator;
 
+    /// <summary>
+    /// Initializes a new builder with a default Sequential strategy.
+    /// 使用默认的顺序策略初始化一个新的构建器。
+    /// </summary>
     public AgentCoordinatorBuilder()
     {
         _coordinator = new AgentCoordinator();
     }
 
+    /// <summary>
+    /// Sets the coordination strategy.
+    /// 设置协调策略。
+    /// </summary>
+    /// <param name="strategy">The coordination strategy / 协调策略</param>
+    /// <returns>This builder instance for chaining / 此构建器实例，用于链式调用</returns>
     public AgentCoordinatorBuilder Strategy(CoordinationStrategy strategy)
     {
         _coordinator = new AgentCoordinator(strategy);
         return this;
     }
 
+    /// <summary>
+    /// Sets the coordinator agent name (automatically switches to Hierarchical strategy).
+    /// 设置协调者 Agent 名称（自动切换到层级策略）。
+    /// </summary>
+    /// <param name="name">Name of the coordinator agent / 协调者 Agent 的名称</param>
+    /// <returns>This builder instance for chaining / 此构建器实例，用于链式调用</returns>
     public AgentCoordinatorBuilder CoordinatorAgent(string name)
     {
         _coordinator = new AgentCoordinator(
@@ -454,12 +523,24 @@ public class AgentCoordinatorBuilder
         return this;
     }
 
+    /// <summary>
+    /// Registers an agent for coordination.
+    /// 注册一个 Agent 用于协调。
+    /// </summary>
+    /// <param name="name">Unique agent name / 唯一的 Agent 名称</param>
+    /// <param name="agent">The agent instance / Agent 实例</param>
+    /// <returns>This builder instance for chaining / 此构建器实例，用于链式调用</returns>
     public AgentCoordinatorBuilder RegisterAgent(string name, IAgent agent)
     {
         _coordinator.RegisterAgent(name, agent);
         return this;
     }
 
+    /// <summary>
+    /// Builds and returns the configured AgentCoordinator.
+    /// 构建并返回配置好的 AgentCoordinator。
+    /// </summary>
+    /// <returns>The configured AgentCoordinator / 配置好的 AgentCoordinator</returns>
     public AgentCoordinator Build()
     {
         return _coordinator;

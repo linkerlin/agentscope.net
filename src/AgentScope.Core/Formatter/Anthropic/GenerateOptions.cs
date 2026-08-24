@@ -20,6 +20,7 @@ namespace AgentScope.Core.Formatter.Anthropic;
 /// 生成选项
 /// Generation options for Anthropic API
 /// </summary>
+[Obsolete("使用 AgentScope.Core.Formatter.GenerateOptions 替代")]
 public class GenerateOptions
 {
     /// <summary>

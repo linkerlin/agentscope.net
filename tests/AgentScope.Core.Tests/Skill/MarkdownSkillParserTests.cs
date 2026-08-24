@@ -5,8 +5,18 @@ using AgentScope.Core.Skill;
 
 namespace AgentScope.Core.Tests.Skill;
 
+/// <summary>
+/// Unit tests for <see cref="MarkdownSkillParser"/> and <see cref="FileSystemSkillRepository"/>,
+/// verifying parsing of markdown front matter, fallback behavior, and file-system scanning.
+/// 对 <see cref="MarkdownSkillParser"/> 和 <see cref="FileSystemSkillRepository"/> 的单元测试，
+/// 验证 Markdown 前置元数据解析、回退行为以及文件系统扫描。
+/// </summary>
 public class MarkdownSkillParserTests
 {
+    /// <summary>
+    /// Tests that parsing markdown with YAML front matter produces a correctly populated <see cref="RegisteredSkill"/>.
+    /// 测试解析包含 YAML 前置元数据的 Markdown 是否能正确生成填充好的 <see cref="RegisteredSkill"/>。
+    /// </summary>
     [Fact]
     public void Parse_WithFrontMatter_ReturnsRegisteredSkill()
     {
@@ -34,6 +44,10 @@ Use this skill when shell work is required.
         Assert.Contains("Use this skill", registered.RawContent, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Tests that parsing markdown without front matter falls back to the heading and source path for metadata.
+    /// 测试解析没有前置元数据的 Markdown 时，是否回退使用标题和源路径作为元数据。
+    /// </summary>
     [Fact]
     public void Parse_WithoutFrontMatter_UsesHeadingAndSourcePathFallback()
     {
@@ -53,6 +67,10 @@ Inspect repository structure and summarize key files.
         Assert.Equal(@"C:\skills\Repo Explorer.md", registered.SourcePath);
     }
 
+    /// <summary>
+    /// Tests that <see cref="FileSystemSkillRepository.Scan"/> uses the parser to extract metadata from markdown files.
+    /// 测试 <see cref="FileSystemSkillRepository.Scan"/> 是否使用解析器从 Markdown 文件中提取元数据。
+    /// </summary>
     [Fact]
     public void FileSystemSkillRepository_Scan_UsesParserMetadata()
     {
@@ -91,6 +109,12 @@ Create clear execution plans.
         }
     }
 
+    /// <summary>
+    /// Tests that <see cref="FileSystemSkillRepository.Load"/> returns a <see cref="MarkdownSkill"/>
+    /// when no custom loader is registered, loading content from the file system.
+    /// 测试 <see cref="FileSystemSkillRepository.Load"/> 在没有注册自定义加载器时，
+    /// 是否从文件系统加载内容并返回 <see cref="MarkdownSkill"/>。
+    /// </summary>
     [Fact]
     public void FileSystemSkillRepository_Load_WithoutLoader_ReturnsMarkdownSkill()
     {

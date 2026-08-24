@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:AgentScope.Client.ViewModels"
+             x:Class="AgentScope.Client.Views.SkillListView"
+             x:DataType="vm:SkillListViewModel">
+  <DockPanel Margin="16">
+    <TextBlock Text="Skill 管理" FontSize="22" FontWeight="Bold"
+               DockPanel.Dock="Top" Margin="0,0,0,16" />
+
+    <Grid ColumnDefinitions="300,*" DockPanel.Dock="Top">
+      <!-- 左侧列表 -->
+      <Border Grid.Column="0" Margin="0,0,16,0">
+        <DockPanel>
+          <Button Content="新增 Skill" Command="{Binding NewItemCommand}"
+                  DockPanel.Dock="Top" Margin="0,0,0,4" />
+          <Button Content="编辑" Command="{Binding EditItemCommand}"
+                  DockPanel.Dock="Top" Margin="0,0,0,4" />
+          <Button Content="删除" Command="{Binding DeleteItemCommand}"
+                  DockPanel.Dock="Top" Margin="0,0,0,8" />
+
+          <ListBox ItemsSource="{Binding Items}"
+                   SelectedItem="{Binding SelectedItem}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel>
+                  <TextBlock Text="{Binding Name}" FontWeight="Bold" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding SourceType}" FontSize="11"
+                               Foreground="#888" />
+                    <TextBlock Text="{Binding IsActive, StringFormat='Active={0}'}"
+                               FontSize="11" Foreground="#888" />
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <!-- 右侧编辑区 -->
+      <Border Grid.Column="1"
+              IsVisible="{Binding IsEditing}"
+              Background="#F9F9F9"
+              CornerRadius="8"
+              Padding="16">
+        <ScrollViewer>
+          <StackPanel Spacing="8">
+            <TextBlock Text="名称" />
+            <TextBox Text="{Binding EditName}" />
+
+            <TextBlock Text="描述" />
+            <TextBox Text="{Binding EditDescription}" />
+
+            <TextBlock Text="来源类型" />
+            <ComboBox ItemsSource="{Binding SourceTypes}"
+                      SelectedItem="{Binding EditSourceType}" />
+
+            <TextBlock Text="文件路径（file 类型）" />
+            <TextBox Text="{Binding EditSourcePath}"
+                     Watermark="如 skills/my_skill.md" />
+
+            <TextBlock Text="内嵌内容（inline 类型）" />
+            <TextBox Text="{Binding EditRawContent}"
+                     AcceptsReturn="True" Height="160"
+                     TextWrapping="Wrap" />
+
+            <CheckBox Content="激活" IsChecked="{Binding EditIsActive}" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+              <Button Content="保存" Command="{Binding SaveItemCommand}"
+                      Background="#7C3AED" Foreground="White" />
+              <Button Content="取消" Command="{Binding CancelEditCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

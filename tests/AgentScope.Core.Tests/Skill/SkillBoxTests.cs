@@ -6,8 +6,18 @@ using AgentScope.Core.Tool;
 
 namespace AgentScope.Core.Tests.Skill;
 
+/// <summary>
+/// Unit tests for <see cref="SkillBox"/>, verifying discovery, loading, tool binding, and activation lifecycle.
+/// 对 <see cref="SkillBox"/> 的单元测试，验证发现、加载、工具绑定以及激活生命周期。
+/// </summary>
 public class SkillBoxTests
 {
+    /// <summary>
+    /// Tests that <see cref="SkillBox.Discover"/> finds skills from repositories,
+    /// <see cref="SkillBox.Load"/> binds declared tools, and activation toggles respect IsActiveByDefault.
+    /// 测试 <see cref="SkillBox.Discover"/> 从仓库发现技能、
+    /// <see cref="SkillBox.Load"/> 绑定声明的工具，以及激活开关是否遵循 IsActiveByDefault。
+    /// </summary>
     [Fact]
     public void Discover_And_Load_BindsToolsAndRespectsDefaultActiveState()
     {
@@ -63,6 +73,10 @@ Use this skill for simple operational assistance.
         }
     }
 
+    /// <summary>
+    /// Tests that <see cref="SkillBox.LoadAll"/> loads every registered skill and deduplicates tools across active skills.
+    /// 测试 <see cref="SkillBox.LoadAll"/> 是否加载所有注册的技能，并对多个活跃技能中的工具进行去重。
+    /// </summary>
     [Fact]
     public void LoadAll_LoadsEveryRegisteredSkill_AndDeduplicatesActiveTools()
     {

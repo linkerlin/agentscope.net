@@ -26,8 +26,17 @@ using DotNetEnv;
 
 namespace QuickStart;
 
+/// <summary>
+/// QuickStart 示例程序 - 展示 AgentScope.NET Core 的基本用法
+/// QuickStart example - demonstrates basic usage of AgentScope.NET Core
+/// </summary>
 class Program
 {
+    /// <summary>
+    /// 应用程序入口点 - 演示 Agent 创建、模型配置和对话循环
+    /// Application entry point - demonstrates agent creation, model configuration and chat loop
+    /// </summary>
+    /// <param name="args">命令行参数 / Command-line arguments</param>
     static async Task Main(string[] args)
     {
         Console.WriteLine($"{CoreVersion.GetFullVersion()}\n");
@@ -48,6 +57,13 @@ class Program
         var openaiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         var openaiBaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
         var openaiModel = Environment.GetEnvironmentVariable("OPENAI_MODEL");
+
+        Console.WriteLine($" setting : {deepseekApiKey}\n {deepseekModel}\n {openaiApiKey} \n{openaiBaseUrl} \n{openaiModel}\n");
+        deepseekApiKey = "";
+        deepseekModel = "DeepSeek-V4-Flash";
+        openaiApiKey = "sk-589f861fa3994720b704412064899256X";   
+        openaiBaseUrl = "http://10.193.41.51:8198/v1";
+        openaiModel = "DeepSeek-V4-Flash";
 
         if (!string.IsNullOrEmpty(deepseekApiKey) && !string.IsNullOrEmpty(deepseekModel))
         {
@@ -79,7 +95,7 @@ class Program
         var memory = new SqliteMemory("example.db");
 
         // 创建 ReActAgent
-        var agent = ReActAgent.Builder()
+        var agent = EnhancedReActAgent.Builder()
             .Name("Assistant")
             .SysPrompt("You are a helpful AI assistant.")
             .Model(model)

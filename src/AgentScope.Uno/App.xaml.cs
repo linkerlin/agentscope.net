@@ -24,8 +24,16 @@ namespace AgentScope.Uno;
 /// </summary>
 public partial class App : Application
 {
+    /// <summary>
+    /// 主窗口引用
+    /// Main window reference
+    /// </summary>
     private Window? _window;
 
+    /// <summary>
+    /// 初始化 App 组件并加载配置
+    /// Initializes App components and loads configuration
+    /// </summary>
     public App()
     {
         this.InitializeComponent();
@@ -34,6 +42,11 @@ public partial class App : Application
         ConfigurationManager.Load();
     }
 
+    /// <summary>
+    /// 在应用程序启动时调用 - 创建并激活主窗口
+    /// Called when the application is launched - creates and activates the main window
+    /// </summary>
+    /// <param name="args">启动事件参数 / Launch activated event arguments</param>
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         _window = new MainWindow();

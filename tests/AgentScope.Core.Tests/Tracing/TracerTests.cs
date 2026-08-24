@@ -6,9 +6,17 @@ using Xunit;
 
 namespace AgentScope.Core.Tests.Tracing;
 
+/// <summary>
+/// Tests for Tracer and TracerProvider
+/// Tracer 和 TracerProvider 的测试
+/// </summary>
 public class TracerTests
 {
     [Fact]
+    /// <summary>
+    /// Tracer constructor sets the tracer name
+    /// 测试 Tracer 构造器设置跟踪器名称
+    /// </summary>
     public void Constructor_WithName_SetsName()
     {
         // Arrange & Act
@@ -19,6 +27,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer.StartSpan creates a span with the given name
+    /// 测试 Tracer.StartSpan 创建具有指定名称的 span
+    /// </summary>
     public void StartSpan_WithName_CreatesSpan()
     {
         // Arrange
@@ -36,6 +48,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer.StartSpan sets the span kind
+    /// 测试 Tracer.StartSpan 设置 span 的 kind 属性
+    /// </summary>
     public void StartSpan_WithKind_SetsKind()
     {
         // Arrange
@@ -49,6 +65,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer.StartSpan with a parent span creates a child span sharing the trace ID
+    /// 测试 Tracer.StartSpan 使用父 span 创建共享 trace ID 的子 span
+    /// </summary>
     public void StartSpan_WithParent_CreatesChildSpan()
     {
         // Arrange
@@ -64,6 +84,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer.StartSpan with explicit trace ID and parent span ID sets the IDs
+    /// 测试 Tracer.StartSpan 使用显式 trace ID 和父 span ID 设置标识符
+    /// </summary>
     public void StartSpan_WithExplicitIds_SetsIds()
     {
         // Arrange
@@ -80,6 +104,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer.StartSpan with attributes sets them on the created span
+    /// 测试 Tracer.StartSpan 在创建 span 时设置属性
+    /// </summary>
     public void StartSpan_WithAttributes_SetsAttributes()
     {
         // Arrange
@@ -99,6 +127,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer.CurrentSpan returns null when there is no active span
+    /// 测试 Tracer.CurrentSpan 在没有活动 span 时返回 null
+    /// </summary>
     public void CurrentSpan_NoActiveSpan_ReturnsNull()
     {
         // Arrange
@@ -112,6 +144,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer.CreateContext generates a valid trace context
+    /// 测试 Tracer.CreateContext 生成有效的跟踪上下文
+    /// </summary>
     public void CreateContext_GeneratesValidContext()
     {
         // Arrange
@@ -128,6 +164,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Tracer.SpanBuilder builds a span with configured options
+    /// 测试 Tracer.SpanBuilder 构建具有配置选项的 span
+    /// </summary>
     public void SpanBuilder_BuildsSpan()
     {
         // Arrange
@@ -146,6 +186,10 @@ public class TracerTests
     }
 
     [Fact]
+    /// <summary>
+    /// TracerProvider.Initialize sets the global tracer instance
+    /// 测试 TracerProvider.Initialize 设置全局跟踪器实例
+    /// </summary>
     public void TracerProvider_Initialize_SetsGlobalTracer()
     {
         // Arrange

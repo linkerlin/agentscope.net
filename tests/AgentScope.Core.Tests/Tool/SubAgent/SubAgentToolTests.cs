@@ -1,6 +1,7 @@
 // Copyright 2024-2026 the original author or authors.
 // Licensed under the Apache License, Version 2.0
 
+using System.Collections.Generic;
 using AgentScope.Core.Agent;
 using AgentScope.Core.Message;
 using AgentScope.Core.Tool.SubAgent;
@@ -9,9 +10,17 @@ using SessionStore = AgentScope.Core.Session.Session;
 
 namespace AgentScope.Core.Tests.Tool.SubAgent;
 
+/// <summary>
+/// Tests for SubAgentTool
+/// SubAgentTool 的测试
+/// </summary>
 public class SubAgentToolTests
 {
     [Fact]
+    /// <summary>
+    /// ExecuteAsync returns fail when message parameter is missing
+    /// 测试 ExecuteAsync 在缺少 message 参数时返回失败
+    /// </summary>
     public async Task ExecuteAsync_MissingMessage_ReturnsFail()
     {
         var session = new SessionStore();
@@ -24,6 +33,10 @@ public class SubAgentToolTests
     }
 
     [Fact]
+    /// <summary>
+    /// ExecuteAsync creates a new session and returns session ID with response
+    /// 测试 ExecuteAsync 创建新会话并返回 session ID 和响应
+    /// </summary>
     public async Task ExecuteAsync_NewSession_ReturnsSessionIdAndResponse()
     {
         var session = new SessionStore();
@@ -41,6 +54,10 @@ public class SubAgentToolTests
     }
 
     [Fact]
+    /// <summary>
+    /// ExecuteAsync continues conversation when same session ID is provided
+    /// 测试 ExecuteAsync 在提供相同 session ID 时继续对话
+    /// </summary>
     public async Task ExecuteAsync_SameSessionId_ContinuesConversation()
     {
         var session = new SessionStore();
@@ -56,19 +73,28 @@ public class SubAgentToolTests
         Assert.Equal(sid, (r2.Result as Dictionary<string, object>)?["session_id"]?.ToString());
     }
 
+    /// <summary>
+    /// Echo agent provider for testing - returns an EchoAgent instance
+    /// 用于测试的 Echo agent 提供者 - 返回 EchoAgent 实例
+    /// </summary>
     private sealed class EchoAgentProvider : ISubAgentProvider
     {
         public IAgent Provide() => new EchoAgent();
     }
 
+    /// <summary>
+    /// Echo agent for testing - echoes back the input message content
+    /// 用于测试的 Echo agent - 将输入消息内容原样返回
+    /// </summary>
     private sealed class EchoAgent : AgentBase
     {
         public EchoAgent() : base("Echo") { }
-        public override IObservable<Msg> Call(Msg message)
+        protected override Task<Msg> DoCallAsync(IReadOnlyList<Msg> messages)
         {
-            var text = message.GetTextContent() ?? "";
+            var last = messages[^1];
+            var text = last.GetTextContent() ?? "";
             var reply = Msg.Builder().Name("Echo").TextContent(text).Role("assistant").Build();
-            return System.Reactive.Linq.Observable.Return(reply);
+            return Task.FromResult(reply);
         }
     }
 }
